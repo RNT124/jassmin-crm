@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jassmin — CRM</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --pink:#D4537E;--pink-light:#FBEAF0;--pink-mid:#F4C0D1;--pink-dark:#72243E;
+  --teal:#1D9E75;--teal-light:#E1F5EE;--teal-dark:#085041;
+  --amber:#BA7517;--amber-light:#FAEEDA;--amber-dark:#633806;
+  --purple:#534AB7;--purple-light:#EEEDFE;--purple-dark:#3C3489;
+  --blue:#185FA5;--blue-light:#E6F1FB;--blue-dark:#0C447C;
+  --coral:#993C1D;--coral-light:#FAECE7;
+  --gray:#5F5E5A;--gray-light:#F1EFE8;--gray-mid:#D3D1C7;
+  --red:#A32D2D;--red-light:#FCEBEB;
+  --green:#3B6D11;--green-light:#EAF3DE;
+  --bg:#FAFAF8;--surface:#FFFFFF;--border:#E8E6E0;--border2:#D3D1C7;
+  --text:#1A1A18;--text2:#5F5E5A;--text3:#9C9A92;
+  --radius:10px;--radius-sm:6px;--radius-lg:14px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh}
+
+/* LAYOUT */
+.app{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--surface);border-right:0.5px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:52px;background:var(--surface);border-bottom:0.5px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+.content{flex:1;padding:20px;overflow-y:auto}
+.page{display:none}
+.page.active{display:block}
+
+/* SIDEBAR */
+.sb-brand{padding:16px 16px 12px;border-bottom:0.5px solid var(--border)}
+.sb-brand-name{font-size:17px;font-weight:600;letter-spacing:.14em;color:var(--text)}
+.sb-brand-sub{font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
+.sb-section{padding:12px 10px 4px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:var(--radius-sm);margin:1px 6px;cursor:pointer;color:var(--text2);font-size:12.5px;transition:background .15s}
+.sb-item:hover{background:var(--gray-light)}
+.sb-item.active{background:var(--pink-light);color:var(--pink-dark);font-weight:500}
+.sb-item svg{width:16px;height:16px;flex-shrink:0}
+.sb-bottom{margin-top:auto;padding:12px;border-top:0.5px solid var(--border)}
+.sb-user{display:flex;align-items:center;gap:9px}
+.sb-avatar{width:30px;height:30px;border-radius:50%;background:var(--pink-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--pink-dark);flex-shrink:0}
+.sb-user-name{font-size:12px;font-weight:500;color:var(--text)}
+.sb-user-role{font-size:10px;color:var(--text3)}
+.sb-logout{margin-left:auto;cursor:pointer;color:var(--text3);padding:4px}
+.sb-logout:hover{color:var(--red)}
+
+/* TOPBAR */
+.tb-title{font-size:14px;font-weight:500;color:var(--text);flex:1}
+.tb-badge{font-size:10px;padding:2px 8px;border-radius:20px}
+
+/* CARDS */
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px}
+.card-sm{padding:12px 14px}
+.card-title{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+
+/* METRICS */
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.metric{background:var(--gray-light);border-radius:var(--radius);padding:14px}
+.metric-val{font-size:24px;font-weight:600;color:var(--text);line-height:1}
+.metric-lbl{font-size:11px;color:var(--text2);margin-top:4px}
+.metric-delta{font-size:11px;margin-top:3px}
+.delta-up{color:var(--green)}
+.delta-dn{color:var(--red)}
+
+/* ALERTS */
+.alert-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--surface);cursor:pointer;margin-bottom:6px;transition:background .15s}
+.alert-item:hover{background:var(--gray-light)}
+.alert-text{flex:1;font-size:12.5px;color:var(--text)}
+.alert-sub{font-size:11px;color:var(--text2)}
+
+/* KANBAN */
+.kanban-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.kcol{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:12px}
+.kcol-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px}
+.kcol-num{font-size:26px;font-weight:600;color:var(--text)}
+.kcol-lbl{font-size:10px;color:var(--text3);margin-top:2px}
+
+/* CHART */
+.bars{display:flex;align-items:flex-end;gap:6px;height:70px;margin-top:8px}
+.bar-col{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1}
+.bar{width:100%;border-radius:3px 3px 0 0}
+.bar-lbl{font-size:9px;color:var(--text3)}
+
+/* BADGES */
+.badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;display:inline-block}
+.badge-warn{background:var(--amber-light);color:var(--amber-dark)}
+.badge-ok{background:var(--green-light);color:var(--green)}
+.badge-info{background:var(--blue-light);color:var(--blue-dark)}
+.badge-pink{background:var(--pink-light);color:var(--pink-dark)}
+.badge-gray{background:var(--gray-light);color:var(--gray)}
+.badge-danger{background:var(--red-light);color:var(--red)}
+
+/* TABLES */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding:8px 12px;border-bottom:0.5px solid var(--border)}
+.tbl td{padding:10px 12px;border-bottom:0.5px solid var(--border);font-size:12.5px;color:var(--text)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--gray-light)}
+.tbl-wrap{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+
+/* FORMS */
+.form-row{margin-bottom:12px}
+.form-label{font-size:11px;font-weight:500;color:var(--text2);margin-bottom:4px;display:block}
+input,select,textarea{width:100%;padding:8px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);font-size:13px;color:var(--text);background:var(--surface);outline:none;transition:border .15s;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--pink)}
+textarea{resize:vertical;min-height:72px}
+
+/* BUTTONS */
+.btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--gray-light)}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--pink);color:#fff;border-color:var(--pink)}
+.btn-primary:hover{background:var(--pink-dark);border-color:var(--pink-dark)}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-xs{padding:3px 9px;font-size:11px}
+.btn-danger{background:var(--red-light);color:var(--red);border-color:transparent}
+.btn-success{background:var(--green-light);color:var(--green);border-color:transparent}
+
+/* PROFILE CARD */
+.profile-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.avatar-lg{width:44px;height:44px;border-radius:50%;background:var(--pink-light);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:var(--pink-dark);flex-shrink:0}
+.avatar-md{width:34px;height:34px;border-radius:50%;background:var(--pink-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--pink-dark);flex-shrink:0}
+
+/* LIVE REGISTRO */
+.live-panel{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cart-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:12.5px}
+.cart-item:last-child{border-bottom:none}
+.cart-total{display:flex;justify-content:space-between;padding-top:10px;margin-top:6px;border-top:0.5px solid var(--border2);font-weight:600;font-size:14px}
+
+/* SEGUIMIENTO TIMELINE */
+.tl-item{display:flex;gap:12px;padding-bottom:16px}
+.tl-item:last-child{padding-bottom:0}
+.tl-left{display:flex;flex-direction:column;align-items:center;width:20px}
+.tl-dot{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tl-line{width:1px;flex:1;min-height:12px;margin-top:3px}
+.tl-body{flex:1;padding-top:1px}
+.tl-step{font-size:12.5px;font-weight:500}
+.tl-date{font-size:11px;color:var(--text3);margin-top:2px}
+.tl-note{font-size:11px;margin-top:4px;padding:5px 9px;border-radius:var(--radius-sm);background:var(--gray-light);color:var(--text2)}
+
+/* PEDIDO STATUS BANNER */
+.status-banner{border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:14px}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius-lg);padding:20px;width:100%;max-width:440px;margin:16px}
+.modal-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:0.5px solid var(--border)}
+
+/* SEARCH */
+.search-wrap{position:relative;margin-bottom:12px}
+.search-wrap input{padding-left:32px}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);width:15px;height:15px}
+
+/* SECTION HEADER */
+.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sec-title{font-size:16px;font-weight:600;color:var(--text)}
+
+/* TABS */
+.tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:0.5px solid var(--border);padding-bottom:0}
+.tab{padding:7px 14px;font-size:12.5px;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-0.5px}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--pink);border-bottom-color:var(--pink);font-weight:500}
+
+/* TOP PRENDAS */
+.tp-bar-wrap{width:60px;height:5px;background:var(--border);border-radius:3px;display:inline-block}
+.tp-bar{height:5px;border-radius:3px;background:var(--pink)}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.login-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:32px;width:100%;max-width:360px}
+.login-brand{text-align:center;margin-bottom:24px}
+.login-brand-name{font-size:24px;font-weight:700;letter-spacing:.16em;color:var(--text)}
+.login-brand-sub{font-size:11px;color:var(--text3);margin-top:3px}
+.login-error{background:var(--red-light);color:var(--red);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;margin-bottom:12px;display:none}
+
+/* TRACKING PAGE */
+.trk-wrap{min-height:100vh;background:var(--bg);padding:16px}
+.trk-card{max-width:420px;margin:0 auto;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.trk-header{padding:16px;border-bottom:0.5px solid var(--border);text-align:center}
+
+/* UTILS */
+.flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-8{gap:8px}.gap-12{gap:12px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mt-8{margin-top:8px}.mt-12{margin-top:12px}.mt-16{margin-top:16px}
+.mb-8{margin-bottom:8px}.mb-12{margin-bottom:12px}.mb-16{margin-bottom:16px}
+.text-sm{font-size:11.5px}.text-xs{font-size:10px}.text-muted{color:var(--text2)}.text-hint{color:var(--text3)}
+.font-500{font-weight:500}.font-600{font-weight:600}
+.w-full{width:100%}
+.divider{border:none;border-top:0.5px solid var(--border);margin:12px 0}
+.pill-row{display:flex;flex-wrap:wrap;gap:5px}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ LOGIN ═══ -->
+<div id="login-page" class="login-wrap">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-brand-name">JASSMIN</div>
+      <div class="login-brand-sub">Sistema de gestión</div>
+    </div>
+    <div id="login-error" class="login-error">Usuario o contraseña incorrectos</div>
+    <div class="form-row">
+      <label class="form-label">Usuario</label>
+      <input type="text" id="inp-user" placeholder="admin / operador" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Contraseña</label>
+      <input type="password" id="inp-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn btn-primary w-full mt-8" onclick="doLogin()" style="justify-content:center">Ingresar</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ FORM ENVIO PUBLIC ═══ -->
+<div id="form-envio-page" style="display:none">
+  <div class="trk-wrap">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--text)">JASSMIN</div>
+      <div style="font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-top:2px">Confirma tu pedido</div>
+    </div>
+    <div style="max-width:420px;margin:0 auto">
+
+      <!-- resumen pedido -->
+      <div class="card mb-12" id="fe-resumen"></div>
+
+      <!-- formulario -->
+      <div class="card" id="fe-form-card">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Completa tus datos de envío</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Solo necesitas hacerlo una vez. Los guardaremos para tu próximo pedido.</div>
+
+        <div class="form-row">
+          <label class="form-label">Tu nombre completo</label>
+          <input type="text" id="fe-nombre" placeholder="Nombre y apellido">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Distrito</label>
+          <select id="fe-distrito-sel" onchange="feUpdateCosto()">
+            <option value="">— seleccionar distrito —</option>
+            <optgroup label="Lima Centro">
+              <option value="Miraflores|13">Miraflores</option>
+              <option value="San Isidro|13">San Isidro</option>
+              <option value="Barranco|13">Barranco</option>
+              <option value="Surquillo|13">Surquillo</option>
+              <option value="Lince|13">Lince</option>
+            </optgroup>
+            <optgroup label="Lima Norte / Este / Sur">
+              <option value="Surco|14">Santiago de Surco</option>
+              <option value="La Molina|14">La Molina</option>
+              <option value="San Borja|14">San Borja</option>
+              <option value="Jesus Maria|13">Jesús María</option>
+              <option value="Pueblo Libre|13">Pueblo Libre</option>
+              <option value="San Miguel|13">San Miguel</option>
+              <option value="Magdalena|13">Magdalena</option>
+              <option value="Chorrillos|14">Chorrillos</option>
+              <option value="Villa Maria|15">Villa María del Triunfo</option>
+              <option value="Ate|15">Ate</option>
+              <option value="San Juan Lurigancho|15">San Juan de Lurigancho</option>
+              <option value="Comas|15">Comas</option>
+              <option value="Los Olivos|15">Los Olivos</option>
+              <option value="Independencia|15">Independencia</option>
+              <option value="Otro Lima|15">Otro distrito Lima</option>
+            </optgroup>
+            <optgroup label="Provincias">
+              <option value="Provincias|20">Provincias (Shalom)</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Dirección</label>
+          <input type="text" id="fe-direccion" placeholder="Calle, número de casa o dpto.">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Referencia <span class="text-hint">(opcional)</span></label>
+          <input type="text" id="fe-referencia" placeholder="ej. frente al parque, edificio azul...">
+        </div>
+
+        <!-- resumen costo -->
+        <div id="fe-costo-box" style="display:none;background:var(--gray-light);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:3px">
+            <span>Subtotal prendas</span><span id="fe-sub">S/ 0</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:6px">
+            <span>Envío</span><span id="fe-env-costo">S/ —</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-weight:600;font-size:14px">
+            <span>Total</span><span id="fe-total-final">S/ 0</span>
+          </div>
+        </div>
+
+        <div id="fe-error" style="display:none;background:var(--red-light);color:var(--red);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;margin-bottom:10px"></div>
+
+        <button class="btn btn-primary w-full" style="justify-content:center" onclick="feConfirmar()">
+          Confirmar datos y ver mi pedido →
+        </button>
+      </div>
+
+      <!-- ya confirmado (clienta recurrente) -->
+      <div id="fe-ya-confirmado" style="display:none" class="card">
+        <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:6px">✓ Dirección guardada</div>
+        <div style="font-size:12px;color:var(--text2)" id="fe-dir-guardada"></div>
+        <button class="btn btn-primary w-full mt-12" style="justify-content:center" onclick="feIrASeguimiento()">Ver seguimiento de mi pedido →</button>
+        <button class="btn btn-sm w-full mt-8" style="justify-content:center;color:var(--text2)" onclick="feCambiarDireccion()">Cambiar dirección</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ REGISTRO PÚBLICO ═══ -->
+<div id="registro-page" style="display:none">
+  <div class="trk-wrap">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--text)">JASSMIN</div>
+      <div style="font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-top:2px">Registra tus datos de envío</div>
+    </div>
+    <div style="max-width:400px;margin:0 auto">
+      <div id="rg-form-wrap">
+        <div style="background:var(--pink-light);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--pink-dark);text-align:center">
+          Llena tus datos una sola vez y úsalos en todos tus pedidos 🌸
+        </div>
+        <div class="card">
+          <div class="form-row">
+            <label class="form-label">Tu nombre completo</label>
+            <input type="text" id="rg-nombre" placeholder="Nombre y apellido">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Tu número WhatsApp</label>
+            <input type="tel" id="rg-tel" placeholder="987 654 321" maxlength="12">
+            <div style="font-size:11px;color:var(--text3);margin-top:3px">Con este número te identificamos en cada pedido</div>
+          </div>
+          <div class="form-row">
+            <label class="form-label">Distrito</label>
+            <select id="rg-distrito">
+              <option value="">— seleccionar distrito —</option>
+              <optgroup label="Lima Centro">
+                <option value="Miraflores|13">Miraflores</option>
+                <option value="San Isidro|13">San Isidro</option>
+                <option value="Barranco|13">Barranco</option>
+                <option value="Surquillo|13">Surquillo</option>
+                <option value="Lince|13">Lince</option>
+                <option value="Jesus Maria|13">Jesús María</option>
+                <option value="Pueblo Libre|13">Pueblo Libre</option>
+                <option value="San Miguel|13">San Miguel</option>
+                <option value="Magdalena|13">Magdalena</option>
+              </optgroup>
+              <optgroup label="Lima Norte / Este / Sur">
+                <option value="Surco|14">Santiago de Surco</option>
+                <option value="La Molina|14">La Molina</option>
+                <option value="San Borja|14">San Borja</option>
+                <option value="Chorrillos|14">Chorrillos</option>
+                <option value="Villa Maria|15">Villa María del Triunfo</option>
+                <option value="Ate|15">Ate</option>
+                <option value="San Juan Lurigancho|15">San Juan de Lurigancho</option>
+                <option value="Comas|15">Comas</option>
+                <option value="Los Olivos|15">Los Olivos</option>
+                <option value="Independencia|15">Independencia</option>
+                <option value="Villa El Salvador|15">Villa El Salvador</option>
+                <option value="San Martin de Porres|15">San Martín de Porres</option>
+                <option value="Otro Lima|15">Otro distrito Lima</option>
+              </optgroup>
+              <optgroup label="Provincias">
+                <option value="Provincias|20">Provincias (Shalom)</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="form-row">
+            <label class="form-label">Dirección</label>
+            <input type="text" id="rg-direccion" placeholder="Calle, número, dpto.">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Referencia <span class="text-hint">(opcional)</span></label>
+            <input type="text" id="rg-referencia" placeholder="ej. frente al parque, portón azul...">
+          </div>
+          <div id="rg-error" style="display:none;background:var(--red-light);color:var(--red);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;margin-bottom:10px"></div>
+          <button class="btn btn-primary w-full" style="justify-content:center" onclick="rgGuardar()">Guardar mis datos →</button>
+        </div>
+      </div>
+      <div id="rg-confirm-wrap" style="display:none">
+        <div class="card" style="text-align:center">
+          <div style="width:52px;height:52px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px">✓</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">¡Datos guardados!</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Ya puedes comprar en nuestros lives sin preocuparte por llenar tu dirección cada vez.</div>
+          <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;text-align:left;margin-bottom:14px">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:6px">TUS DATOS GUARDADOS</div>
+            <div id="rg-confirm-detalle" style="font-size:12.5px;color:var(--text);line-height:1.8"></div>
+          </div>
+          <button class="btn w-full" style="justify-content:center;font-size:12px" onclick="rgEditar()">Actualizar mis datos</button>
+        </div>
+        <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--text3)">
+          ¿Preguntas? Escríbenos al <strong style="color:var(--text)">921 328 731</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ APP ═══ -->
+<div id="app-page" class="app" style="display:none">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-name">JASSMIN</div>
+      <div class="sb-brand-sub">gestión de tienda</div>
+    </div>
+
+    <div class="sb-section">Principal</div>
+    <div class="sb-item active" onclick="nav('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      Dashboard
+    </div>
+    <div class="sb-item" onclick="nav('live',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+      Registro — live
+    </div>
+
+    <div class="sb-section">Operación</div>
+    <div class="sb-item" onclick="nav('pedidos',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7l-8-4-8 4v10l8 4 8-4V7z"/><path d="M12 3v18M4 7l8 4 8-4"/></svg>
+      Pedidos
+    </div>
+    <div class="sb-item" onclick="nav('clientes',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a7 7 0 0 1 12-4.9M16 11a4 4 0 1 1 5 5.9M21 21l-4.35-4.35"/></svg>
+      Clientas
+    </div>
+    <div class="sb-item" id="sb-catalogo" onclick="nav('catalogo',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/></svg>
+      Catálogo
+    </div>
+
+    <div class="sb-bottom">
+      <div class="sb-user">
+        <div class="sb-avatar" id="sb-avatar">R</div>
+        <div>
+          <div class="sb-user-name" id="sb-uname">Renato</div>
+          <div class="sb-user-role" id="sb-urole">Admin</div>
+        </div>
+        <div class="sb-logout" onclick="doLogout()" title="Salir">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <span class="tb-title" id="tb-title">Dashboard</span>
+      <span id="tb-live-badge" class="badge badge-danger" style="display:none">● En vivo</span>
+    </div>
+    <div class="content">
+
+      <!-- ── DASHBOARD ── -->
+      <div id="pg-dashboard" class="page active">
+        <div class="metrics-grid">
+          <div class="metric">
+            <div class="metric-val">S/ 347</div>
+            <div class="metric-lbl">Vendido hoy</div>
+            <div class="metric-delta delta-up">↑ 18% vs semana pasada</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">8</div>
+            <div class="metric-lbl">Pedidos activos</div>
+            <div class="metric-delta text-hint">3 nuevos hoy</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">S/ 214</div>
+            <div class="metric-lbl">Pagos recibidos hoy</div>
+            <div class="metric-delta delta-up">2 confirmados</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">23</div>
+            <div class="metric-lbl">Clientas totales</div>
+            <div class="metric-delta delta-up">↑ 2 nuevas esta semana</div>
+          </div>
+        </div>
+
+        <div class="grid-2 mb-16">
+          <div>
+            <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Alertas</div>
+            <div class="alert-item" onclick="nav('pedidos',document.querySelector('[onclick*=pedidos]'))">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M20 7l-8-4-8 4v10l8 4 8-4V7z"/></svg>
+              <div style="flex:1"><div class="alert-text">3 pedidos para empaquetar</div><div class="alert-sub">Pago confirmado — sin preparar</div></div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+            <div class="alert-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+              <div style="flex:1"><div class="alert-text">2 carritos +7 días sin cerrar</div><div class="alert-sub">Clientas con prendas acumuladas</div></div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+            <div class="alert-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <div style="flex:1"><div class="alert-text">1 pago parcial +5 días</div><div class="alert-sub">JAS-0038 · Lucia M. · falta S/ 64</div></div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+
+          <div>
+            <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Pedidos en curso</div>
+            <div class="kanban-grid" style="grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div class="kcol"><div class="kcol-title">Por pagar</div><div class="kcol-num">4</div><div class="kcol-lbl">pendiente / parcial</div></div>
+              <div class="kcol"><div class="kcol-title">Preparando</div><div class="kcol-num">3</div><div class="kcol-lbl">empaquetando</div></div>
+              <div class="kcol"><div class="kcol-title">En camino</div><div class="kcol-num">1</div><div class="kcol-lbl">con courier</div></div>
+            </div>
+
+            <div class="card card-sm mt-8">
+              <div class="card-title">Ventas esta semana</div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+                <span class="text-muted text-sm">Total</span>
+                <span class="font-600" style="font-size:15px">S/ 892</span>
+              </div>
+              <div class="bars" id="db-bars"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec-header">
+          <div class="sec-title" style="font-size:13px">Prendas más vendidas — este mes</div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>#</th><th>Prenda</th><th>Unidades</th><th>Ingresos</th></tr></thead>
+            <tbody>
+              <tr><td class="text-hint">1</td><td>Vestido lino manga larga</td><td>12</td><td>S/ 1,068</td></tr>
+              <tr><td class="text-hint">2</td><td>Conjunto jogger rosa</td><td>9</td><td>S/ 882</td></tr>
+              <tr><td class="text-hint">3</td><td>Blusa flores bordadas</td><td>7</td><td>S/ 385</td></tr>
+              <tr><td class="text-hint">4</td><td>Pantalon palazzo beige</td><td>5</td><td>S/ 375</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── LIVE ── -->
+      <div id="pg-live" class="page">
+        <div class="live-panel">
+          <!-- LEFT: buscar clienta -->
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="card">
+              <div class="card-title">1. Buscar clienta</div>
+              <div class="search-wrap" style="margin-bottom:8px">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input type="text" id="live-search" placeholder="Número WhatsApp..." oninput="liveSearch(this.value)" autocomplete="off">
+              </div>
+              <div id="live-search-results"></div>
+            </div>
+
+            <div class="card" id="live-client-card" style="display:none">
+              <div class="card-title">2. Perfil</div>
+              <div class="profile-header">
+                <div class="avatar-lg" id="lc-av">KF</div>
+                <div>
+                  <div class="font-500" style="font-size:14px" id="lc-name">Karina Flores</div>
+                  <div class="text-muted text-sm" id="lc-tel">987 654 321</div>
+                  <span class="badge mt-8" id="lc-badge">recurrente</span>
+                </div>
+              </div>
+              <div class="grid-2 mb-8">
+                <div><div class="text-xs text-hint">Total gastado</div><div class="font-600" id="lc-total">S/ 247</div></div>
+                <div><div class="text-xs text-hint">Pedidos</div><div class="font-600" id="lc-pedidos">4</div></div>
+              </div>
+              <div class="card-title">Últimas compras</div>
+              <div id="lc-history"></div>
+            </div>
+          </div>
+
+          <!-- RIGHT: carrito -->
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="card" id="live-cart-card" style="display:none">
+              <div class="card-title">3. Agregar prenda</div>
+              <div class="form-row">
+                <label class="form-label">Prenda</label>
+                <select id="lv-prenda">
+                  <option value="">— seleccionar —</option>
+                </select>
+              </div>
+              <div class="grid-2">
+                <div class="form-row">
+                  <label class="form-label">Talla</label>
+                  <select id="lv-talla">
+                    <option value="">— talla —</option>
+                    <option>S</option><option>M</option><option>L</option><option>XL</option>
+                  </select>
+                </div>
+                <div class="form-row" style="display:flex;align-items:flex-end">
+                  <button class="btn btn-primary w-full" onclick="addToCart()">+ Agregar</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" id="live-resumen-card" style="display:none">
+              <div class="card-title">Carrito abierto</div>
+              <div id="live-cart-items"><div class="text-hint text-sm">Sin prendas aún</div></div>
+              <div class="cart-total mt-8">
+                <span>Total acumulado</span>
+                <span id="live-cart-total">S/ 0</span>
+              </div>
+              <hr class="divider">
+              <button class="btn btn-success w-full" style="justify-content:center" onclick="openEnvioModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                Generar pedido de envío
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PEDIDOS ── -->
+      <div id="pg-pedidos" class="page">
+        <div class="sec-header">
+          <div class="sec-title">Pedidos</div>
+          <div class="tabs" style="margin:0;border:none">
+            <div class="tab active" onclick="filterPedidos('todos',this)">Todos</div>
+            <div class="tab" onclick="filterPedidos('por_pagar',this)">Por pagar</div>
+            <div class="tab" onclick="filterPedidos('pago_completo',this)">Empaquetar</div>
+            <div class="tab" onclick="filterPedidos('en_camino',this)">En camino</div>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Pedido</th><th>Clienta</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Courier</th><th>Acciones</th></tr></thead>
+            <tbody id="pedidos-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── CLIENTES ── -->
+      <div id="pg-clientes" class="page">
+        <div class="sec-header">
+          <div class="sec-title">Clientas</div>
+          <button class="btn btn-sm" onclick="openModalNuevaCliente()">+ Nueva clienta</button>
+        </div>
+        <div class="search-wrap mb-12">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" placeholder="Buscar por nombre o teléfono..." oninput="filterClientes(this.value)">
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Clienta</th><th>Teléfono WA</th><th>Talla</th><th>Pedidos</th><th>Total gastado</th><th>Última compra</th><th></th></tr></thead>
+            <tbody id="clientes-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── CATALOGO ── -->
+      <div id="pg-catalogo" class="page">
+        <div class="sec-header">
+          <div class="sec-title">Catálogo</div>
+          <button class="btn btn-primary btn-sm" onclick="openModalPrenda()">+ Agregar prenda</button>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Prenda</th><th>Código</th><th>Precio</th><th>Tallas</th><th>Categoría</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="catalogo-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TRACKING PUBLIC PAGE ═══ -->
+<div id="tracking-page" style="display:none">
+  <div class="trk-wrap">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--text)">JASSMIN</div>
+      <div style="font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-top:2px">Seguimiento de pedido</div>
+    </div>
+    <div class="trk-card">
+      <div style="padding:14px 16px;border-bottom:0.5px solid var(--border)">
+        <div style="font-size:11px;color:var(--text3)" id="trk-num">Pedido #JAS-2025-0041</div>
+        <div style="font-size:15px;font-weight:600;margin-top:2px" id="trk-name">Karina Flores</div>
+        <div style="display:flex;gap:12px;margin-top:8px;font-size:12px;color:var(--text2)" id="trk-meta"></div>
+      </div>
+      <div id="trk-banner" style="margin:12px 16px 0;border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:10px"></div>
+      <div style="padding:14px 16px">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:12px">Estado del pedido</div>
+        <div id="trk-timeline"></div>
+      </div>
+      <div style="padding:14px 16px;border-top:0.5px solid var(--border)">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Prendas</div>
+        <div id="trk-items"></div>
+      </div>
+      <div style="padding:12px 16px;text-align:center;font-size:12px;color:var(--text3);border-top:0.5px solid var(--border)">
+        Consultas al WhatsApp <strong style="color:var(--text)">921 328 731</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MODALS ═══════ -->
+
+<!-- Modal: generar pedido envío -->
+<div class="modal-overlay" id="modal-envio">
+  <div class="modal">
+    <div class="modal-title">Generar pedido de envío</div>
+    <div style="background:var(--blue-light);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--blue-dark);margin-bottom:14px">
+      La clienta completará su dirección y distrito desde el link de seguimiento.
+    </div>
+    <div class="form-row">
+      <label class="form-label">Tipo de envío estimado</label>
+      <select id="env-tipo" onchange="updateEnvCosto()">
+        <option value="motorizado_13">Motorizado Lima — S/ 13</option>
+        <option value="motorizado_14">Motorizado Lima (zona media) — S/ 14</option>
+        <option value="motorizado_15">Motorizado Lima (zona lejana) — S/ 15</option>
+        <option value="shalom">Shalom (provincias) — S/ 20</option>
+      </select>
+    </div>
+    <div class="card" style="background:var(--gray-light);border:none;padding:10px 14px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px">
+        <span>Subtotal prendas</span><span id="env-subtotal">S/ 0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:6px">
+        <span>Costo envío estimado</span><span id="env-costo">S/ 13</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-weight:600;font-size:14px">
+        <span>Total estimado</span><span id="env-total">S/ 0</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-envio')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmarPedido()">Generar link para clienta →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: ver pedido + confirmar pago -->
+<div class="modal-overlay" id="modal-pedido">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title" id="mp-title">Pedido #JAS-0041</div>
+    <div id="mp-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-pedido')">Cerrar</button>
+      <button class="btn btn-primary btn-sm" id="mp-action-btn" onclick="avanzarEstado()">Confirmar pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: nueva prenda -->
+<div class="modal-overlay" id="modal-prenda">
+  <div class="modal">
+    <div class="modal-title" id="modal-prenda-title">Nueva prenda</div>
+    <div class="grid-2">
+      <div class="form-row">
+        <label class="form-label">Nombre</label>
+        <input type="text" id="pr-nombre" placeholder="Vestido lino manga larga">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Código</label>
+        <input type="text" id="pr-codigo" placeholder="VES-001">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-row">
+        <label class="form-label">Precio venta (S/)</label>
+        <input type="number" id="pr-precio" placeholder="89">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Costo (S/) <span class="text-hint">(solo admin)</span></label>
+        <input type="number" id="pr-costo" placeholder="45" id="pr-costo-inp">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-row">
+        <label class="form-label">Categoría</label>
+        <select id="pr-cat">
+          <option>Vestido</option><option>Blusa</option><option>Pantalon</option><option>Conjunto</option><option>Top</option><option>Falda</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Tallas disponibles</label>
+        <div class="pill-row" style="gap:4px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px"><input type="checkbox" value="S" class="talla-chk" style="width:auto"> S</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px"><input type="checkbox" value="M" class="talla-chk" style="width:auto" checked> M</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px"><input type="checkbox" value="L" class="talla-chk" style="width:auto" checked> L</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:12px"><input type="checkbox" value="XL" class="talla-chk" style="width:auto"> XL</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-prenda')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="guardarPrenda()">Guardar prenda</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: nueva clienta -->
+<div class="modal-overlay" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-title">Nueva clienta</div>
+    <div class="grid-2">
+      <div class="form-row"><label class="form-label">Nombre</label><input type="text" id="nc-nombre" placeholder="Nombre completo"></div>
+      <div class="form-row"><label class="form-label">WhatsApp</label><input type="text" id="nc-tel" placeholder="987654321"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-row"><label class="form-label">Talla habitual</label><select id="nc-talla"><option value="">—</option><option>S</option><option>M</option><option>L</option><option>XL</option></select></div>
+      <div class="form-row"><label class="form-label">Distrito</label><input type="text" id="nc-distrito" placeholder="ej. San Isidro"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-cliente')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="guardarCliente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: link de seguimiento generado -->
+<div class="modal-overlay" id="modal-link">
+  <div class="modal" style="text-align:center">
+    <div style="font-size:32px;margin-bottom:8px">✓</div>
+    <div class="modal-title" style="text-align:center">Pedido creado</div>
+    <div class="text-muted text-sm mb-12">Comparte este link con la clienta por WhatsApp</div>
+    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:10px 14px;font-family:monospace;font-size:12px;color:var(--text);margin-bottom:12px;word-break:break-all" id="link-url"></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px" id="link-wa-msg"></div>
+    <hr class="divider">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Link fijo de registro para nuevas clientas</div>
+    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:8px 12px;font-family:monospace;font-size:11.5px;color:var(--text);margin-bottom:12px;word-break:break-all" id="link-registro"></div>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-sm" onclick="copyLink()">Copiar link pedido</button>
+      <button class="btn btn-sm" onclick="copyRegistroLink()">Copiar link registro</button>
+      <button class="btn btn-primary btn-sm" onclick="verTracking()">Ver seguimiento →</button>
+      <button class="btn btn-sm" onclick="closeModal('modal-link')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════ DATA ═══════════════════════════
+const USERS = {
+  admin: { pass:'jassmin2025', nombre:'Renato', rol:'Admin', initials:'R' },
+  operador: { pass:'tienda123', nombre:'Operador', rol:'Operador', initials:'O' }
+};
+
+let currentUser = null;
+let currentLiveClient = null;
+let liveCart = [];
+let currentPedidoIdx = null;
+let editingPrendaIdx = null;
+
+const DISTRITOS_COSTO = {
+  'motorizado_13': 13, 'motorizado_14': 14, 'motorizado_15': 15, 'shalom': 20
+};
+
+let DB = {
+  clientes: [
+    { id:'c1', telefono:'987654321', nombre:'Karina Flores', talla:'M', distrito:'San Isidro', direccion:'Av. Javier Prado 450', total:247, pedidos_count:4 },
+    { id:'c2', telefono:'912345678', nombre:'Lucia Mamani', talla:'S', distrito:'Surco', direccion:'', total:134, pedidos_count:2 },
+    { id:'c3', telefono:'998877665', nombre:'Paola Quispe', talla:'L', distrito:'Miraflores', direccion:'Calle Berlin 230', total:89, pedidos_count:1 },
+    { id:'c4', telefono:'976543210', nombre:'Maria Torres', talla:'M', distrito:'La Molina', direccion:'', total:0, pedidos_count:0 },
+  ],
+  prendas: [
+    { id:'p1', nombre:'Vestido lino manga larga', codigo:'VES-001', precio:89, costo:38, categoria:'Vestido', tallas:['S','M','L'], activo:true },
+    { id:'p2', nombre:'Blusa flores bordadas', codigo:'BLU-001', precio:55, costo:22, categoria:'Blusa', tallas:['S','M','L','XL'], activo:true },
+    { id:'p3', nombre:'Pantalon palazzo beige', codigo:'PAN-001', precio:75, costo:30, categoria:'Pantalon', tallas:['S','M','L'], activo:true },
+    { id:'p4', nombre:'Conjunto jogger rosa', codigo:'CON-001', precio:98, costo:42, categoria:'Conjunto', tallas:['M','L','XL'], activo:true },
+    { id:'p5', nombre:'Top encaje crema', codigo:'TOP-001', precio:45, costo:18, categoria:'Top', tallas:['S','M','L'], activo:true },
+  ],
+  pedidos: [
+    { id:'ped1', num:'JAS-2025-0038', cliente_id:'c2', items:[{nombre:'Blusa flores bordadas',talla:'S',precio:55},{nombre:'Vestido lino manga larga',talla:'S',precio:89}], subtotal:144, costo_envio:13, total:157, pagado:93, estado:'pago_parcial', tipo_envio:'motorizado_13', distrito:'Surco', direccion:'Los Cedros 123', courier_codigo:'', fecha:'2025-06-04' },
+    { id:'ped2', num:'JAS-2025-0039', cliente_id:'c3', items:[{nombre:'Conjunto jogger rosa',talla:'L',precio:98}], subtotal:98, costo_envio:14, total:112, pagado:112, estado:'pago_completo', tipo_envio:'motorizado_14', distrito:'Miraflores', direccion:'Calle Berlin 230', courier_codigo:'', fecha:'2025-06-05' },
+    { id:'ped3', num:'JAS-2025-0040', cliente_id:'c4', items:[{nombre:'Top encaje crema',talla:'M',precio:45},{nombre:'Pantalon palazzo beige',talla:'M',precio:75}], subtotal:120, costo_envio:13, total:133, pagado:133, estado:'empaquetado', tipo_envio:'motorizado_13', distrito:'La Molina', direccion:'Las Flores 89', courier_codigo:'', fecha:'2025-06-06' },
+    { id:'ped4', num:'JAS-2025-0041', cliente_id:'c1', items:[{nombre:'Vestido lino manga larga',talla:'M',precio:89},{nombre:'Blusa flores bordadas',talla:'S',precio:55}], subtotal:144, costo_envio:13, total:157, pagado:157, estado:'en_camino', tipo_envio:'motorizado_13', distrito:'San Isidro', direccion:'Av. Javier Prado 450', courier_codigo:'SHL-887234', fecha:'2025-06-07' },
+  ]
+};
+
+const ESTADOS_ORDEN = ['pago_pendiente','pago_parcial','pago_completo','empaquetado','en_camino','entregado'];
+const ESTADOS_LABEL = { pago_pendiente:'Pendiente pago', pago_parcial:'Pago parcial', pago_completo:'Pago completo', empaquetado:'Empaquetado', en_camino:'En camino', entregado:'Entregado' };
+const ESTADOS_BADGE = { pago_pendiente:'badge-danger', pago_parcial:'badge-warn', pago_completo:'badge-ok', empaquetado:'badge-info', en_camino:'badge-pink', entregado:'badge-gray' };
+const ESTADOS_ACTION = { pago_pendiente:'Confirmar pago', pago_parcial:'Confirmar pago restante', pago_completo:'Marcar empaquetado', empaquetado:'Registrar despacho', en_camino:'Confirmar entrega', entregado:null };
+const ESTADOS_NEXT = { pago_pendiente:'pago_completo', pago_parcial:'pago_completo', pago_completo:'empaquetado', empaquetado:'en_camino', en_camino:'entregado' };
+
+// ═══════════════════════════ AUTH ═══════════════════════════
+function doLogin(){
+  const u = document.getElementById('inp-user').value.trim().toLowerCase();
+  const p = document.getElementById('inp-pass').value;
+  const user = USERS[u];
+  if(!user || user.pass !== p){ document.getElementById('login-error').style.display='block'; return; }
+  currentUser = { ...user, key:u };
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app-page').style.display = 'flex';
+  document.getElementById('sb-avatar').textContent = user.initials;
+  document.getElementById('sb-uname').textContent = user.nombre;
+  document.getElementById('sb-urole').textContent = user.rol;
+  if(u==='operador'){ document.getElementById('sb-catalogo').style.display='none'; }
+  initApp();
+}
+function doLogout(){
+  currentUser = null;
+  document.getElementById('app-page').style.display='none';
+  document.getElementById('login-page').style.display='flex';
+  document.getElementById('inp-user').value='';
+  document.getElementById('inp-pass').value='';
+  document.getElementById('login-error').style.display='none';
+}
+
+// ═══════════════════════════ NAV ═══════════════════════════
+function nav(page, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  document.getElementById('pg-'+page).classList.add('active');
+  if(el) el.classList.add('active');
+  const titles = {dashboard:'Dashboard',live:'Registro — live',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo'};
+  document.getElementById('tb-title').textContent = titles[page]||page;
+  if(page==='pedidos') renderPedidos('todos');
+  if(page==='clientes') renderClientes();
+  if(page==='catalogo') renderCatalogo();
+}
+
+// ═══════════════════════════ INIT ═══════════════════════════
+function initApp(){
+  renderDashboardBars();
+  renderLiveCatalog();
+  renderPedidos('todos');
+  renderClientes();
+  renderCatalogo();
+}
+
+function renderDashboardBars(){
+  const data=[{d:'Lun',v:0},{d:'Mar',v:124},{d:'Mie',v:89},{d:'Jue',v:198},{d:'Vie',v:134},{d:'Sab',v:347},{d:'Dom',v:0}];
+  const mx=Math.max(...data.map(d=>d.v));
+  document.getElementById('db-bars').innerHTML=data.map((d,i)=>{
+    const h=mx>0?Math.round((d.v/mx)*62):4;
+    const active=i===5;
+    return `<div class="bar-col"><div class="bar" style="height:${Math.max(h,4)}px;background:${active?'var(--pink)':'var(--gray-mid)'}"></div><div class="bar-lbl">${d.d}</div></div>`;
+  }).join('');
+}
+
+// ═══════════════════════════ LIVE ═══════════════════════════
+function renderLiveCatalog(){
+  const sel=document.getElementById('lv-prenda');
+  sel.innerHTML='<option value="">— seleccionar —</option>';
+  DB.prendas.filter(p=>p.activo).forEach(p=>{
+    sel.innerHTML+=`<option value="${p.id}">${p.nombre} — S/${p.precio}</option>`;
+  });
+}
+
+function liveSearch(val){
+  const clean=val.replace(/\s/g,'');
+  const res=document.getElementById('live-search-results');
+  if(clean.length<4){ res.innerHTML=''; hideClientCard(); return; }
+  const matches=DB.clientes.filter(c=>c.telefono.startsWith(clean));
+  if(matches.length===0){
+    res.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:6px">No encontrada</div><button class="btn btn-sm" onclick="registrarNuevaEnLive('${clean}')">+ Registrar nueva clienta</button>`;
+    hideClientCard();
+  } else {
+    res.innerHTML=`<div class="pill-row">${matches.map(c=>`<button class="btn btn-xs" onclick="selectLiveClient('${c.id}')">${c.nombre} · ${c.telefono.slice(0,4)}···</button>`).join('')}</div>`;
+  }
+}
+
+function selectLiveClient(id){
+  const c=DB.clientes.find(x=>x.id===id);
+  if(!c) return;
+  currentLiveClient=c;
+  liveCart=[];
+  document.getElementById('lc-av').textContent=initials(c.nombre);
+  document.getElementById('lc-name').textContent=c.nombre;
+  document.getElementById('lc-tel').textContent=c.telefono;
+  const badge=document.getElementById('lc-badge');
+  if(c.pedidos_count>0){ badge.textContent='recurrente'; badge.className='badge badge-pink'; }
+  else { badge.textContent='nueva clienta'; badge.className='badge badge-ok'; }
+  document.getElementById('lc-total').textContent='S/ '+c.total;
+  document.getElementById('lc-pedidos').textContent=c.pedidos_count;
+  const hist=DB.pedidos.filter(p=>p.cliente_id===c.id).slice(-2).reverse();
+  document.getElementById('lc-history').innerHTML=hist.length?hist.map(p=>`<div class="cart-item"><span class="text-muted">${p.num}</span><span class="font-500">S/ ${p.total}</span></div>`).join(''):`<div class="text-hint text-sm">Sin historial aún</div>`;
+  document.getElementById('live-client-card').style.display='block';
+  document.getElementById('live-cart-card').style.display='block';
+  document.getElementById('live-resumen-card').style.display='block';
+  renderLiveCart();
+}
+
+function hideClientCard(){
+  document.getElementById('live-client-card').style.display='none';
+  document.getElementById('live-cart-card').style.display='none';
+  document.getElementById('live-resumen-card').style.display='none';
+}
+
+function registrarNuevaEnLive(tel){
+  const nuevo={ id:'c'+Date.now(), telefono:tel, nombre:'Nueva clienta', talla:'', distrito:'', direccion:'', total:0, pedidos_count:0 };
+  DB.clientes.push(nuevo);
+  selectLiveClient(nuevo.id);
+}
+
+function addToCart(){
+  const pId=document.getElementById('lv-prenda').value;
+  const talla=document.getElementById('lv-talla').value;
+  if(!pId||!talla||!currentLiveClient){ alert('Selecciona prenda y talla'); return; }
+  const p=DB.prendas.find(x=>x.id===pId);
+  liveCart.push({prenda_id:pId, nombre:p.nombre, talla, precio:p.precio});
+  document.getElementById('lv-prenda').value='';
+  document.getElementById('lv-talla').value='';
+  renderLiveCart();
+}
+
+function renderLiveCart(){
+  const cont=document.getElementById('live-cart-items');
+  const total=liveCart.reduce((a,i)=>a+i.precio,0);
+  cont.innerHTML=liveCart.length?liveCart.map((it,i)=>`
+    <div class="cart-item">
+      <span>${it.nombre} <span class="text-hint">T-${it.talla}</span></span>
+      <span style="display:flex;align-items:center;gap:8px"><span class="font-500">S/ ${it.precio}</span>
+      <span style="cursor:pointer;color:var(--text3)" onclick="removeCartItem(${i})">✕</span></span>
+    </div>`).join(''):`<div class="text-hint text-sm">Sin prendas aún</div>`;
+  document.getElementById('live-cart-total').textContent='S/ '+total;
+}
+
+function removeCartItem(i){ liveCart.splice(i,1); renderLiveCart(); }
+
+function openEnvioModal(){
+  if(!liveCart.length){ alert('Agrega al menos una prenda'); return; }
+  const sub=liveCart.reduce((a,i)=>a+i.precio,0);
+  document.getElementById('env-subtotal').textContent='S/ '+sub;
+  updateEnvCosto();
+  document.getElementById('modal-envio').classList.add('open');
+  if(currentLiveClient?.distrito) document.getElementById('env-distrito').value=currentLiveClient.distrito;
+  if(currentLiveClient?.direccion) document.getElementById('env-dir').value=currentLiveClient.direccion;
+}
+
+function updateEnvCosto(){
+  const tipo=document.getElementById('env-tipo').value;
+  const costo=DISTRITOS_COSTO[tipo]||13;
+  const sub=liveCart.reduce((a,i)=>a+i.precio,0);
+  document.getElementById('env-costo').textContent='S/ '+costo;
+  document.getElementById('env-total').textContent='S/ '+(sub+costo);
+}
+
+function confirmarPedido(){
+  const tipo=document.getElementById('env-tipo').value;
+  const costo=DISTRITOS_COSTO[tipo]||13;
+  const sub=liveCart.reduce((a,i)=>a+i.precio,0);
+  const num='JAS-2025-0'+(42+DB.pedidos.length);
+  const ped={ id:'ped'+Date.now(), num, cliente_id:currentLiveClient.id,
+    items:[...liveCart.map(i=>({nombre:i.nombre,talla:i.talla,precio:i.precio}))],
+    subtotal:sub, costo_envio:costo, total:sub+costo, pagado:0,
+    estado:'pago_pendiente', tipo_envio:tipo, distrito:'', direccion:'',
+    courier_codigo:'', fecha:new Date().toISOString().slice(0,10) };
+  DB.pedidos.push(ped);
+  currentLiveClient.pedidos_count++;
+  closeModal('modal-envio');
+  liveCart=[];
+  renderLiveCart();
+  currentLiveClient=null;
+  hideClientCard();
+  const link=`${location.origin}${location.pathname}?tracking=${ped.num}`;
+  const linkReg=`${location.origin}${location.pathname}?registro`;
+  document.getElementById('link-url').textContent=link;
+  document.getElementById('link-registro').textContent=linkReg;
+  document.getElementById('link-wa-msg').textContent=`WA: "Hola! Tu pedido ${num} está listo. Total aprox. S/${sub+costo}. Ingresa tu dirección y sigue tu pedido aquí: ${link}"`;
+  document.getElementById('modal-link').classList.add('open');
+}
+
+function copyLink(){ navigator.clipboard.writeText(document.getElementById('link-url').textContent).catch(()=>{}); }
+function copyRegistroLink(){ navigator.clipboard.writeText(document.getElementById('link-registro').textContent).catch(()=>{}); }
+function verTracking(){ closeModal('modal-link'); showTracking(document.getElementById('link-url').textContent.split('tracking=')[1]); }
+
+// ═══════════════════════════ PEDIDOS ═══════════════════════════
+let pedidoFiltro='todos';
+function filterPedidos(f, el){
+  pedidoFiltro=f;
+  document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderPedidos(f);
+}
+
+function renderPedidos(f){
+  let list=DB.pedidos;
+  if(f==='por_pagar') list=list.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado));
+  if(f==='pago_completo') list=list.filter(p=>p.estado==='pago_completo');
+  if(f==='en_camino') list=list.filter(p=>p.estado==='en_camino');
+  const c=DB.clientes;
+  document.getElementById('pedidos-tbody').innerHTML=list.map((p,i)=>{
+    const cl=c.find(x=>x.id===p.cliente_id);
+    const falta=p.total-p.pagado;
+    return `<tr>
+      <td class="font-500">${p.num}</td>
+      <td>${cl?cl.nombre:'—'}</td>
+      <td>S/ ${p.total}</td>
+      <td>${falta>0?`<span class="text-hint">S/ ${p.pagado} <span style="color:var(--red)">(-S/${falta})</span></span>`:`<span style="color:var(--green)">S/ ${p.pagado} ✓</span>`}</td>
+      <td><span class="badge ${ESTADOS_BADGE[p.estado]}">${ESTADOS_LABEL[p.estado]}</span></td>
+      <td>${p.courier_codigo||'—'}</td>
+      <td><button class="btn btn-xs" onclick="openPedidoModal(${DB.pedidos.indexOf(p)})">Ver</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function openPedidoModal(idx){
+  currentPedidoIdx=idx;
+  const p=DB.pedidos[idx];
+  const cl=DB.clientes.find(x=>x.id===p.cliente_id);
+  document.getElementById('mp-title').textContent=p.num;
+  const next=ESTADOS_NEXT[p.estado];
+  const actionLabel=ESTADOS_ACTION[p.estado];
+  const btn=document.getElementById('mp-action-btn');
+  if(actionLabel && currentUser?.key==='admin' || (currentUser?.key==='operador' && p.estado!=='entregado')){
+    btn.style.display='inline-flex'; btn.textContent=actionLabel;
+    if(p.estado==='empaquetado'){ btn.onclick=()=>openDespachoInput(idx); }
+    else { btn.onclick=avanzarEstado; }
+  } else { btn.style.display='none'; }
+  const falta=p.total-p.pagado;
+  document.getElementById('mp-content').innerHTML=`
+    <div class="grid-2 mb-12">
+      <div><div class="text-xs text-hint">Clienta</div><div class="font-500">${cl?cl.nombre:'—'}</div></div>
+      <div><div class="text-xs text-hint">Fecha</div><div>${p.fecha}</div></div>
+      <div><div class="text-xs text-hint">Estado</div><div><span class="badge ${ESTADOS_BADGE[p.estado]}">${ESTADOS_LABEL[p.estado]}</span></div></div>
+      <div><div class="text-xs text-hint">Envío</div><div>${p.distrito} · S/${p.costo_envio}</div></div>
+      <div><div class="text-xs text-hint">Total</div><div class="font-600">S/ ${p.total}</div></div>
+      <div><div class="text-xs text-hint">Pagado</div><div class="${falta>0?'delta-dn':'delta-up'} font-500">S/ ${p.pagado}${falta>0?' (falta S/'+falta+')':' ✓'}</div></div>
+    </div>
+    <div class="card-title">Prendas</div>
+    <div class="tbl-wrap mb-12">${p.items.map(it=>`<div class="cart-item" style="padding:7px 12px">${it.nombre} T-${it.talla} <span class="font-500 ml-auto">S/ ${it.precio}</span></div>`).join('')}</div>
+    ${p.estado==='pago_pendiente'||p.estado==='pago_parcial'?`
+    <div class="card-title">Registrar pago</div>
+    <div class="grid-2">
+      <div class="form-row"><label class="form-label">Monto recibido (S/)</label><input type="number" id="mp-monto" placeholder="${falta}"></div>
+      <div class="form-row"><label class="form-label">Método</label><select id="mp-metodo"><option>Yape</option><option>Plin</option><option>Transferencia</option></select></div>
+    </div>`:''}
+    ${p.estado==='en_camino'?`<div class="form-row"><label class="form-label">Código courier</label><div class="font-500">${p.courier_codigo||'—'}</div></div>`:''}
+  `;
+  document.getElementById('modal-pedido').classList.add('open');
+}
+
+function avanzarEstado(){
+  const p=DB.pedidos[currentPedidoIdx];
+  if((p.estado==='pago_pendiente'||p.estado==='pago_parcial')){
+    const monto=parseFloat(document.getElementById('mp-monto')?.value||0);
+    if(!monto){ alert('Ingresa el monto recibido'); return; }
+    p.pagado=Math.min(p.pagado+monto, p.total);
+  }
+  p.estado=ESTADOS_NEXT[p.estado]||p.estado;
+  closeModal('modal-pedido');
+  renderPedidos(pedidoFiltro);
+}
+
+function openDespachoInput(idx){
+  const codigo=prompt('Ingresa el código de seguimiento del courier:');
+  if(!codigo) return;
+  DB.pedidos[idx].courier_codigo=codigo;
+  DB.pedidos[idx].estado='en_camino';
+  closeModal('modal-pedido');
+  renderPedidos(pedidoFiltro);
+}
+
+// ═══════════════════════════ CLIENTES ═══════════════════════════
+function renderClientes(filter=''){
+  let list=DB.clientes.filter(c=>!filter||c.nombre.toLowerCase().includes(filter.toLowerCase())||c.telefono.includes(filter));
+  document.getElementById('clientes-tbody').innerHTML=list.map(c=>`
+    <tr>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="avatar-md">${initials(c.nombre)}</div><span class="font-500">${c.nombre}</span></div></td>
+      <td class="text-muted">${c.telefono}</td>
+      <td>${c.talla||'—'}</td>
+      <td>${c.pedidos_count}</td>
+      <td>S/ ${c.total}</td>
+      <td class="text-hint">${c.pedidos_count?'Reciente':'Sin pedidos'}</td>
+      <td><button class="btn btn-xs" onclick="editCliente('${c.id}')">Editar</button></td>
+    </tr>`).join('');
+}
+function filterClientes(v){ renderClientes(v); }
+function editCliente(id){
+  const c=DB.clientes.find(x=>x.id===id);
+  document.getElementById('nc-nombre').value=c.nombre;
+  document.getElementById('nc-tel').value=c.telefono;
+  document.getElementById('nc-talla').value=c.talla||'';
+  document.getElementById('nc-distrito').value=c.distrito||'';
+  document.querySelector('#modal-cliente .modal-title').textContent='Editar clienta';
+  document.querySelector('#modal-cliente .btn-primary').onclick=()=>guardarClienteEdit(id);
+  document.getElementById('modal-cliente').classList.add('open');
+}
+function openModalNuevaCliente(){
+  document.getElementById('nc-nombre').value='';
+  document.getElementById('nc-tel').value='';
+  document.getElementById('nc-talla').value='';
+  document.getElementById('nc-distrito').value='';
+  document.querySelector('#modal-cliente .modal-title').textContent='Nueva clienta';
+  document.querySelector('#modal-cliente .btn-primary').onclick=guardarCliente;
+  document.getElementById('modal-cliente').classList.add('open');
+}
+function guardarCliente(){
+  const nuevo={ id:'c'+Date.now(), telefono:document.getElementById('nc-tel').value, nombre:document.getElementById('nc-nombre').value, talla:document.getElementById('nc-talla').value, distrito:document.getElementById('nc-distrito').value, direccion:'', total:0, pedidos_count:0 };
+  DB.clientes.push(nuevo);
+  closeModal('modal-cliente'); renderClientes();
+}
+function guardarClienteEdit(id){
+  const c=DB.clientes.find(x=>x.id===id);
+  c.nombre=document.getElementById('nc-nombre').value;
+  c.telefono=document.getElementById('nc-tel').value;
+  c.talla=document.getElementById('nc-talla').value;
+  c.distrito=document.getElementById('nc-distrito').value;
+  closeModal('modal-cliente'); renderClientes();
+}
+
+// ═══════════════════════════ CATÁLOGO ═══════════════════════════
+function renderCatalogo(){
+  document.getElementById('catalogo-tbody').innerHTML=DB.prendas.map((p,i)=>`
+    <tr>
+      <td class="font-500">${p.nombre}</td>
+      <td class="text-muted">${p.codigo}</td>
+      <td>S/ ${p.precio}${currentUser?.key==='admin'?` <span class="text-hint">(costo S/${p.costo})</span>`:''}</td>
+      <td>${p.tallas.join(', ')}</td>
+      <td>${p.categoria}</td>
+      <td><span class="badge ${p.activo?'badge-ok':'badge-gray'}">${p.activo?'Activo':'Inactivo'}</span></td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-xs" onclick="openModalPrenda(${i})">Editar</button>
+        <button class="btn btn-xs" onclick="togglePrenda(${i})">${p.activo?'Desactivar':'Activar'}</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openModalPrenda(idx){
+  editingPrendaIdx = idx !== undefined ? idx : null;
+  if(idx !== undefined){
+    const p=DB.prendas[idx];
+    document.getElementById('modal-prenda-title').textContent='Editar prenda';
+    document.getElementById('pr-nombre').value=p.nombre;
+    document.getElementById('pr-codigo').value=p.codigo;
+    document.getElementById('pr-precio').value=p.precio;
+    document.getElementById('pr-costo').value=p.costo;
+    document.getElementById('pr-cat').value=p.categoria;
+    document.querySelectorAll('.talla-chk').forEach(chk=>{ chk.checked=p.tallas.includes(chk.value); });
+  } else {
+    document.getElementById('modal-prenda-title').textContent='Nueva prenda';
+    document.getElementById('pr-nombre').value='';
+    document.getElementById('pr-codigo').value='';
+    document.getElementById('pr-precio').value='';
+    document.getElementById('pr-costo').value='';
+    document.getElementById('pr-cat').value='Vestido';
+    document.querySelectorAll('.talla-chk').forEach(chk=>{ chk.checked=chk.value==='M'||chk.value==='L'; });
+  }
+  document.getElementById('modal-prenda').classList.add('open');
+}
+
+function guardarPrenda(){
+  const tallas=[...document.querySelectorAll('.talla-chk:checked')].map(c=>c.value);
+  if(!tallas.length){ alert('Selecciona al menos una talla'); return; }
+  const data={ nombre:document.getElementById('pr-nombre').value, codigo:document.getElementById('pr-codigo').value,
+    precio:parseFloat(document.getElementById('pr-precio').value)||0,
+    costo:parseFloat(document.getElementById('pr-costo').value)||0,
+    categoria:document.getElementById('pr-cat').value, tallas, activo:true };
+  if(editingPrendaIdx !== null){ Object.assign(DB.prendas[editingPrendaIdx], data); }
+  else { DB.prendas.push({ id:'p'+Date.now(), ...data }); }
+  closeModal('modal-prenda'); renderCatalogo(); renderLiveCatalog();
+}
+
+function togglePrenda(i){ DB.prendas[i].activo=!DB.prendas[i].activo; renderCatalogo(); renderLiveCatalog(); }
+
+// ═══════════════════════════ TRACKING — ENTRY POINT ═══════════════════════════
+let trackingNum = null;
+
+function showTracking(num){
+  const ped=DB.pedidos.find(p=>p.num===num);
+  if(!ped){ return; }
+  trackingNum=num;
+  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
+  hideAllRootPages();
+
+  // Si la clienta ya tiene dirección guardada → mostrar form con datos precargados
+  if(cl && cl.direccion && cl.direccion.trim()!==''){
+    showFormEnvio(num, true); // true = ya tiene datos
+  } else {
+    showFormEnvio(num, false);
+  }
+}
+
+function hideAllRootPages(){
+  document.getElementById('app-page').style.display='none';
+  document.getElementById('login-page').style.display='none';
+  document.getElementById('tracking-page').style.display='none';
+  document.getElementById('form-envio-page').style.display='none';
+}
+
+// ── FORMULARIO PÚBLICO DE DATOS ──
+function showFormEnvio(num, tieneDir){
+  const ped=DB.pedidos.find(p=>p.num===num);
+  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
+  hideAllRootPages();
+  document.getElementById('form-envio-page').style.display='block';
+
+  // Resumen del pedido arriba
+  document.getElementById('fe-resumen').innerHTML=`
+    <div style="font-size:11px;color:var(--text3);margin-bottom:2px">Pedido ${ped.num}</div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:10px">${ped.items.length} prenda${ped.items.length>1?'s':''} reservadas para ti</div>
+    ${ped.items.map(it=>`<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:0.5px solid var(--border)"><span>${it.nombre} <span style="color:var(--text3)">T-${it.talla}</span></span><span class="font-500">S/${it.precio}</span></div>`).join('')}
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-top:8px"><span>Subtotal prendas</span><span>S/${ped.subtotal}</span></div>`;
+
+  if(tieneDir){
+    // Clienta recurrente: mostrar dirección guardada y botón directo
+    document.getElementById('fe-form-card').style.display='none';
+    document.getElementById('fe-ya-confirmado').style.display='block';
+    document.getElementById('fe-dir-guardada').innerHTML=`<strong>${cl.nombre}</strong><br>${cl.direccion}${cl.referencia?', '+cl.referencia:''}<br><span style="color:var(--text3)">${cl.distrito}</span>`;
+  } else {
+    // Clienta nueva: mostrar formulario
+    document.getElementById('fe-form-card').style.display='block';
+    document.getElementById('fe-ya-confirmado').style.display='none';
+    if(cl && cl.nombre && cl.nombre!=='Nueva clienta') document.getElementById('fe-nombre').value=cl.nombre;
+    document.getElementById('fe-sub').textContent='S/'+ped.subtotal;
+  }
+}
+
+function feUpdateCosto(){
+  const sel=document.getElementById('fe-distrito-sel').value;
+  if(!sel){ document.getElementById('fe-costo-box').style.display='none'; return; }
+  const ped=DB.pedidos.find(p=>p.num===trackingNum);
+  const costo=parseInt(sel.split('|')[1])||13;
+  document.getElementById('fe-costo-box').style.display='block';
+  document.getElementById('fe-sub').textContent='S/'+ped.subtotal;
+  document.getElementById('fe-env-costo').textContent='S/'+costo;
+  document.getElementById('fe-total-final').textContent='S/'+(ped.subtotal+costo);
+}
+
+function feConfirmar(){
+  const nombre=document.getElementById('fe-nombre').value.trim();
+  const disSel=document.getElementById('fe-distrito-sel').value;
+  const dir=document.getElementById('fe-direccion').value.trim();
+  const ref=document.getElementById('fe-referencia').value.trim();
+  const errEl=document.getElementById('fe-error');
+
+  if(!nombre){ errEl.textContent='Por favor ingresa tu nombre completo.'; errEl.style.display='block'; return; }
+  if(!disSel){ errEl.textContent='Selecciona tu distrito.'; errEl.style.display='block'; return; }
+  if(!dir){ errEl.textContent='Ingresa tu dirección de entrega.'; errEl.style.display='block'; return; }
+  errEl.style.display='none';
+
+  const distrito=disSel.split('|')[0];
+  const costo=parseInt(disSel.split('|')[1])||13;
+  const ped=DB.pedidos.find(p=>p.num===trackingNum);
+  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
+
+  // Actualizar datos en la clienta y en el pedido
+  if(cl){
+    cl.nombre=nombre;
+    cl.distrito=distrito;
+    cl.direccion=dir;
+    cl.referencia=ref;
+  }
+  ped.distrito=distrito;
+  ped.direccion=dir;
+  ped.costo_envio=costo;
+  ped.total=ped.subtotal+costo;
+  ped.tipo_envio=costo===20?'shalom':'motorizado_'+costo;
+
+  renderTrackingPage(trackingNum);
+}
+
+function feIrASeguimiento(){ renderTrackingPage(trackingNum); }
+
+function feCambiarDireccion(){
+  document.getElementById('fe-ya-confirmado').style.display='none';
+  document.getElementById('fe-form-card').style.display='block';
+  const ped=DB.pedidos.find(p=>p.num===trackingNum);
+  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
+  if(cl){ document.getElementById('fe-nombre').value=cl.nombre||''; document.getElementById('fe-direccion').value=cl.direccion||''; document.getElementById('fe-referencia').value=cl.referencia||''; }
+  document.getElementById('fe-sub').textContent='S/'+ped.subtotal;
+}
+
+// ── PÁGINA DE SEGUIMIENTO REAL ──
+function renderTrackingPage(num){
+  const ped=DB.pedidos.find(p=>p.num===num);
+  if(!ped){ return; }
+  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
+  hideAllRootPages();
+  document.getElementById('tracking-page').style.display='block';
+  document.getElementById('trk-num').textContent='Pedido #'+ped.num;
+  document.getElementById('trk-name').textContent=cl?cl.nombre:'Clienta';
+  document.getElementById('trk-meta').innerHTML=`<span>${ped.fecha}</span><span>${ped.tipo_envio.startsWith('motor')?'Motorizado':'Shalom'}</span><span>${ped.distrito}</span>`;
+  const banners={
+    pago_pendiente:{bg:'#FAEEDA',c:'#633806',lbl:'Pendiente de pago',sub:`Yape o Plin al 921 328 731 · Total S/${ped.total}`},
+    pago_parcial:{bg:'#FAEEDA',c:'#633806',lbl:'Pago parcial recibido',sub:`Abono S/${ped.pagado} · faltan S/${ped.total-ped.pagado}`},
+    pago_completo:{bg:'#E6F1FB',c:'#0C447C',lbl:'Pago confirmado',sub:'Tu pedido está en preparación'},
+    empaquetado:{bg:'#E1F5EE',c:'#085041',lbl:'Pedido empaquetado',sub:'Listo para el próximo despacho'},
+    en_camino:{bg:'#F1EFE8',c:'#2C2C2A',lbl:'Tu pedido va en camino',sub:`Código: ${ped.courier_codigo} · ${ped.distrito}`},
+    entregado:{bg:'#EAF3DE',c:'#27500A',lbl:'Pedido entregado',sub:'¡Gracias por tu compra!'}
+  };
+  const b=banners[ped.estado];
+  document.getElementById('trk-banner').style.cssText=`background:${b.bg};color:${b.c};margin:12px 16px 0;border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:3px`;
+  document.getElementById('trk-banner').innerHTML=`<div style="font-weight:600;font-size:13px">${b.lbl}</div><div style="font-size:12px;opacity:.85">${b.sub}</div>`;
+  const steps=[
+    {key:'pago_pendiente',lbl:'Pedido creado'},
+    {key:'pago_completo',lbl:'Pago confirmado'},
+    {key:'empaquetado',lbl:'Empaquetado'},
+    {key:'en_camino',lbl:`Entregado a ${ped.tipo_envio.startsWith('motor')?'motorizado':'Shalom'}`},
+    {key:'entregado',lbl:'Entregado'}
+  ];
+  const curIdx=ESTADOS_ORDEN.indexOf(ped.estado);
+  document.getElementById('trk-timeline').innerHTML=steps.map((s,i)=>{
+    const done=curIdx>=ESTADOS_ORDEN.indexOf(s.key);
+    const isLast=i===steps.length-1;
+    return `<div class="tl-item">
+      <div class="tl-left">
+        <div class="tl-dot" style="background:${done?'#1D9E75':'#D3D1C7'};color:${done?'#fff':'#888780'};font-size:11px">${done?'✓':'○'}</div>
+        ${!isLast?`<div class="tl-line" style="background:${done?'#1D9E75':'#D3D1C7'}"></div>`:''}
+      </div>
+      <div class="tl-body">
+        <div class="tl-step" style="color:${done?'#1A1A18':'#9C9A92'}">${s.lbl}</div>
+        <div class="tl-date">${done?'Completado':'Pendiente'}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('trk-items').innerHTML=
+    ped.items.map(it=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:12.5px"><span>${it.nombre} <span style="color:var(--text3)">T-${it.talla}</span></span><span style="font-weight:500">S/${it.precio}</span></div>`).join('')+
+    `<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);padding:6px 0;border-bottom:0.5px solid var(--border)"><span>Envío</span><span>S/${ped.costo_envio}</span></div>`+
+    `<div style="display:flex;justify-content:space-between;margin-top:8px;font-weight:600;font-size:13px"><span>Total</span><span>S/${ped.total}</span></div>`;
+}
+
+// ═══════════════════════════ REGISTRO PÚBLICO ═══════════════════════════
+function showRegistro(){
+  hideAllRootPages();
+  document.getElementById('registro-page').style.display='block';
+  document.getElementById('rg-form-wrap').style.display='block';
+  document.getElementById('rg-confirm-wrap').style.display='none';
+  document.getElementById('rg-error').style.display='none';
+}
+
+function rgGuardar(){
+  const nombre = document.getElementById('rg-nombre').value.trim();
+  const tel = document.getElementById('rg-tel').value.replace(/\s/g,'');
+  const disSel = document.getElementById('rg-distrito').value;
+  const dir = document.getElementById('rg-direccion').value.trim();
+  const ref = document.getElementById('rg-referencia').value.trim();
+  const errEl = document.getElementById('rg-error');
+
+  if(!nombre){ errEl.textContent='Por favor ingresa tu nombre completo.'; errEl.style.display='block'; return; }
+  if(!tel || tel.length < 9){ errEl.textContent='Ingresa tu número de WhatsApp (9 dígitos).'; errEl.style.display='block'; return; }
+  if(!disSel){ errEl.textContent='Selecciona tu distrito.'; errEl.style.display='block'; return; }
+  if(!dir){ errEl.textContent='Ingresa tu dirección de entrega.'; errEl.style.display='block'; return; }
+  errEl.style.display='none';
+
+  const distrito = disSel.split('|')[0];
+  const costoEnv = parseInt(disSel.split('|')[1])||13;
+
+  // Buscar si ya existe ese teléfono → actualizar, si no → crear
+  const existe = DB.clientes.find(c=>c.telefono===tel);
+  if(existe){
+    existe.nombre=nombre; existe.distrito=distrito; existe.direccion=dir; existe.referencia=ref; existe.costo_envio=costoEnv;
+  } else {
+    DB.clientes.push({ id:'c'+Date.now(), telefono:tel, nombre, talla:'', distrito, direccion:dir, referencia:ref, costo_envio:costoEnv, total:0, pedidos_count:0 });
+  }
+
+  // Mostrar confirmación
+  document.getElementById('rg-form-wrap').style.display='none';
+  document.getElementById('rg-confirm-wrap').style.display='block';
+  document.getElementById('rg-confirm-detalle').innerHTML=
+    `<strong>${nombre}</strong><br>${dir}${ref?', '+ref:''}<br>${distrito} · Envío S/${costoEnv}<br><span style="color:var(--text3)">WA: ${tel}</span>`;
+}
+
+function rgEditar(){
+  document.getElementById('rg-confirm-wrap').style.display='none';
+  document.getElementById('rg-form-wrap').style.display='block';
+}
+
+// ═══════════════════════════ UTILS ═══════════════════════════
+function initials(n){ return n.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'; }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+
+// Check URL params — routing público
+(function(){
+  const params=new URLSearchParams(location.search);
+  const trk=params.get('tracking');
+  const reg=params.get('registro');
+  if(trk){ showTracking(trk); }
+  else if(reg!==null){ showRegistro(); }
+})();
+</script>
+</body>
+</html>
