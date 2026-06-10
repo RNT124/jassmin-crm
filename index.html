@@ -832,6 +832,30 @@ textarea{resize:vertical;min-height:72px}
 
 <script>
 // ═══════════════════════════ DATA ═══════════════════════════
+// ══════════════ SUPABASE CONFIG ══════════════
+const SUPA_URL = 'https://qnuirdkwfxyfngrhohsh.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFudWlyZGt3Znh5Zm5ncmhvaHNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTQwMjEsImV4cCI6MjA5NjYzMDAyMX0.RQ0NtdTOxITRceruvlUJYsctHhHb0pKcNmTgt2ADOxA';
+
+async function supaFetch(path, opts={}) {
+  const url = `${SUPA_URL}/rest/v1/${path}`;
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || 'return=representation',
+    },
+    ...opts
+  });
+  if (!res.ok) { const e = await res.text(); throw new Error(e); }
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
+const dbGet    = p => supaFetch(p, {method:'GET'});
+const dbPost   = (p,b) => supaFetch(p, {method:'POST', body:JSON.stringify(b)});
+const dbPatch  = (p,b) => supaFetch(p, {method:'PATCH', body:JSON.stringify(b), prefer:'return=representation'});
+
+// ══════════════ LOCAL FALLBACK DATA ══════════════
 const USERS = {
   admin: { pass:'jassmin2025', nombre:'Renato', rol:'Admin', initials:'R' },
   operador: { pass:'tienda123', nombre:'Operador', rol:'Operador', initials:'O' }
@@ -876,18 +900,29 @@ const ESTADOS_ACTION = { pago_pendiente:'Confirmar pago', pago_parcial:'Confirma
 const ESTADOS_NEXT = { pago_pendiente:'pago_completo', pago_parcial:'pago_completo', pago_completo:'empaquetado', empaquetado:'en_camino', en_camino:'entregado' };
 
 // ═══════════════════════════ AUTH ═══════════════════════════
-function doLogin(){
+async function doLogin(){
   const u = document.getElementById('inp-user').value.trim().toLowerCase();
   const p = document.getElementById('inp-pass').value;
-  const user = USERS[u];
-  if(!user || user.pass !== p){ document.getElementById('login-error').style.display='block'; return; }
-  currentUser = { ...user, key:u };
+  const errEl = document.getElementById('login-error');
+  errEl.style.display='none';
+  try {
+    const rows = await dbGet(`usuarios?username=eq.${u}&activo=eq.true&select=*`);
+    if(!rows || !rows.length || rows[0].password_hash !== p){
+      errEl.textContent='Usuario o contraseña incorrectos'; errEl.style.display='block'; return;
+    }
+    currentUser = { ...rows[0], key: u };
+  } catch(e) {
+    // fallback local si Supabase falla
+    const user = USERS[u];
+    if(!user || user.pass !== p){ errEl.textContent='Usuario o contraseña incorrectos'; errEl.style.display='block'; return; }
+    currentUser = { ...user, key:u, rol: user.rol.toLowerCase() };
+  }
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app-page').style.display = 'flex';
-  document.getElementById('sb-avatar').textContent = user.initials;
-  document.getElementById('sb-uname').textContent = user.nombre;
-  document.getElementById('sb-urole').textContent = user.rol;
-  if(u==='operador'){ document.getElementById('sb-catalogo').style.display='none'; }
+  document.getElementById('sb-avatar').textContent = currentUser.nombre[0];
+  document.getElementById('sb-uname').textContent = currentUser.nombre;
+  document.getElementById('sb-urole').textContent = currentUser.rol==='admin'?'Admin':'Operador';
+  if(currentUser.rol!=='admin') document.getElementById('sb-catalogo').style.display='none';
   initApp();
 }
 function doLogout(){
@@ -1029,28 +1064,47 @@ function updateEnvCosto(){
   document.getElementById('env-total').textContent='S/ '+(sub+costo);
 }
 
-function confirmarPedido(){
+async function confirmarPedido(){
   const tipo=document.getElementById('env-tipo').value;
   const costo=DISTRITOS_COSTO[tipo]||13;
   const sub=liveCart.reduce((a,i)=>a+i.precio,0);
-  const num='JAS-2025-0'+(42+DB.pedidos.length);
-  const ped={ id:'ped'+Date.now(), num, cliente_id:currentLiveClient.id,
-    items:[...liveCart.map(i=>({nombre:i.nombre,talla:i.talla,precio:i.precio}))],
-    subtotal:sub, costo_envio:costo, total:sub+costo, pagado:0,
-    estado:'pago_pendiente', tipo_envio:tipo, distrito:'', direccion:'',
-    courier_codigo:'', fecha:new Date().toISOString().slice(0,10) };
-  DB.pedidos.push(ped);
-  currentLiveClient.pedidos_count++;
+  let numPedido = 'JAS-'+new Date().getFullYear()+'-'+(String(DB.pedidos.length+42).padStart(4,'0'));
+  try {
+    // 1. Crear carrito en Supabase
+    const carritoRows = await dbPost('carritos', {cliente_id: currentLiveClient.id, estado:'en_pedido', total: sub});
+    const carrito = Array.isArray(carritoRows)?carritoRows[0]:carritoRows;
+    // 2. Crear items
+    for(const item of liveCart){
+      await dbPost('carrito_items', {carrito_id:carrito.id, prenda_id:item.prenda_id, talla:item.talla, precio_unitario:item.precio});
+    }
+    // 3. Crear pedido (trigger genera el número)
+    const pedRows = await dbPost('pedidos', {
+      numero:'', cliente_id:currentLiveClient.id, carrito_id:carrito.id,
+      subtotal:sub, costo_envio:costo, total:sub+costo, monto_pagado:0, estado:'pago_pendiente'
+    });
+    const ped = Array.isArray(pedRows)?pedRows[0]:pedRows;
+    numPedido = ped.numero;
+    // 4. Actualizar contador clienta
+    await dbPatch(`clientes?id=eq.${currentLiveClient.id}`, {pedidos_count:(currentLiveClient.pedidos_count||0)+1});
+    DB.pedidos.push({id:ped.id, num:numPedido, cliente_id:currentLiveClient.id, subtotal:sub, costo_envio:costo, total:sub+costo, pagado:0, estado:'pago_pendiente'});
+  } catch(e) {
+    // fallback local
+    DB.pedidos.push({id:'ped'+Date.now(), num:numPedido, cliente_id:currentLiveClient.id,
+      items:[...liveCart.map(i=>({nombre:i.nombre,talla:i.talla,precio:i.precio}))],
+      subtotal:sub, costo_envio:costo, total:sub+costo, pagado:0, estado:'pago_pendiente',
+      tipo_envio:tipo, distrito:'', direccion:'', courier_codigo:'', fecha:new Date().toISOString().slice(0,10)});
+    currentLiveClient.pedidos_count++;
+  }
   closeModal('modal-envio');
-  liveCart=[];
-  renderLiveCart();
-  currentLiveClient=null;
-  hideClientCard();
-  const link=`${location.origin}${location.pathname}?tracking=${ped.num}`;
+  liveCart=[]; renderLiveCart();
+  currentLiveClient=null; hideClientCard();
+  document.getElementById('live-search').value='';
+  document.getElementById('live-search-results').innerHTML='';
+  const link=`${location.origin}${location.pathname}?tracking=${numPedido}`;
   const linkReg=`${location.origin}${location.pathname}?registro`;
   document.getElementById('link-url').textContent=link;
   document.getElementById('link-registro').textContent=linkReg;
-  document.getElementById('link-wa-msg').textContent=`WA: "Hola! Tu pedido ${num} está listo. Total aprox. S/${sub+costo}. Ingresa tu dirección y sigue tu pedido aquí: ${link}"`;
+  document.getElementById('link-wa-msg').textContent=`WA: "Hola! Tu pedido ${numPedido} está listo. Total aprox. S/${sub+costo}. Ingresa tu dirección y sigue tu pedido: ${link}"`;
   document.getElementById('modal-link').classList.add('open');
 }
 
@@ -1179,17 +1233,23 @@ function openModalNuevaCliente(){
   document.querySelector('#modal-cliente .btn-primary').onclick=guardarCliente;
   document.getElementById('modal-cliente').classList.add('open');
 }
-function guardarCliente(){
-  const nuevo={ id:'c'+Date.now(), telefono:document.getElementById('nc-tel').value, nombre:document.getElementById('nc-nombre').value, talla:document.getElementById('nc-talla').value, distrito:document.getElementById('nc-distrito').value, direccion:'', total:0, pedidos_count:0 };
-  DB.clientes.push(nuevo);
-  closeModal('modal-cliente'); renderClientes();
-}
-function guardarClienteEdit(id){
-  const c=DB.clientes.find(x=>x.id===id);
-  c.nombre=document.getElementById('nc-nombre').value;
-  c.telefono=document.getElementById('nc-tel').value;
-  c.talla=document.getElementById('nc-talla').value;
-  c.distrito=document.getElementById('nc-distrito').value;
+async function guardarCliente(){
+  const data = { nombre:document.getElementById('nc-nombre').value, telefono:document.getElementById('nc-tel').value,
+    talla:document.getElementById('nc-talla').value, distrito:document.getElementById('nc-distrito').value };
+  if(!data.telefono){ alert('El teléfono es obligatorio'); return; }
+  try {
+    if(editingClienteId){
+      await dbPatch(`clientes?id=eq.${editingClienteId}`, data);
+      const c=DB.clientes.find(x=>x.id===editingClienteId); if(c) Object.assign(c,data);
+    } else {
+      const rows = await dbPost('clientes', {...data, pedidos_count:0, total_gastado:0});
+      const nuevo = Array.isArray(rows)?rows[0]:rows;
+      DB.clientes.push({...data, id:nuevo.id, total:0, pedidos_count:0});
+    }
+  } catch(e) {
+    if(editingClienteId){ const c=DB.clientes.find(x=>x.id===editingClienteId); if(c) Object.assign(c,data); }
+    else { DB.clientes.push({ id:'c'+Date.now(), ...data, total:0, pedidos_count:0 }); }
+  }
   closeModal('modal-cliente'); renderClientes();
 }
 
@@ -1233,15 +1293,29 @@ function openModalPrenda(idx){
   document.getElementById('modal-prenda').classList.add('open');
 }
 
-function guardarPrenda(){
+async function guardarPrenda(){
   const tallas=[...document.querySelectorAll('.talla-chk:checked')].map(c=>c.value);
   if(!tallas.length){ alert('Selecciona al menos una talla'); return; }
   const data={ nombre:document.getElementById('pr-nombre').value, codigo:document.getElementById('pr-codigo').value,
     precio:parseFloat(document.getElementById('pr-precio').value)||0,
     costo:parseFloat(document.getElementById('pr-costo').value)||0,
     categoria:document.getElementById('pr-cat').value, tallas, activo:true };
-  if(editingPrendaIdx !== null){ Object.assign(DB.prendas[editingPrendaIdx], data); }
-  else { DB.prendas.push({ id:'p'+Date.now(), ...data }); }
+  if(!data.nombre){ alert('El nombre es obligatorio'); return; }
+  try {
+    if(editingPrendaIdx !== null){
+      const p = DB.prendas[editingPrendaIdx];
+      await dbPatch(`prendas?id=eq.${p.id}`, data);
+      Object.assign(DB.prendas[editingPrendaIdx], data);
+    } else {
+      const rows = await dbPost('prendas', data);
+      const nueva = Array.isArray(rows)?rows[0]:rows;
+      DB.prendas.push({id: nueva.id, ...data});
+    }
+  } catch(e) {
+    // fallback local
+    if(editingPrendaIdx !== null){ Object.assign(DB.prendas[editingPrendaIdx], data); }
+    else { DB.prendas.push({ id:'p'+Date.now(), ...data }); }
+  }
   closeModal('modal-prenda'); renderCatalogo(); renderLiveCatalog();
 }
 
@@ -1413,36 +1487,36 @@ function showRegistro(){
   document.getElementById('rg-error').style.display='none';
 }
 
-function rgGuardar(){
+async function rgGuardar(){
   const nombre = document.getElementById('rg-nombre').value.trim();
   const tel = document.getElementById('rg-tel').value.replace(/\s/g,'');
   const disSel = document.getElementById('rg-distrito').value;
   const dir = document.getElementById('rg-direccion').value.trim();
   const ref = document.getElementById('rg-referencia').value.trim();
   const errEl = document.getElementById('rg-error');
-
-  if(!nombre){ errEl.textContent='Por favor ingresa tu nombre completo.'; errEl.style.display='block'; return; }
-  if(!tel || tel.length < 9){ errEl.textContent='Ingresa tu número de WhatsApp (9 dígitos).'; errEl.style.display='block'; return; }
+  if(!nombre){ errEl.textContent='Ingresa tu nombre completo.'; errEl.style.display='block'; return; }
+  if(tel.length < 9){ errEl.textContent='Ingresa tu número de WhatsApp (9 dígitos).'; errEl.style.display='block'; return; }
   if(!disSel){ errEl.textContent='Selecciona tu distrito.'; errEl.style.display='block'; return; }
   if(!dir){ errEl.textContent='Ingresa tu dirección de entrega.'; errEl.style.display='block'; return; }
   errEl.style.display='none';
-
   const distrito = disSel.split('|')[0];
   const costoEnv = parseInt(disSel.split('|')[1])||13;
-
-  // Buscar si ya existe ese teléfono → actualizar, si no → crear
-  const existe = DB.clientes.find(c=>c.telefono===tel);
-  if(existe){
-    existe.nombre=nombre; existe.distrito=distrito; existe.direccion=dir; existe.referencia=ref; existe.costo_envio=costoEnv;
-  } else {
-    DB.clientes.push({ id:'c'+Date.now(), telefono:tel, nombre, talla:'', distrito, direccion:dir, referencia:ref, costo_envio:costoEnv, total:0, pedidos_count:0 });
+  try {
+    const existe = await dbGet(`clientes?telefono=eq.${tel}`);
+    if(existe && existe.length){
+      await dbPatch(`clientes?telefono=eq.${tel}`, {nombre, distrito, direccion:dir, referencia:ref, costo_envio:costoEnv});
+    } else {
+      await dbPost('clientes', {telefono:tel, nombre, distrito, direccion:dir, referencia:ref, costo_envio:costoEnv, pedidos_count:0, total_gastado:0});
+    }
+  } catch(e) {
+    // fallback local
+    const existe = DB.clientes.find(c=>c.telefono===tel);
+    if(existe){ existe.nombre=nombre; existe.distrito=distrito; existe.direccion=dir; existe.referencia=ref; }
+    else { DB.clientes.push({ id:'c'+Date.now(), telefono:tel, nombre, talla:'', distrito, direccion:dir, referencia:ref, costo_envio:costoEnv, total:0, pedidos_count:0 }); }
   }
-
-  // Mostrar confirmación
   document.getElementById('rg-form-wrap').style.display='none';
   document.getElementById('rg-confirm-wrap').style.display='block';
-  document.getElementById('rg-confirm-detalle').innerHTML=
-    `<strong>${nombre}</strong><br>${dir}${ref?', '+ref:''}<br>${distrito} · Envío S/${costoEnv}<br><span style="color:var(--text3)">WA: ${tel}</span>`;
+  document.getElementById('rg-confirm-detalle').innerHTML=`<strong>${nombre}</strong><br>${dir}${ref?', '+ref:''}<br>${distrito} · Envío S/${costoEnv}<br><span style="color:var(--text3)">WA: ${tel}</span>`;
 }
 
 function rgEditar(){
