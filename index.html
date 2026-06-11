@@ -834,14 +834,13 @@ textarea{resize:vertical;min-height:72px}
 // ═══════════════════════════ DATA ═══════════════════════════
 // ══════════════ SUPABASE CONFIG ══════════════
 const SUPA_URL = 'https://qnuirdkwfxyfngrhohsh.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFudWlyZGt3Znh5Zm5ncmhvaHNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTQwMjEsImV4cCI6MjA5NjYzMDAyMX0.RQ0NtdTOxITRceruvlUJYsctHhHb0pKcNmTgt2ADOxA';
+const SUPA_KEY = 'sb_publishable_6C793L_1WnQdbAEFHFo1vg___kezg4E';
 
 async function supaFetch(path, opts={}) {
   const url = `${SUPA_URL}/rest/v1/${path}`;
   const res = await fetch(url, {
     headers: {
       'apikey': SUPA_KEY,
-      'Authorization': `Bearer ${SUPA_KEY}`,
       'Content-Type': 'application/json',
       'Prefer': opts.prefer || 'return=representation',
     },
