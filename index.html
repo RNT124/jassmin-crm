@@ -862,6 +862,7 @@ const USERS = {
 
 let currentUser = null;
 let currentLiveClient = null;
+let currentCarritoId = null;
 let liveCart = [];
 let currentPedidoIdx = null;
 let editingPrendaIdx = null;
@@ -947,65 +948,116 @@ function nav(page, el){
 }
 
 // ═══════════════════════════ INIT ═══════════════════════════
-function initApp(){
-  renderDashboardBars();
-  renderLiveCatalog();
-  renderPedidos('todos');
-  renderClientes();
-  renderCatalogo();
+async function initApp(){
+  await loadCatalogoLive();
+  loadDashboard();
+  loadPedidos();
+  loadClientes();
+  loadCatalogo();
 }
 
-function renderDashboardBars(){
-  const data=[{d:'Lun',v:0},{d:'Mar',v:124},{d:'Mie',v:89},{d:'Jue',v:198},{d:'Vie',v:134},{d:'Sab',v:347},{d:'Dom',v:0}];
-  const mx=Math.max(...data.map(d=>d.v));
-  document.getElementById('db-bars').innerHTML=data.map((d,i)=>{
-    const h=mx>0?Math.round((d.v/mx)*62):4;
-    const active=i===5;
-    return `<div class="bar-col"><div class="bar" style="height:${Math.max(h,4)}px;background:${active?'var(--pink)':'var(--gray-mid)'}"></div><div class="bar-lbl">${d.d}</div></div>`;
-  }).join('');
+async function loadDashboard(){
+  try {
+    const [pedidos, clientes] = await Promise.all([
+      dbGet('pedidos?select=*&order=creado_en.desc'),
+      dbGet('clientes?select=id')
+    ]);
+    const hoy = new Date().toISOString().slice(0,10);
+    const ventasHoy = pedidos.filter(p=>p.creado_en?.slice(0,10)===hoy).reduce((a,p)=>a+(p.subtotal||0),0);
+    const pagosHoy = pedidos.filter(p=>p.creado_en?.slice(0,10)===hoy&&p.monto_pagado>0).reduce((a,p)=>a+p.monto_pagado,0);
+    const activos = pedidos.filter(p=>p.estado!=='entregado').length;
+    document.getElementById('db-metrics').innerHTML=`
+      <div class="metric"><div class="metric-val">S/ ${ventasHoy}</div><div class="metric-lbl">Vendido hoy</div></div>
+      <div class="metric"><div class="metric-val">${activos}</div><div class="metric-lbl">Pedidos activos</div></div>
+      <div class="metric"><div class="metric-val">S/ ${pagosHoy}</div><div class="metric-lbl">Pagos recibidos hoy</div></div>
+      <div class="metric"><div class="metric-val">${clientes.length}</div><div class="metric-lbl">Clientas totales</div></div>`;
+    const empaquetar=pedidos.filter(p=>p.estado==='pago_completo').length;
+    const sinDir=pedidos.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado)&&!p.direccion).length;
+    const porPagar=pedidos.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado)).length;
+    const preparando=pedidos.filter(p=>['pago_completo','empaquetado'].includes(p.estado)).length;
+    const enCamino=pedidos.filter(p=>p.estado==='en_camino').length;
+    document.getElementById('db-alertas').innerHTML=`
+      ${empaquetar>0?`<div class="alert-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M20 7l-8-4-8 4v10l8 4 8-4V7z"/></svg><div style="flex:1"><div class="alert-text">${empaquetar} pedido${empaquetar>1?'s':''} para empaquetar</div><div class="alert-sub">Pago confirmado</div></div></div>`:''}
+      ${sinDir>0?`<div class="alert-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div style="flex:1"><div class="alert-text">${sinDir} pedido${sinDir>1?'s':''} sin dirección</div><div class="alert-sub">Clienta no completó datos</div></div></div>`:''}
+      ${empaquetar===0&&sinDir===0?'<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin alertas ✓</div>':''}`;
+    document.getElementById('db-kanban').innerHTML=`
+      <div class="kcol"><div class="kcol-title">Por pagar</div><div class="kcol-num">${porPagar}</div><div class="kcol-lbl">pendiente/parcial</div></div>
+      <div class="kcol"><div class="kcol-title">Preparando</div><div class="kcol-num">${preparando}</div><div class="kcol-lbl">empaquetando</div></div>
+      <div class="kcol"><div class="kcol-title">En camino</div><div class="kcol-num">${enCamino}</div><div class="kcol-lbl">con courier</div></div>`;
+    const dias=['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+    const semana=Array(7).fill(0);
+    const hoyDate=new Date();
+    pedidos.forEach(p=>{ const d=new Date(p.creado_en); const diff=Math.floor((hoyDate-d)/86400000); if(diff>=0&&diff<7) semana[6-diff]+=(p.subtotal||0); });
+    const totalSemana=semana.reduce((a,b)=>a+b,0);
+    document.getElementById('db-semana-total').textContent='S/ '+totalSemana;
+    const mx=Math.max(...semana,1);
+    const labels=[];
+    for(let i=6;i>=0;i--){ const d=new Date(hoyDate); d.setDate(d.getDate()-i); labels.push(dias[d.getDay()]); }
+    document.getElementById('db-bars').innerHTML=semana.map((v,i)=>
+      `<div class="bar-col"><div class="bar" style="height:${Math.max(Math.round(v/mx*62),4)}px;background:${i===6?'var(--pink)':'var(--gray-mid)'}"></div><div class="bar-lbl">${labels[i]}</div></div>`
+    ).join('');
+  } catch(e){ console.error('Dashboard error:',e); }
 }
 
 // ═══════════════════════════ LIVE ═══════════════════════════
-function renderLiveCatalog(){
-  const sel=document.getElementById('lv-prenda');
-  sel.innerHTML='<option value="">— seleccionar —</option>';
-  DB.prendas.filter(p=>p.activo).forEach(p=>{
-    sel.innerHTML+=`<option value="${p.id}">${p.nombre} — S/${p.precio}</option>`;
-  });
+async function loadCatalogoLive(){
+  try {
+    const prendas = await dbGet('prendas?activo=eq.true&order=nombre');
+    DB.prendas = prendas;
+    const sel=document.getElementById('lv-prenda');
+    sel.innerHTML='<option value="">— seleccionar —</option>';
+    prendas.forEach(p=>{ sel.innerHTML+=`<option value="${p.id}|${p.precio}">${p.nombre} — S/${p.precio}</option>`; });
+  } catch(e){ console.error('Catalogo live error:',e); }
 }
 
-function liveSearch(val){
+async function liveSearch(val){
   const clean=val.replace(/\s/g,'');
   const res=document.getElementById('live-search-results');
   if(clean.length<4){ res.innerHTML=''; hideClientCard(); return; }
-  const matches=DB.clientes.filter(c=>c.telefono.startsWith(clean));
-  if(matches.length===0){
-    res.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:6px">No encontrada</div><button class="btn btn-sm" onclick="registrarNuevaEnLive('${clean}')">+ Registrar nueva clienta</button>`;
-    hideClientCard();
-  } else {
-    res.innerHTML=`<div class="pill-row">${matches.map(c=>`<button class="btn btn-xs" onclick="selectLiveClient('${c.id}')">${c.nombre} · ${c.telefono.slice(0,4)}···</button>`).join('')}</div>`;
-  }
+  try {
+    const matches = await dbGet(`clientes?telefono=like.${clean}*&limit=5`);
+    if(!matches.length){
+      res.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:6px">No encontrada</div><button class="btn btn-sm" onclick="registrarNuevaEnLive('${clean}')">+ Registrar nueva</button>`;
+      hideClientCard();
+    } else {
+      res.innerHTML=`<div class="pill-row">${matches.map(c=>`<button class="btn btn-xs" onclick="selectLiveClient('${c.id}')">${c.nombre||c.telefono} · ${c.telefono.slice(0,4)}···</button>`).join('')}</div>`;
+    }
+  } catch(e){ res.innerHTML='<div style="font-size:12px;color:var(--red)">Error de conexión</div>'; }
 }
 
-function selectLiveClient(id){
-  const c=DB.clientes.find(x=>x.id===id);
-  if(!c) return;
-  currentLiveClient=c;
-  liveCart=[];
-  document.getElementById('lc-av').textContent=initials(c.nombre);
-  document.getElementById('lc-name').textContent=c.nombre;
-  document.getElementById('lc-tel').textContent=c.telefono;
-  const badge=document.getElementById('lc-badge');
-  if(c.pedidos_count>0){ badge.textContent='recurrente'; badge.className='badge badge-pink'; }
-  else { badge.textContent='nueva clienta'; badge.className='badge badge-ok'; }
-  document.getElementById('lc-total').textContent='S/ '+c.total;
-  document.getElementById('lc-pedidos').textContent=c.pedidos_count;
-  const hist=DB.pedidos.filter(p=>p.cliente_id===c.id).slice(-2).reverse();
-  document.getElementById('lc-history').innerHTML=hist.length?hist.map(p=>`<div class="cart-item"><span class="text-muted">${p.num}</span><span class="font-500">S/ ${p.total}</span></div>`).join(''):`<div class="text-hint text-sm">Sin historial aún</div>`;
-  document.getElementById('live-client-card').style.display='block';
-  document.getElementById('live-cart-card').style.display='block';
-  document.getElementById('live-resumen-card').style.display='block';
-  renderLiveCart();
+async function selectLiveClient(id){
+  try {
+    const rows = await dbGet(`clientes?id=eq.${id}&select=*`);
+    const c = rows[0];
+    if(!c) return;
+    currentLiveClient=c;
+    // Cargar carrito abierto existente desde Supabase
+    const carritoRows = await dbGet(`carritos?cliente_id=eq.${id}&estado=eq.abierto&order=creado_en.desc&limit=1`);
+    if(carritoRows.length){
+      currentCarritoId = carritoRows[0].id;
+      const items = await dbGet(`carrito_items?carrito_id=eq.${currentCarritoId}&select=*,prendas(nombre)`);
+      liveCart = items.map(it=>({id:it.id, prenda_id:it.prenda_id, nombre:it.prendas?.nombre||'Prenda', talla:it.talla, precio:it.precio_unitario}));
+    } else {
+      currentCarritoId = null;
+      liveCart = [];
+    }
+    const pedidos = await dbGet(`pedidos?cliente_id=eq.${id}&order=creado_en.desc&limit=3`);
+    document.getElementById('lc-av').textContent=initials(c.nombre||'?');
+    document.getElementById('lc-name').textContent=c.nombre||'Sin nombre';
+    document.getElementById('lc-tel').textContent=c.telefono;
+    const badge=document.getElementById('lc-badge');
+    if(c.pedidos_count>0){ badge.textContent='recurrente'; badge.className='badge badge-pink'; }
+    else { badge.textContent='nueva'; badge.className='badge badge-ok'; }
+    document.getElementById('lc-total').textContent='S/ '+(c.total_gastado||0);
+    document.getElementById('lc-pedidos').textContent=c.pedidos_count||0;
+    document.getElementById('lc-history').innerHTML=pedidos.length
+      ?pedidos.map(p=>`<div class="cart-item"><span class="text-muted">${p.numero}</span><span class="font-500">S/ ${p.total}</span></div>`).join('')
+      :'<div class="text-hint text-sm">Sin historial aún</div>';
+    document.getElementById('live-client-card').style.display='block';
+    document.getElementById('live-cart-card').style.display='block';
+    document.getElementById('live-resumen-card').style.display='block';
+    renderLiveCart();
+  } catch(e){ console.error('selectLiveClient error:',e); alert('Error cargando clienta'); }
 }
 
 function hideClientCard(){
@@ -1014,21 +1066,34 @@ function hideClientCard(){
   document.getElementById('live-resumen-card').style.display='none';
 }
 
-function registrarNuevaEnLive(tel){
-  const nuevo={ id:'c'+Date.now(), telefono:tel, nombre:'Nueva clienta', talla:'', distrito:'', direccion:'', total:0, pedidos_count:0 };
-  DB.clientes.push(nuevo);
-  selectLiveClient(nuevo.id);
+async function registrarNuevaEnLive(tel){
+  try {
+    const rows = await dbPost('clientes', {telefono:tel, nombre:'Nueva clienta', pedidos_count:0, total_gastado:0});
+    const nueva = Array.isArray(rows)?rows[0]:rows;
+    await selectLiveClient(nueva.id);
+  } catch(e){ alert('Error registrando: '+e.message); }
 }
 
-function addToCart(){
-  const pId=document.getElementById('lv-prenda').value;
+async function addToCart(){
+  const val=document.getElementById('lv-prenda').value;
   const talla=document.getElementById('lv-talla').value;
-  if(!pId||!talla||!currentLiveClient){ alert('Selecciona prenda y talla'); return; }
-  const p=DB.prendas.find(x=>x.id===pId);
-  liveCart.push({prenda_id:pId, nombre:p.nombre, talla, precio:p.precio});
-  document.getElementById('lv-prenda').value='';
-  document.getElementById('lv-talla').value='';
-  renderLiveCart();
+  if(!val||!talla||!currentLiveClient){ alert('Selecciona prenda y talla'); return; }
+  const [prendaId, precio] = val.split('|');
+  const prenda = DB.prendas.find(p=>p.id===prendaId);
+  if(!prenda) return;
+  try {
+    if(!currentCarritoId){
+      const carritoRows = await dbPost('carritos', {cliente_id:currentLiveClient.id, estado:'abierto', total:0});
+      const carrito = Array.isArray(carritoRows)?carritoRows[0]:carritoRows;
+      currentCarritoId = carrito.id;
+    }
+    const itemRows = await dbPost('carrito_items', {carrito_id:currentCarritoId, prenda_id:prendaId, talla, precio_unitario:parseFloat(precio)});
+    const item = Array.isArray(itemRows)?itemRows[0]:itemRows;
+    liveCart.push({id:item.id, prenda_id:prendaId, nombre:prenda.nombre, talla, precio:parseFloat(precio)});
+    document.getElementById('lv-prenda').value='';
+    document.getElementById('lv-talla').value='';
+    renderLiveCart();
+  } catch(e){ alert('Error agregando: '+e.message); }
 }
 
 function renderLiveCart(){
@@ -1065,9 +1130,49 @@ function updateEnvCosto(){
 
 async function confirmarPedido(){
   const tipo=document.getElementById('env-tipo').value;
-  const costo=DISTRITOS_COSTO[tipo]||13;
+  const costo=parseInt(tipo)||13;
   const sub=liveCart.reduce((a,i)=>a+i.precio,0);
-  let numPedido = 'JAS-'+new Date().getFullYear()+'-'+(String(DB.pedidos.length+42).padStart(4,'0'));
+  let numPedido='';
+  try {
+    // Usar carrito existente o crear uno nuevo
+    let carritoId = currentCarritoId;
+    if(!carritoId){
+      const carritoRows = await dbPost('carritos', {cliente_id:currentLiveClient.id, estado:'en_pedido', total:sub});
+      const carrito = Array.isArray(carritoRows)?carritoRows[0]:carritoRows;
+      carritoId = carrito.id;
+      // Agregar items si no estaban en Supabase aún
+      for(const item of liveCart){
+        await dbPost('carrito_items', {carrito_id:carritoId, prenda_id:item.prenda_id, talla:item.talla, precio_unitario:item.precio});
+      }
+    } else {
+      // Actualizar estado del carrito existente
+      await dbPatch(`carritos?id=eq.${carritoId}`, {estado:'en_pedido', total:sub});
+    }
+    // Crear pedido
+    const pedRows = await dbPost('pedidos', {
+      numero:'', cliente_id:currentLiveClient.id, carrito_id:carritoId,
+      subtotal:sub, costo_envio:costo, total:sub+costo, monto_pagado:0, estado:'pago_pendiente'
+    });
+    const ped = Array.isArray(pedRows)?pedRows[0]:pedRows;
+    numPedido = ped.numero;
+    // Actualizar contador clienta
+    await dbPatch(`clientes?id=eq.${currentLiveClient.id}`, {pedidos_count:(currentLiveClient.pedidos_count||0)+1});
+  } catch(e){
+    alert('Error creando pedido: '+e.message); return;
+  }
+  closeModal('modal-envio');
+  liveCart=[]; currentCarritoId=null; renderLiveCart();
+  currentLiveClient=null; hideClientCard();
+  document.getElementById('live-search').value='';
+  document.getElementById('live-search-results').innerHTML='';
+  const base=location.origin+location.pathname;
+  const linkPedido=`${base}?tracking=${numPedido}`;
+  const linkReg=`${base}?registro`;
+  document.getElementById('link-url').textContent=linkPedido;
+  document.getElementById('link-registro').textContent=linkReg;
+  document.getElementById('link-wa-msg').textContent=`WA: "Hola! Tu pedido ${numPedido} está listo. Total aprox. S/${sub+costo}. Sigue tu pedido aquí: ${linkPedido}"`;
+  document.getElementById('modal-link').classList.add('open');
+}
   try {
     // 1. Crear carrito en Supabase
     const carritoRows = await dbPost('carritos', {cliente_id: currentLiveClient.id, estado:'en_pedido', total: sub});
@@ -1077,150 +1182,146 @@ async function confirmarPedido(){
       await dbPost('carrito_items', {carrito_id:carrito.id, prenda_id:item.prenda_id, talla:item.talla, precio_unitario:item.precio});
     }
     // 3. Crear pedido (trigger genera el número)
-    const pedRows = await dbPost('pedidos', {
-      numero:'', cliente_id:currentLiveClient.id, carrito_id:carrito.id,
-      subtotal:sub, costo_envio:costo, total:sub+costo, monto_pagado:0, estado:'pago_pendiente'
-    });
-    const ped = Array.isArray(pedRows)?pedRows[0]:pedRows;
-    numPedido = ped.numero;
-    // 4. Actualizar contador clienta
-    await dbPatch(`clientes?id=eq.${currentLiveClient.id}`, {pedidos_count:(currentLiveClient.pedidos_count||0)+1});
-    DB.pedidos.push({id:ped.id, num:numPedido, cliente_id:currentLiveClient.id, subtotal:sub, costo_envio:costo, total:sub+costo, pagado:0, estado:'pago_pendiente'});
-  } catch(e) {
-    // fallback local
-    DB.pedidos.push({id:'ped'+Date.now(), num:numPedido, cliente_id:currentLiveClient.id,
-      items:[...liveCart.map(i=>({nombre:i.nombre,talla:i.talla,precio:i.precio}))],
-      subtotal:sub, costo_envio:costo, total:sub+costo, pagado:0, estado:'pago_pendiente',
-      tipo_envio:tipo, distrito:'', direccion:'', courier_codigo:'', fecha:new Date().toISOString().slice(0,10)});
-    currentLiveClient.pedidos_count++;
-  }
-  closeModal('modal-envio');
-  liveCart=[]; renderLiveCart();
-  currentLiveClient=null; hideClientCard();
-  document.getElementById('live-search').value='';
-  document.getElementById('live-search-results').innerHTML='';
-  const link=`${location.origin}${location.pathname}?tracking=${numPedido}`;
-  const linkReg=`${location.origin}${location.pathname}?registro`;
-  document.getElementById('link-url').textContent=link;
-  document.getElementById('link-registro').textContent=linkReg;
-  document.getElementById('link-wa-msg').textContent=`WA: "Hola! Tu pedido ${numPedido} está listo. Total aprox. S/${sub+costo}. Ingresa tu dirección y sigue tu pedido: ${link}"`;
-  document.getElementById('modal-link').classList.add('open');
-}
-
 function copyLink(){ navigator.clipboard.writeText(document.getElementById('link-url').textContent).catch(()=>{}); }
 function copyRegistroLink(){ navigator.clipboard.writeText(document.getElementById('link-registro').textContent).catch(()=>{}); }
 function verTracking(){ closeModal('modal-link'); showTracking(document.getElementById('link-url').textContent.split('tracking=')[1]); }
 
 // ═══════════════════════════ PEDIDOS ═══════════════════════════
 let pedidoFiltro='todos';
-function filterPedidos(f, el){
+function filterPedidos(f,el){
   pedidoFiltro=f;
   document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
-  renderPedidos(f);
+  loadPedidos(f);
 }
 
-function renderPedidos(f){
-  let list=DB.pedidos;
-  if(f==='por_pagar') list=list.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado));
-  if(f==='pago_completo') list=list.filter(p=>p.estado==='pago_completo');
-  if(f==='en_camino') list=list.filter(p=>p.estado==='en_camino');
-  const c=DB.clientes;
-  document.getElementById('pedidos-tbody').innerHTML=list.map((p,i)=>{
-    const cl=c.find(x=>x.id===p.cliente_id);
-    const falta=p.total-p.pagado;
-    return `<tr>
-      <td class="font-500">${p.num}</td>
-      <td>${cl?cl.nombre:'—'}</td>
-      <td>S/ ${p.total}</td>
-      <td>${falta>0?`<span class="text-hint">S/ ${p.pagado} <span style="color:var(--red)">(-S/${falta})</span></span>`:`<span style="color:var(--green)">S/ ${p.pagado} ✓</span>`}</td>
-      <td><span class="badge ${ESTADOS_BADGE[p.estado]}">${ESTADOS_LABEL[p.estado]}</span></td>
-      <td>${p.courier_codigo||'—'}</td>
-      <td><button class="btn btn-xs" onclick="openPedidoModal(${DB.pedidos.indexOf(p)})">Ver</button></td>
-    </tr>`;
-  }).join('');
+async function renderPedidos(f){ loadPedidos(f); }
+
+async function loadPedidos(f='todos'){
+  try {
+    const pedidos = await dbGet('pedidos?select=*,clientes(nombre,telefono)&order=creado_en.desc');
+    DB.pedidos = pedidos;
+    let list = pedidos;
+    if(f==='por_pagar') list=pedidos.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado));
+    if(f==='pago_completo') list=pedidos.filter(p=>p.estado==='pago_completo');
+    if(f==='en_camino') list=pedidos.filter(p=>p.estado==='en_camino');
+    const falta=p=>p.total-p.monto_pagado;
+    document.getElementById('pedidos-tbody').innerHTML=list.length?list.map(p=>`
+      <tr>
+        <td class="font-500">${p.numero}</td>
+        <td>${p.clientes?.nombre||'—'}</td>
+        <td>S/ ${p.total}</td>
+        <td>${falta(p)>0?`<span style="color:var(--red)">S/${p.monto_pagado} (-S/${falta(p)})</span>`:`<span style="color:var(--green)">S/${p.monto_pagado} ✓</span>`}</td>
+        <td><span class="badge ${ESTADOS_BADGE[p.estado]}">${ESTADOS_LABEL[p.estado]}</span></td>
+        <td><button class="btn btn-xs" onclick="openPedidoModal('${p.id}')">Ver</button>
+        ${p.estado!=='entregado'?`<button class="btn btn-xs" onclick="avanzarEstadoDirecto('${p.id}','${p.estado}')">${ESTADOS_ACTION[p.estado]||''}</button>`:''}</td>
+      </tr>`).join(''):'<tr><td colspan="6" class="loading">Sin pedidos</td></tr>';
+  } catch(e){ console.error('loadPedidos error:',e); }
 }
 
-function openPedidoModal(idx){
-  currentPedidoIdx=idx;
-  const p=DB.pedidos[idx];
-  const cl=DB.clientes.find(x=>x.id===p.cliente_id);
-  document.getElementById('mp-title').textContent=p.num;
-  const next=ESTADOS_NEXT[p.estado];
-  const actionLabel=ESTADOS_ACTION[p.estado];
-  const btn=document.getElementById('mp-action-btn');
-  if(actionLabel && currentUser?.key==='admin' || (currentUser?.key==='operador' && p.estado!=='entregado')){
-    btn.style.display='inline-flex'; btn.textContent=actionLabel;
-    if(p.estado==='empaquetado'){ btn.onclick=()=>openDespachoInput(idx); }
-    else { btn.onclick=avanzarEstado; }
-  } else { btn.style.display='none'; }
-  const falta=p.total-p.pagado;
-  document.getElementById('mp-content').innerHTML=`
-    <div class="grid-2 mb-12">
-      <div><div class="text-xs text-hint">Clienta</div><div class="font-500">${cl?cl.nombre:'—'}</div></div>
-      <div><div class="text-xs text-hint">Fecha</div><div>${p.fecha}</div></div>
-      <div><div class="text-xs text-hint">Estado</div><div><span class="badge ${ESTADOS_BADGE[p.estado]}">${ESTADOS_LABEL[p.estado]}</span></div></div>
-      <div><div class="text-xs text-hint">Envío</div><div>${p.distrito} · S/${p.costo_envio}</div></div>
-      <div><div class="text-xs text-hint">Total</div><div class="font-600">S/ ${p.total}</div></div>
-      <div><div class="text-xs text-hint">Pagado</div><div class="${falta>0?'delta-dn':'delta-up'} font-500">S/ ${p.pagado}${falta>0?' (falta S/'+falta+')':' ✓'}</div></div>
-    </div>
-    <div class="card-title">Prendas</div>
-    <div class="tbl-wrap mb-12">${p.items.map(it=>`<div class="cart-item" style="padding:7px 12px">${it.nombre} T-${it.talla} <span class="font-500 ml-auto">S/ ${it.precio}</span></div>`).join('')}</div>
-    ${p.estado==='pago_pendiente'||p.estado==='pago_parcial'?`
-    <div class="card-title">Registrar pago</div>
-    <div class="grid-2">
-      <div class="form-row"><label class="form-label">Monto recibido (S/)</label><input type="number" id="mp-monto" placeholder="${falta}"></div>
-      <div class="form-row"><label class="form-label">Método</label><select id="mp-metodo"><option>Yape</option><option>Plin</option><option>Transferencia</option></select></div>
-    </div>`:''}
-    ${p.estado==='en_camino'?`<div class="form-row"><label class="form-label">Código courier</label><div class="font-500">${p.courier_codigo||'—'}</div></div>`:''}
-  `;
-  document.getElementById('modal-pedido').classList.add('open');
+async function openPedidoModal(id){
+  currentPedidoIdx=id;
+  try {
+    const rows = await dbGet(`pedidos?id=eq.${id}&select=*,clientes(nombre,telefono)`);
+    const p = rows[0];
+    const items = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&select=*,prendas(nombre)`);
+    document.getElementById('mp-title').textContent=p.numero;
+    const falta=p.total-p.monto_pagado;
+    const actionLabel=ESTADOS_ACTION[p.estado];
+    const btn=document.getElementById('mp-action-btn');
+    if(actionLabel){ btn.style.display='inline-flex'; btn.textContent=actionLabel; btn.onclick=()=>avanzarEstadoDirecto(p.id,p.estado); }
+    else btn.style.display='none';
+    document.getElementById('mp-content').innerHTML=`
+      <div class="grid-2 mb-12">
+        <div><div class="text-xs text-hint">Clienta</div><div class="font-500">${p.clientes?.nombre||'—'}</div></div>
+        <div><div class="text-xs text-hint">Fecha</div><div>${p.creado_en?.slice(0,10)||'—'}</div></div>
+        <div><div class="text-xs text-hint">Estado</div><div><span class="badge ${ESTADOS_BADGE[p.estado]}">${ESTADOS_LABEL[p.estado]}</span></div></div>
+        <div><div class="text-xs text-hint">Envío</div><div>${p.distrito||'Sin dirección'} · S/${p.costo_envio}</div></div>
+        <div><div class="text-xs text-hint">Total</div><div class="font-600">S/ ${p.total}</div></div>
+        <div><div class="text-xs text-hint">Pagado</div><div class="${falta>0?'delta-dn':'delta-up'} font-500">S/${p.monto_pagado}${falta>0?' (falta S/'+falta+')':' ✓'}</div></div>
+      </div>
+      ${p.courier_codigo?`<div class="mb-12"><div class="text-xs text-hint">Código courier</div><div class="font-500">${p.courier_codigo}</div></div>`:''}
+      <div class="card-title">Prendas</div>
+      <div class="tbl-wrap mb-12">${items.map(it=>`<div class="cart-item" style="padding:7px 12px">${it.prendas?.nombre||'Prenda'} T-${it.talla} <span class="font-500" style="margin-left:auto">S/ ${it.precio_unitario}</span></div>`).join('')||'<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin items</div>'}</div>
+      ${['pago_pendiente','pago_parcial'].includes(p.estado)?`
+        <div class="card-title">Registrar pago</div>
+        <div class="grid-2">
+          <div class="form-row"><label class="form-label">Monto (S/)</label><input type="number" id="mp-monto" placeholder="${falta}"></div>
+          <div class="form-row"><label class="form-label">Método</label><select id="mp-metodo"><option>Yape</option><option>Plin</option><option>Transferencia</option></select></div>
+        </div>
+        <button class="btn btn-success w-full" onclick="registrarPago('${p.id}','${p.total}','${p.monto_pagado}')">Confirmar pago</button>`:''}`;
+    document.getElementById('modal-pedido').classList.add('open');
+  } catch(e){ alert('Error: '+e.message); }
 }
 
-function avanzarEstado(){
-  const p=DB.pedidos[currentPedidoIdx];
-  if((p.estado==='pago_pendiente'||p.estado==='pago_parcial')){
-    const monto=parseFloat(document.getElementById('mp-monto')?.value||0);
-    if(!monto){ alert('Ingresa el monto recibido'); return; }
-    p.pagado=Math.min(p.pagado+monto, p.total);
-  }
-  p.estado=ESTADOS_NEXT[p.estado]||p.estado;
-  closeModal('modal-pedido');
-  renderPedidos(pedidoFiltro);
+async function registrarPago(pedidoId,total,pagadoActual){
+  const monto=parseFloat(document.getElementById('mp-monto')?.value||0);
+  const metodo=document.getElementById('mp-metodo')?.value||'Yape';
+  if(!monto){ alert('Ingresa el monto'); return; }
+  try {
+    await dbPost('pagos', {pedido_id:pedidoId, metodo, monto, estado:'confirmado'});
+    alert('Pago registrado ✓');
+    closeModal('modal-pedido');
+    loadPedidos(pedidoFiltro);
+    loadDashboard();
+  } catch(e){ alert('Error: '+e.message); }
 }
 
-function openDespachoInput(idx){
-  const codigo=prompt('Ingresa el código de seguimiento del courier:');
-  if(!codigo) return;
-  DB.pedidos[idx].courier_codigo=codigo;
-  DB.pedidos[idx].estado='en_camino';
-  closeModal('modal-pedido');
-  renderPedidos(pedidoFiltro);
+async function avanzarEstadoDirecto(id,estadoActual){
+  const next=ESTADOS_NEXT[estadoActual];
+  if(!next) return;
+  try {
+    if(estadoActual==='empaquetado'){
+      const codigo=prompt('Código de seguimiento del courier:');
+      if(!codigo) return;
+      await dbPatch(`pedidos?id=eq.${id}`, {estado:next, courier_codigo:codigo});
+    } else if(['pago_pendiente','pago_parcial'].includes(estadoActual)){
+      openPedidoModal(id); return;
+    } else {
+      await dbPatch(`pedidos?id=eq.${id}`, {estado:next});
+    }
+    closeModal('modal-pedido');
+    loadPedidos(pedidoFiltro);
+    loadDashboard();
+  } catch(e){ alert('Error: '+e.message); }
 }
 
 // ═══════════════════════════ CLIENTES ═══════════════════════════
-function renderClientes(filter=''){
-  let list=DB.clientes.filter(c=>!filter||c.nombre.toLowerCase().includes(filter.toLowerCase())||c.telefono.includes(filter));
-  document.getElementById('clientes-tbody').innerHTML=list.map(c=>`
+async function loadClientes(filter=''){
+  try {
+    const q = filter
+      ? `clientes?or=(nombre.ilike.*${filter}*,telefono.ilike.*${filter}*)&order=nombre`
+      : 'clientes?order=nombre';
+    const list = await dbGet(q);
+    DB.clientes = list;
+    renderClientesTabla(list);
+  } catch(e){ console.error('loadClientes error:',e); }
+}
+function renderClientes(filter=''){ loadClientes(filter); }
+function filterClientes(v){ loadClientes(v); }
+
+function renderClientesTabla(list){
+  document.getElementById('clientes-tbody').innerHTML=list.length?list.map(c=>`
     <tr>
-      <td><div style="display:flex;align-items:center;gap:8px"><div class="avatar-md">${initials(c.nombre)}</div><span class="font-500">${c.nombre}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="avatar-md">${initials(c.nombre||'?')}</div><span class="font-500">${c.nombre||'Sin nombre'}</span></div></td>
       <td class="text-muted">${c.telefono}</td>
       <td>${c.talla||'—'}</td>
-      <td>${c.pedidos_count}</td>
-      <td>S/ ${c.total}</td>
+      <td>${c.pedidos_count||0}</td>
+      <td>S/ ${c.total_gastado||0}</td>
       <td class="text-hint">${c.pedidos_count?'Reciente':'Sin pedidos'}</td>
       <td><button class="btn btn-xs" onclick="editCliente('${c.id}')">Editar</button></td>
-    </tr>`).join('');
+    </tr>`).join(''):'<tr><td colspan="7" class="loading">Sin clientas aún</td></tr>';
 }
-function filterClientes(v){ renderClientes(v); }
 function editCliente(id){
   const c=DB.clientes.find(x=>x.id===id);
-  document.getElementById('nc-nombre').value=c.nombre;
-  document.getElementById('nc-tel').value=c.telefono;
+  if(!c) return;
+  editingClienteId=id;
+  document.getElementById('nc-nombre').value=c.nombre||'';
+  document.getElementById('nc-tel').value=c.telefono||'';
   document.getElementById('nc-talla').value=c.talla||'';
   document.getElementById('nc-distrito').value=c.distrito||'';
   document.querySelector('#modal-cliente .modal-title').textContent='Editar clienta';
-  document.querySelector('#modal-cliente .btn-primary').onclick=()=>guardarClienteEdit(id);
+  document.querySelector('#modal-cliente .btn-primary').onclick=guardarCliente;
   document.getElementById('modal-cliente').classList.add('open');
 }
 function openModalNuevaCliente(){
@@ -1253,39 +1354,46 @@ async function guardarCliente(){
 }
 
 // ═══════════════════════════ CATÁLOGO ═══════════════════════════
-function renderCatalogo(){
-  document.getElementById('catalogo-tbody').innerHTML=DB.prendas.map((p,i)=>`
+async function loadCatalogo(){
+  try {
+    const prendas = await dbGet('prendas?order=nombre');
+    DB.prendas = prendas;
+    renderCatalogoTabla(prendas);
+  } catch(e){ console.error('loadCatalogo error:',e); }
+}
+function renderCatalogo(){ loadCatalogo(); }
+
+function renderCatalogoTabla(prendas){
+  document.getElementById('catalogo-tbody').innerHTML=prendas.length?prendas.map(p=>`
     <tr>
       <td class="font-500">${p.nombre}</td>
-      <td class="text-muted">${p.codigo}</td>
-      <td>S/ ${p.precio}${currentUser?.key==='admin'?` <span class="text-hint">(costo S/${p.costo})</span>`:''}</td>
-      <td>${p.tallas.join(', ')}</td>
-      <td>${p.categoria}</td>
+      <td class="text-muted">${p.codigo||'—'}</td>
+      <td>S/ ${p.precio}${currentUser?.rol==='admin'?` <span class="text-hint">(costo S/${p.costo||0})</span>`:''}</td>
+      <td>${(p.tallas||[]).join(', ')}</td>
+      <td>${p.categoria||'—'}</td>
       <td><span class="badge ${p.activo?'badge-ok':'badge-gray'}">${p.activo?'Activo':'Inactivo'}</span></td>
-      <td style="display:flex;gap:6px">
-        <button class="btn btn-xs" onclick="openModalPrenda(${i})">Editar</button>
-        <button class="btn btn-xs" onclick="togglePrenda(${i})">${p.activo?'Desactivar':'Activar'}</button>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-xs" onclick="openModalPrenda('${p.id}')">Editar</button>
+        <button class="btn btn-xs" onclick="togglePrenda('${p.id}',${p.activo})">${p.activo?'Desactivar':'Activar'}</button>
       </td>
-    </tr>`).join('');
+    </tr>`).join(''):'<tr><td colspan="7" class="loading">Sin prendas aún</td></tr>';
 }
 
-function openModalPrenda(idx){
-  editingPrendaIdx = idx !== undefined ? idx : null;
-  if(idx !== undefined){
-    const p=DB.prendas[idx];
+function openModalPrenda(id){
+  editingPrendaIdx = id || null;
+  if(id){
+    const p=DB.prendas.find(x=>x.id===id);
+    if(!p) return;
     document.getElementById('modal-prenda-title').textContent='Editar prenda';
     document.getElementById('pr-nombre').value=p.nombre;
-    document.getElementById('pr-codigo').value=p.codigo;
+    document.getElementById('pr-codigo').value=p.codigo||'';
     document.getElementById('pr-precio').value=p.precio;
-    document.getElementById('pr-costo').value=p.costo;
-    document.getElementById('pr-cat').value=p.categoria;
-    document.querySelectorAll('.talla-chk').forEach(chk=>{ chk.checked=p.tallas.includes(chk.value); });
+    document.getElementById('pr-costo').value=p.costo||'';
+    document.getElementById('pr-cat').value=p.categoria||'Vestido';
+    document.querySelectorAll('.talla-chk').forEach(chk=>{ chk.checked=(p.tallas||[]).includes(chk.value); });
   } else {
     document.getElementById('modal-prenda-title').textContent='Nueva prenda';
-    document.getElementById('pr-nombre').value='';
-    document.getElementById('pr-codigo').value='';
-    document.getElementById('pr-precio').value='';
-    document.getElementById('pr-costo').value='';
+    ['pr-nombre','pr-codigo','pr-precio','pr-costo'].forEach(fid=>document.getElementById(fid).value='');
     document.getElementById('pr-cat').value='Vestido';
     document.querySelectorAll('.talla-chk').forEach(chk=>{ chk.checked=chk.value==='M'||chk.value==='L'; });
   }
@@ -1301,41 +1409,38 @@ async function guardarPrenda(){
     categoria:document.getElementById('pr-cat').value, tallas, activo:true };
   if(!data.nombre){ alert('El nombre es obligatorio'); return; }
   try {
-    if(editingPrendaIdx !== null){
-      const p = DB.prendas[editingPrendaIdx];
-      await dbPatch(`prendas?id=eq.${p.id}`, data);
-      Object.assign(DB.prendas[editingPrendaIdx], data);
+    if(editingPrendaIdx){
+      await dbPatch(`prendas?id=eq.${editingPrendaIdx}`, data);
     } else {
-      const rows = await dbPost('prendas', data);
-      const nueva = Array.isArray(rows)?rows[0]:rows;
-      DB.prendas.push({id: nueva.id, ...data});
+      await dbPost('prendas', data);
     }
-  } catch(e) {
-    // fallback local
-    if(editingPrendaIdx !== null){ Object.assign(DB.prendas[editingPrendaIdx], data); }
-    else { DB.prendas.push({ id:'p'+Date.now(), ...data }); }
-  }
-  closeModal('modal-prenda'); renderCatalogo(); renderLiveCatalog();
+  } catch(e){ alert('Error: '+e.message); return; }
+  closeModal('modal-prenda'); loadCatalogo(); loadCatalogoLive();
 }
 
-function togglePrenda(i){ DB.prendas[i].activo=!DB.prendas[i].activo; renderCatalogo(); renderLiveCatalog(); }
+async function togglePrenda(id, activo){
+  try {
+    await dbPatch(`prendas?id=eq.${id}`, {activo:!activo});
+    loadCatalogo(); loadCatalogoLive();
+  } catch(e){ alert('Error: '+e.message); }
+}
 
-// ═══════════════════════════ TRACKING — ENTRY POINT ═══════════════════════════
+// ═══════════════════════════ TRACKING ═══════════════════════════
 let trackingNum = null;
 
-function showTracking(num){
-  const ped=DB.pedidos.find(p=>p.num===num);
-  if(!ped){ return; }
+async function showTracking(num){
   trackingNum=num;
-  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
-  hideAllRootPages();
-
-  // Si la clienta ya tiene dirección guardada → mostrar form con datos precargados
-  if(cl && cl.direccion && cl.direccion.trim()!==''){
-    showFormEnvio(num, true); // true = ya tiene datos
-  } else {
-    showFormEnvio(num, false);
-  }
+  try {
+    const rows = await dbGet(`pedidos?numero=eq.${num}&select=*,clientes(*),carrito_items(precio_unitario,talla,prendas(nombre))`);
+    if(!rows.length){ alert('Pedido no encontrado'); return; }
+    const ped=rows[0];
+    hideAllRootPages();
+    if(!ped.clientes?.direccion){
+      showFormEnvio(ped);
+    } else {
+      renderTrackingPage(ped);
+    }
+  } catch(e){ alert('Error cargando pedido: '+e.message); }
 }
 
 function hideAllRootPages(){
