@@ -1175,15 +1175,6 @@ async function confirmarPedido(){
   document.getElementById('link-wa-msg').textContent=`WA: "Hola! Tu pedido ${numPedido} está listo. Total aprox. S/${sub+costo}. Sigue tu pedido aquí: ${linkPedido}"`;
   document.getElementById('modal-link').classList.add('open');
 }
-  try {
-    // 1. Crear carrito en Supabase
-    const carritoRows = await dbPost('carritos', {cliente_id: currentLiveClient.id, estado:'en_pedido', total: sub});
-    const carrito = Array.isArray(carritoRows)?carritoRows[0]:carritoRows;
-    // 2. Crear items
-    for(const item of liveCart){
-      await dbPost('carrito_items', {carrito_id:carrito.id, prenda_id:item.prenda_id, talla:item.talla, precio_unitario:item.precio});
-    }
-    // 3. Crear pedido (trigger genera el número)
 function copyLink(){ navigator.clipboard.writeText(document.getElementById('link-url').textContent).catch(()=>{}); }
 function copyRegistroLink(){ navigator.clipboard.writeText(document.getElementById('link-registro').textContent).catch(()=>{}); }
 function verTracking(){ closeModal('modal-link'); showTracking(document.getElementById('link-url').textContent.split('tracking=')[1]); }
