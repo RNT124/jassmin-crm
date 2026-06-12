@@ -905,25 +905,30 @@ async function doLogin(){
   const p = document.getElementById('inp-pass').value;
   const errEl = document.getElementById('login-error');
   errEl.style.display='none';
-  try {
-    const rows = await dbGet(`usuarios?username=eq.${u}&activo=eq.true&select=*`);
-    if(!rows || !rows.length || rows[0].password_hash !== p){
-      errEl.textContent='Usuario o contraseña incorrectos'; errEl.style.display='block'; return;
-    }
-    currentUser = { ...rows[0], key: u };
-  } catch(e) {
-    // fallback local si Supabase falla
-    const user = USERS[u];
-    if(!user || user.pass !== p){ errEl.textContent='Usuario o contraseña incorrectos'; errEl.style.display='block'; return; }
-    currentUser = { ...user, key:u, rol: user.rol.toLowerCase() };
+
+  // Verificar credenciales locales primero (instantáneo)
+  const localUser = USERS[u];
+  if(!localUser || localUser.pass !== p){
+    errEl.textContent='Usuario o contraseña incorrectos'; errEl.style.display='block'; return;
   }
-  document.getElementById('login-page').style.display = 'none';
-  document.getElementById('app-page').style.display = 'flex';
-  document.getElementById('sb-avatar').textContent = currentUser.nombre[0];
-  document.getElementById('sb-uname').textContent = currentUser.nombre;
-  document.getElementById('sb-urole').textContent = currentUser.rol==='admin'?'Admin':'Operador';
+  currentUser = { ...localUser, key:u, rol:localUser.rol.toLowerCase() };
+
+  // Entrar inmediatamente
+  document.getElementById('login-page').style.display='none';
+  document.getElementById('app-page').style.display='flex';
+  document.getElementById('sb-avatar').textContent=currentUser.nombre[0];
+  document.getElementById('sb-uname').textContent=currentUser.nombre;
+  document.getElementById('sb-urole').textContent=currentUser.rol==='admin'?'Admin':'Operador';
   if(currentUser.rol!=='admin') document.getElementById('sb-catalogo').style.display='none';
   initApp();
+
+  // Verificar con Supabase en background (para obtener datos actualizados del usuario)
+  try {
+    const rows = await dbGet(`usuarios?username=eq.${u}&activo=eq.true&select=*`);
+    if(rows && rows.length && rows[0].password_hash===p){
+      currentUser = {...rows[0], key:u};
+    }
+  } catch(e){ /* usa credenciales locales */ }
 }
 function doLogout(){
   currentUser = null;
@@ -949,11 +954,8 @@ function nav(page, el){
 
 // ═══════════════════════════ INIT ═══════════════════════════
 async function initApp(){
-  await loadCatalogoLive();
-  loadDashboard();
-  loadPedidos();
-  loadClientes();
-  loadCatalogo();
+  // Carga en paralelo solo lo esencial — dashboard y catálogo para el live
+  Promise.all([loadDashboard(), loadCatalogoLive()]);
 }
 
 async function loadDashboard(){
