@@ -422,6 +422,11 @@ textarea{resize:vertical;min-height:72px}
     </div>
 
     <div class="sb-section">Operación</div>
+    <div class="sb-item" onclick="nav('carritos',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      Carritos abiertos
+      <span id="badge-carritos" style="margin-left:auto;background:var(--pink);color:#fff;font-size:10px;padding:1px 7px;border-radius:20px;display:none">0</span>
+    </div>
     <div class="sb-item" onclick="nav('pedidos',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7l-8-4-8 4v10l8 4 8-4V7z"/><path d="M12 3v18M4 7l8 4 8-4"/></svg>
       Pedidos
@@ -609,6 +614,20 @@ textarea{resize:vertical;min-height:72px}
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- ── CARRITOS ABIERTOS ── -->
+      <div id="pg-carritos" class="page">
+        <div class="sec-header">
+          <div class="sec-title">Carritos abiertos</div>
+          <div style="font-size:12px;color:var(--text2)" id="carritos-subtitle">Prendas reservadas pendientes de pedido</div>
+        </div>
+
+        <!-- resumen rápido -->
+        <div class="metrics-grid" id="carritos-metrics" style="margin-bottom:16px"></div>
+
+        <!-- lista de bolsas -->
+        <div id="carritos-lista"></div>
       </div>
 
       <!-- ── PEDIDOS ── -->
@@ -945,11 +964,12 @@ function nav(page, el){
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   document.getElementById('pg-'+page).classList.add('active');
   if(el) el.classList.add('active');
-  const titles = {dashboard:'Dashboard',live:'Registro — live',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo'};
+  const titles = {dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo'};
   document.getElementById('tb-title').textContent = titles[page]||page;
-  if(page==='pedidos') renderPedidos('todos');
-  if(page==='clientes') renderClientes();
-  if(page==='catalogo') renderCatalogo();
+  if(page==='carritos') loadCarritos();
+  if(page==='pedidos') loadPedidos();
+  if(page==='clientes') loadClientes();
+  if(page==='catalogo') loadCatalogo();
 }
 
 // ═══════════════════════════ INIT ═══════════════════════════
@@ -999,6 +1019,111 @@ async function loadDashboard(){
       `<div class="bar-col"><div class="bar" style="height:${Math.max(Math.round(v/mx*62),4)}px;background:${i===6?'var(--pink)':'var(--gray-mid)'}"></div><div class="bar-lbl">${labels[i]}</div></div>`
     ).join('');
   } catch(e){ console.error('Dashboard error:',e); }
+}
+
+// ═══════════════════════════ CARRITOS ABIERTOS ═══════════════════════════
+async function loadCarritos(){
+  document.getElementById('carritos-lista').innerHTML='<div class="loading">Cargando carritos...</div>';
+  try {
+    // Cargar carritos abiertos con sus items y clientas
+    const carritos = await dbGet('carritos?estado=eq.abierto&select=*,clientes(nombre,telefono,talla),carrito_items(id,talla,precio_unitario,prendas(nombre))&order=actualizado_en.desc');
+
+    // Actualizar badge en sidebar
+    const badge = document.getElementById('badge-carritos');
+    if(carritos.length > 0){ badge.textContent=carritos.length; badge.style.display='inline-block'; }
+    else { badge.style.display='none'; }
+
+    // Métricas rápidas
+    const totalPrendas = carritos.reduce((a,c)=>a+(c.carrito_items?.length||0),0);
+    const totalValor = carritos.reduce((a,c)=>a+(c.total||0),0);
+    const sinNombre = carritos.filter(c=>!c.clientes?.nombre||c.clientes.nombre==='Nueva clienta').length;
+    document.getElementById('carritos-metrics').innerHTML=`
+      <div class="metric"><div class="metric-val">${carritos.length}</div><div class="metric-lbl">Bolsas abiertas</div></div>
+      <div class="metric"><div class="metric-val">${totalPrendas}</div><div class="metric-lbl">Prendas reservadas</div></div>
+      <div class="metric"><div class="metric-val">S/ ${totalValor}</div><div class="metric-lbl">Valor acumulado</div></div>
+      ${sinNombre>0?`<div class="metric" style="background:var(--amber-light)"><div class="metric-val" style="color:var(--amber-dark)">${sinNombre}</div><div class="metric-lbl" style="color:var(--amber-dark)">Sin nombre aún</div></div>`:''}`;
+
+    if(!carritos.length){
+      document.getElementById('carritos-lista').innerHTML=`
+        <div class="card" style="text-align:center;padding:32px">
+          <div style="font-size:32px;margin-bottom:8px">🛍️</div>
+          <div style="font-size:14px;font-weight:500;color:var(--text)">Sin carritos abiertos</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px">Cuando registres prendas en el live aparecerán aquí</div>
+        </div>`;
+      return;
+    }
+
+    document.getElementById('carritos-lista').innerHTML = carritos.map(c=>{
+      const items = c.carrito_items||[];
+      const nombre = c.clientes?.nombre||'Sin nombre';
+      const tel = c.clientes?.telefono||'—';
+      const talla = c.clientes?.talla||'';
+      const total = items.reduce((a,it)=>a+it.precio_unitario,0);
+      const dias = Math.floor((Date.now()-new Date(c.actualizado_en))/86400000);
+      const diasLabel = dias===0?'hoy':dias===1?'ayer':`hace ${dias} días`;
+
+      return `<div class="card" style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--amber-light);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:var(--amber-dark);flex-shrink:0">${initials(nombre)}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500;color:var(--text)">${nombre}</div>
+            <div style="font-size:11.5px;color:var(--text2)">${tel}${talla?' · T-'+talla:''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:15px;font-weight:600;color:var(--text)">S/ ${total}</div>
+            <div style="font-size:11px;color:var(--text3)">${items.length} prenda${items.length!==1?'s':''} · ${diasLabel}</div>
+          </div>
+        </div>
+
+        <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:10px">
+          ${items.map(it=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid var(--border);font-size:12.5px">
+              <span>📦 ${it.prendas?.nombre||'Prenda'} <span style="color:var(--text3)">T-${it.talla}</span></span>
+              <span style="font-weight:500">S/ ${it.precio_unitario}</span>
+            </div>`).join('')}
+          <div style="display:flex;justify-content:space-between;font-weight:600;font-size:13px;padding-top:6px;margin-top:2px">
+            <span>Total carrito</span><span>S/ ${total}</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="generarPedidoDesdeCarrito('${c.id}','${c.cliente_id}',${total})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            Generar pedido de envío
+          </button>
+          <button class="btn btn-sm" onclick="irAlLiveConCliente('${c.cliente_id}')">
+            + Agregar más prendas
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e){ document.getElementById('carritos-lista').innerHTML='<div style="color:var(--red);font-size:12px">Error cargando carritos: '+e.message+'</div>'; }
+}
+
+async function generarPedidoDesdeCarrito(carritoId, clienteId, subtotal){
+  const tipoOpts = [
+    {val:13, label:'Motorizado Lima — S/ 13'},
+    {val:14, label:'Motorizado Lima zona media — S/ 14'},
+    {val:15, label:'Motorizado Lima zona lejana — S/ 15'},
+    {val:20, label:'Shalom provincias — S/ 20'}
+  ];
+  // Mostrar modal de envío
+  currentCarritoId = carritoId;
+  try {
+    const rows = await dbGet(`clientes?id=eq.${clienteId}`);
+    currentLiveClient = rows[0];
+    // Cargar items del carrito en liveCart
+    const items = await dbGet(`carrito_items?carrito_id=eq.${carritoId}&select=*,prendas(nombre)`);
+    liveCart = items.map(it=>({id:it.id, prenda_id:it.prenda_id, nombre:it.prendas?.nombre||'Prenda', talla:it.talla, precio:it.precio_unitario}));
+    document.getElementById('env-subtotal').textContent = 'S/ '+subtotal;
+    updateEnvCosto();
+    document.getElementById('modal-envio').classList.add('open');
+  } catch(e){ alert('Error: '+e.message); }
+}
+
+function irAlLiveConCliente(clienteId){
+  nav('live', document.querySelector('[onclick*="live"]'));
+  setTimeout(()=>{ selectLiveClient(clienteId); }, 300);
 }
 
 // ═══════════════════════════ LIVE ═══════════════════════════
@@ -1443,136 +1568,13 @@ function hideAllRootPages(){
   document.getElementById('form-envio-page').style.display='none';
 }
 
-// ── FORMULARIO PÚBLICO DE DATOS ──
-function showFormEnvio(num, tieneDir){
-  const ped=DB.pedidos.find(p=>p.num===num);
-  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
-  hideAllRootPages();
-  document.getElementById('form-envio-page').style.display='block';
+// ── FORMULARIO Y SEGUIMIENTO — ver funciones showTracking/showFormEnvio/renderTrackingPage arriba ──
 
-  // Resumen del pedido arriba
-  document.getElementById('fe-resumen').innerHTML=`
-    <div style="font-size:11px;color:var(--text3);margin-bottom:2px">Pedido ${ped.num}</div>
-    <div style="font-size:14px;font-weight:600;margin-bottom:10px">${ped.items.length} prenda${ped.items.length>1?'s':''} reservadas para ti</div>
-    ${ped.items.map(it=>`<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:0.5px solid var(--border)"><span>${it.nombre} <span style="color:var(--text3)">T-${it.talla}</span></span><span class="font-500">S/${it.precio}</span></div>`).join('')}
-    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-top:8px"><span>Subtotal prendas</span><span>S/${ped.subtotal}</span></div>`;
-
-  if(tieneDir){
-    // Clienta recurrente: mostrar dirección guardada y botón directo
-    document.getElementById('fe-form-card').style.display='none';
-    document.getElementById('fe-ya-confirmado').style.display='block';
-    document.getElementById('fe-dir-guardada').innerHTML=`<strong>${cl.nombre}</strong><br>${cl.direccion}${cl.referencia?', '+cl.referencia:''}<br><span style="color:var(--text3)">${cl.distrito}</span>`;
-  } else {
-    // Clienta nueva: mostrar formulario
-    document.getElementById('fe-form-card').style.display='block';
-    document.getElementById('fe-ya-confirmado').style.display='none';
-    if(cl && cl.nombre && cl.nombre!=='Nueva clienta') document.getElementById('fe-nombre').value=cl.nombre;
-    document.getElementById('fe-sub').textContent='S/'+ped.subtotal;
-  }
-}
-
-function feUpdateCosto(){
-  const sel=document.getElementById('fe-distrito-sel').value;
-  if(!sel){ document.getElementById('fe-costo-box').style.display='none'; return; }
-  const ped=DB.pedidos.find(p=>p.num===trackingNum);
-  const costo=parseInt(sel.split('|')[1])||13;
-  document.getElementById('fe-costo-box').style.display='block';
-  document.getElementById('fe-sub').textContent='S/'+ped.subtotal;
-  document.getElementById('fe-env-costo').textContent='S/'+costo;
-  document.getElementById('fe-total-final').textContent='S/'+(ped.subtotal+costo);
-}
-
-function feConfirmar(){
-  const nombre=document.getElementById('fe-nombre').value.trim();
-  const disSel=document.getElementById('fe-distrito-sel').value;
-  const dir=document.getElementById('fe-direccion').value.trim();
-  const ref=document.getElementById('fe-referencia').value.trim();
-  const errEl=document.getElementById('fe-error');
-
-  if(!nombre){ errEl.textContent='Por favor ingresa tu nombre completo.'; errEl.style.display='block'; return; }
-  if(!disSel){ errEl.textContent='Selecciona tu distrito.'; errEl.style.display='block'; return; }
-  if(!dir){ errEl.textContent='Ingresa tu dirección de entrega.'; errEl.style.display='block'; return; }
-  errEl.style.display='none';
-
-  const distrito=disSel.split('|')[0];
-  const costo=parseInt(disSel.split('|')[1])||13;
-  const ped=DB.pedidos.find(p=>p.num===trackingNum);
-  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
-
-  // Actualizar datos en la clienta y en el pedido
-  if(cl){
-    cl.nombre=nombre;
-    cl.distrito=distrito;
-    cl.direccion=dir;
-    cl.referencia=ref;
-  }
-  ped.distrito=distrito;
-  ped.direccion=dir;
-  ped.costo_envio=costo;
-  ped.total=ped.subtotal+costo;
-  ped.tipo_envio=costo===20?'shalom':'motorizado_'+costo;
-
-  renderTrackingPage(trackingNum);
-}
-
-function feIrASeguimiento(){ renderTrackingPage(trackingNum); }
+function feIrASeguimiento(){ renderTrackingPage(trackingPedidoData); }
 
 function feCambiarDireccion(){
   document.getElementById('fe-ya-confirmado').style.display='none';
   document.getElementById('fe-form-card').style.display='block';
-  const ped=DB.pedidos.find(p=>p.num===trackingNum);
-  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
-  if(cl){ document.getElementById('fe-nombre').value=cl.nombre||''; document.getElementById('fe-direccion').value=cl.direccion||''; document.getElementById('fe-referencia').value=cl.referencia||''; }
-  document.getElementById('fe-sub').textContent='S/'+ped.subtotal;
-}
-
-// ── PÁGINA DE SEGUIMIENTO REAL ──
-function renderTrackingPage(num){
-  const ped=DB.pedidos.find(p=>p.num===num);
-  if(!ped){ return; }
-  const cl=DB.clientes.find(x=>x.id===ped.cliente_id);
-  hideAllRootPages();
-  document.getElementById('tracking-page').style.display='block';
-  document.getElementById('trk-num').textContent='Pedido #'+ped.num;
-  document.getElementById('trk-name').textContent=cl?cl.nombre:'Clienta';
-  document.getElementById('trk-meta').innerHTML=`<span>${ped.fecha}</span><span>${ped.tipo_envio.startsWith('motor')?'Motorizado':'Shalom'}</span><span>${ped.distrito}</span>`;
-  const banners={
-    pago_pendiente:{bg:'#FAEEDA',c:'#633806',lbl:'Pendiente de pago',sub:`Yape o Plin al 921 328 731 · Total S/${ped.total}`},
-    pago_parcial:{bg:'#FAEEDA',c:'#633806',lbl:'Pago parcial recibido',sub:`Abono S/${ped.pagado} · faltan S/${ped.total-ped.pagado}`},
-    pago_completo:{bg:'#E6F1FB',c:'#0C447C',lbl:'Pago confirmado',sub:'Tu pedido está en preparación'},
-    empaquetado:{bg:'#E1F5EE',c:'#085041',lbl:'Pedido empaquetado',sub:'Listo para el próximo despacho'},
-    en_camino:{bg:'#F1EFE8',c:'#2C2C2A',lbl:'Tu pedido va en camino',sub:`Código: ${ped.courier_codigo} · ${ped.distrito}`},
-    entregado:{bg:'#EAF3DE',c:'#27500A',lbl:'Pedido entregado',sub:'¡Gracias por tu compra!'}
-  };
-  const b=banners[ped.estado];
-  document.getElementById('trk-banner').style.cssText=`background:${b.bg};color:${b.c};margin:12px 16px 0;border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:3px`;
-  document.getElementById('trk-banner').innerHTML=`<div style="font-weight:600;font-size:13px">${b.lbl}</div><div style="font-size:12px;opacity:.85">${b.sub}</div>`;
-  const steps=[
-    {key:'pago_pendiente',lbl:'Pedido creado'},
-    {key:'pago_completo',lbl:'Pago confirmado'},
-    {key:'empaquetado',lbl:'Empaquetado'},
-    {key:'en_camino',lbl:`Entregado a ${ped.tipo_envio.startsWith('motor')?'motorizado':'Shalom'}`},
-    {key:'entregado',lbl:'Entregado'}
-  ];
-  const curIdx=ESTADOS_ORDEN.indexOf(ped.estado);
-  document.getElementById('trk-timeline').innerHTML=steps.map((s,i)=>{
-    const done=curIdx>=ESTADOS_ORDEN.indexOf(s.key);
-    const isLast=i===steps.length-1;
-    return `<div class="tl-item">
-      <div class="tl-left">
-        <div class="tl-dot" style="background:${done?'#1D9E75':'#D3D1C7'};color:${done?'#fff':'#888780'};font-size:11px">${done?'✓':'○'}</div>
-        ${!isLast?`<div class="tl-line" style="background:${done?'#1D9E75':'#D3D1C7'}"></div>`:''}
-      </div>
-      <div class="tl-body">
-        <div class="tl-step" style="color:${done?'#1A1A18':'#9C9A92'}">${s.lbl}</div>
-        <div class="tl-date">${done?'Completado':'Pendiente'}</div>
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('trk-items').innerHTML=
-    ped.items.map(it=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:12.5px"><span>${it.nombre} <span style="color:var(--text3)">T-${it.talla}</span></span><span style="font-weight:500">S/${it.precio}</span></div>`).join('')+
-    `<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);padding:6px 0;border-bottom:0.5px solid var(--border)"><span>Envío</span><span>S/${ped.costo_envio}</span></div>`+
-    `<div style="display:flex;justify-content:space-between;margin-top:8px;font-weight:600;font-size:13px"><span>Total</span><span>S/${ped.total}</span></div>`;
 }
 
 // ═══════════════════════════ REGISTRO PÚBLICO ═══════════════════════════
