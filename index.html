@@ -1057,6 +1057,7 @@ let currentUser = null;
 let currentLiveClient = null;
 let currentCarritoId = null;
 let liveCart = [];
+let trackingPedidoData = null;
 let currentPedidoIdx = null;
 let editingPrendaIdx = null;
 
@@ -1723,11 +1724,19 @@ let trackingNum = null;
 async function showTracking(num){
   trackingNum=num;
   try {
-    const rows = await dbGet(`pedidos?numero=eq.${num}&select=*,clientes(*),carrito_items(precio_unitario,talla,prendas(nombre))`);
+    const rows = await dbGet(`pedidos?numero=eq.${num}&select=*,clientes(*)`);
     if(!rows.length){ alert('Pedido no encontrado'); return; }
     const ped=rows[0];
+    // Traer items del carrito por separado
+    if(ped.carrito_id){
+      const items = await dbGet(`carrito_items?carrito_id=eq.${ped.carrito_id}&select=*,prendas(nombre)`);
+      ped.carrito_items = items;
+    } else {
+      ped.carrito_items = [];
+    }
+    trackingPedidoData = ped;
     hideAllRootPages();
-    if(!ped.clientes?.direccion){
+    if(!ped.clientes?.direccion || ped.clientes.direccion.trim()===''){
       showFormEnvio(ped);
     } else {
       renderTrackingPage(ped);
