@@ -218,189 +218,363 @@ textarea{resize:vertical;min-height:72px}
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════ FORM ENVIO PUBLIC ═══ -->
-<div id="form-envio-page" style="display:none">
-  <div class="trk-wrap">
-    <div style="text-align:center;margin-bottom:16px">
-      <div style="font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--text)">JASSMIN</div>
-      <div style="font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-top:2px">Confirma tu pedido</div>
-    </div>
-    <div style="max-width:420px;margin:0 auto">
+<style>
+/* ── FORM 5 PASOS ── */
+.f5-wrap{min-height:100vh;background:linear-gradient(135deg,#FDF0F5 0%,#F8F0FA 100%);padding:0 0 40px}
+.f5-header{text-align:center;padding:28px 16px 20px}
+.f5-logo{font-size:22px;font-weight:700;letter-spacing:.16em;color:#72243E}
+.f5-subtitle{font-size:11px;color:#9C9A92;letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.f5-card{max-width:420px;margin:0 auto 12px;background:#fff;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,.06);overflow:hidden}
+.f5-progress{display:flex;background:#F1EFE8;padding:0}
+.f5-step-tab{flex:1;padding:10px 4px;text-align:center;font-size:10px;color:#9C9A92;border-bottom:2px solid transparent;transition:all .2s;cursor:default}
+.f5-step-tab.active{color:#D4537E;border-bottom-color:#D4537E;font-weight:600}
+.f5-step-tab.done{color:#1D9E75;border-bottom-color:#1D9E75}
+.f5-step-num{display:block;font-size:14px;font-weight:700;margin-bottom:2px}
+.f5-body{padding:20px 20px 8px}
+.f5-title{font-size:16px;font-weight:600;color:#1A1A18;margin-bottom:4px}
+.f5-desc{font-size:12px;color:#5F5E5A;margin-bottom:18px;line-height:1.5}
+.f5-label{font-size:11px;font-weight:500;color:#5F5E5A;margin-bottom:4px;display:block}
+.f5-input{width:100%;padding:10px 13px;border:1px solid #E8E6E0;border-radius:8px;font-size:13px;color:#1A1A18;background:#fff;outline:none;transition:border .15s;font-family:inherit;margin-bottom:12px}
+.f5-input:focus{border-color:#D4537E}
+.f5-select{width:100%;padding:10px 13px;border:1px solid #E8E6E0;border-radius:8px;font-size:13px;color:#1A1A18;background:#fff;outline:none;margin-bottom:12px;font-family:inherit}
+.f5-courier-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.f5-courier-opt{border:1.5px solid #E8E6E0;border-radius:12px;padding:14px 12px;cursor:pointer;text-align:center;transition:all .2s}
+.f5-courier-opt:hover{border-color:#D4537E;background:#FBEAF0}
+.f5-courier-opt.selected{border-color:#D4537E;background:#FBEAF0}
+.f5-courier-icon{font-size:26px;margin-bottom:6px}
+.f5-courier-name{font-size:13px;font-weight:600;color:#1A1A18;margin-bottom:3px}
+.f5-courier-desc{font-size:11px;color:#5F5E5A;line-height:1.4}
+.f5-courier-price{font-size:12px;font-weight:600;margin-top:6px}
+.f5-courier-price.gratis{color:#1D9E75}
+.f5-courier-price.pago{color:#D4537E}
+.f5-info-box{background:#FBEAF0;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#72243E;line-height:1.5}
+.f5-info-box.green{background:#EAF3DE;color:#27500A}
+.f5-tc-box{background:#F1EFE8;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:11.5px;color:#5F5E5A;line-height:1.6;max-height:160px;overflow-y:auto}
+.f5-tc-box h4{font-size:12px;font-weight:600;color:#1A1A18;margin-bottom:6px}
+.f5-tc-box li{margin-bottom:4px;margin-left:14px}
+.f5-check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:16px}
+.f5-check-row input{width:auto;margin-top:2px;flex-shrink:0;accent-color:#D4537E}
+.f5-check-label{font-size:12px;color:#5F5E5A;line-height:1.5}
+.f5-nav{display:flex;gap:10px;padding:12px 20px 20px}
+.f5-btn-back{flex:1;padding:11px;border:1px solid #E8E6E0;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;background:#fff;color:#5F5E5A}
+.f5-btn-next{flex:2;padding:11px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#D4537E;color:#fff;transition:background .15s}
+.f5-btn-next:hover{background:#72243E}
+.f5-btn-next:disabled{background:#D3D1C7;cursor:not-allowed}
+.f5-btn-full{width:100%;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:#D4537E;color:#fff;margin-bottom:10px}
+.f5-resumen-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid #E8E6E0;font-size:12.5px}
+.f5-resumen-item:last-child{border-bottom:none}
+.f5-total-row{display:flex;justify-content:space-between;font-weight:700;font-size:15px;padding-top:10px;margin-top:6px;border-top:1px solid #E8E6E0}
+.f5-pago-metodo{display:flex;gap:8px;margin-bottom:12px}
+.f5-pago-btn{flex:1;padding:10px;border:1.5px solid #E8E6E0;border-radius:8px;cursor:pointer;text-align:center;font-size:12px;font-weight:500;transition:all .2s}
+.f5-pago-btn.selected{border-color:#D4537E;background:#FBEAF0;color:#72243E}
+.f5-upload-area{border:1.5px dashed #D3D1C7;border-radius:8px;padding:20px;text-align:center;cursor:pointer;margin-bottom:12px;transition:border .2s}
+.f5-upload-area:hover{border-color:#D4537E}
+.f5-upload-area.has-file{border-color:#1D9E75;background:#EAF3DE}
+.f5-error{background:#FCEBEB;color:#A32D2D;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:10px;display:none}
+.f5-success{text-align:center;padding:32px 20px}
+.f5-success-icon{font-size:52px;margin-bottom:12px}
+</style>
 
-      <!-- resumen pedido -->
-      <div class="card mb-12" id="fe-resumen"></div>
+<div class="f5-wrap" id="form-envio-page" style="display:none">
+  <div class="f5-header">
+    <div class="f5-logo">JASSMIN</div>
+    <div class="f5-subtitle">Programa tu envío</div>
+  </div>
 
-      <!-- formulario -->
-      <div class="card" id="fe-form-card">
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Completa tus datos de envío</div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Solo necesitas hacerlo una vez. Los guardaremos para tu próximo pedido.</div>
+  <div class="f5-card">
+    <!-- barra de progreso -->
+    <div class="f5-progress" id="f5-progress-bar"></div>
 
-        <div class="form-row">
-          <label class="form-label">Tu nombre completo</label>
-          <input type="text" id="fe-nombre" placeholder="Nombre y apellido">
+    <!-- PASO 1: Tipo de envío -->
+    <div id="f5-paso-1" class="f5-paso">
+      <div class="f5-body">
+        <div class="f5-title">¿Cómo quieres recibir tu pedido?</div>
+        <div class="f5-desc">Elige el método de envío que más te convenga</div>
+        <div class="f5-courier-grid">
+          <div class="f5-courier-opt" id="opt-shalom" onclick="selCourier('shalom')">
+            <div class="f5-courier-icon">🚛</div>
+            <div class="f5-courier-name">Shalom</div>
+            <div class="f5-courier-desc">Envío a nivel nacional — recojo en agencia</div>
+            <div class="f5-courier-price gratis">Sin costo adicional</div>
+          </div>
+          <div class="f5-courier-opt" id="opt-motorizado" onclick="selCourier('motorizado')">
+            <div class="f5-courier-icon">🏍️</div>
+            <div class="f5-courier-name">Motorizado</div>
+            <div class="f5-courier-desc">Entrega a domicilio en Lima Metropolitana</div>
+            <div class="f5-courier-price pago">S/ 14.00</div>
+          </div>
         </div>
-        <div class="form-row">
-          <label class="form-label">Distrito</label>
-          <select id="fe-distrito-sel" onchange="feUpdateCosto()">
+        <div id="f5-shalom-info" style="display:none" class="f5-info-box green">
+          ✓ Con Shalom <strong>no pagas envío</strong> — solo recoge tu paquete en la agencia más cercana. El envío sale en 48 horas hábiles.
+        </div>
+        <div id="f5-motor-info" style="display:none" class="f5-info-box">
+          🏍️ El motorizado llega a tu puerta en Lima Metropolitana. Costo fijo de <strong>S/ 14</strong> para todos los distritos. Pagas al programar.
+        </div>
+      </div>
+      <div class="f5-nav" style="justify-content:flex-end">
+        <button class="f5-btn-next" style="flex:none;padding:11px 28px" onclick="f5Next()" id="f5-btn-1">Continuar →</button>
+      </div>
+    </div>
+
+    <!-- PASO 2: Datos personales -->
+    <div id="f5-paso-2" class="f5-paso" style="display:none">
+      <div class="f5-body">
+        <div class="f5-title">Tus datos de envío</div>
+        <div class="f5-desc">Completa tus datos para que podamos preparar tu paquete</div>
+        <label class="f5-label">Nombre completo *</label>
+        <input class="f5-input" id="f5-nombre" placeholder="Nombre y apellido completo">
+        <label class="f5-label">Número WhatsApp *</label>
+        <input class="f5-input" id="f5-tel" placeholder="987 654 321" type="tel" maxlength="12">
+        <div style="font-size:11px;color:#9C9A92;margin-top:-8px;margin-bottom:12px">⚠️ Coloca el número con el que compraste. Si colocas otro número <strong>tu pedido no se programará</strong>.</div>
+        <label class="f5-label">DNI *</label>
+        <input class="f5-input" id="f5-dni" placeholder="12345678" type="text" maxlength="8">
+
+        <!-- campos shalom -->
+        <div id="f5-campos-shalom" style="display:none">
+          <label class="f5-label">Agencia Shalom de recojo *</label>
+          <input class="f5-input" id="f5-agencia" placeholder="ej. Shalom San Juan de Lurigancho">
+          <label class="f5-label">Ciudad / Provincia *</label>
+          <input class="f5-input" id="f5-ciudad" placeholder="ej. Lima, Cusco, Arequipa...">
+        </div>
+
+        <!-- campos motorizado -->
+        <div id="f5-campos-motor" style="display:none">
+          <label class="f5-label">Distrito *</label>
+          <select class="f5-select" id="f5-distrito">
             <option value="">— seleccionar distrito —</option>
             <optgroup label="Lima Centro">
-              <option value="Miraflores|13">Miraflores</option>
-              <option value="San Isidro|13">San Isidro</option>
-              <option value="Barranco|13">Barranco</option>
-              <option value="Surquillo|13">Surquillo</option>
-              <option value="Lince|13">Lince</option>
+              <option>Miraflores</option><option>San Isidro</option><option>Barranco</option>
+              <option>Surquillo</option><option>Lince</option><option>Jesús María</option>
+              <option>Pueblo Libre</option><option>San Miguel</option><option>Magdalena del Mar</option>
+              <option>Breña</option><option>La Victoria</option><option>Rímac</option>
             </optgroup>
-            <optgroup label="Lima Norte / Este / Sur">
-              <option value="Surco|14">Santiago de Surco</option>
-              <option value="La Molina|14">La Molina</option>
-              <option value="San Borja|14">San Borja</option>
-              <option value="Jesus Maria|13">Jesús María</option>
-              <option value="Pueblo Libre|13">Pueblo Libre</option>
-              <option value="San Miguel|13">San Miguel</option>
-              <option value="Magdalena|13">Magdalena</option>
-              <option value="Chorrillos|14">Chorrillos</option>
-              <option value="Villa Maria|15">Villa María del Triunfo</option>
-              <option value="Ate|15">Ate</option>
-              <option value="San Juan Lurigancho|15">San Juan de Lurigancho</option>
-              <option value="Comas|15">Comas</option>
-              <option value="Los Olivos|15">Los Olivos</option>
-              <option value="Independencia|15">Independencia</option>
-              <option value="Otro Lima|15">Otro distrito Lima</option>
+            <optgroup label="Lima Sur">
+              <option>Santiago de Surco</option><option>Chorrillos</option><option>Barranco</option>
+              <option>San Juan de Miraflores</option><option>Villa María del Triunfo</option>
+              <option>Villa El Salvador</option><option>Lurín</option>
             </optgroup>
-            <optgroup label="Provincias">
-              <option value="Provincias|20">Provincias (Shalom)</option>
+            <optgroup label="Lima Este">
+              <option>Ate</option><option>San Juan de Lurigancho</option><option>La Molina</option>
+              <option>El Agustino</option><option>Santa Anita</option><option>Chaclacayo</option>
             </optgroup>
+            <optgroup label="Lima Norte">
+              <option>Los Olivos</option><option>Independencia</option><option>Comas</option>
+              <option>Carabayllo</option><option>Puente Piedra</option><option>San Martín de Porres</option>
+              <option>Ancón</option>
+            </optgroup>
+            <optgroup label="Callao">
+              <option>Callao</option><option>Bellavista</option><option>La Punta</option>
+              <option>La Perla</option><option>Mi Perú</option><option>Ventanilla</option>
+            </optgroup>
+            <option value="Otro">Otro distrito Lima</option>
           </select>
-        </div>
-        <div class="form-row">
-          <label class="form-label">Dirección</label>
-          <input type="text" id="fe-direccion" placeholder="Calle, número de casa o dpto.">
-        </div>
-        <div class="form-row">
-          <label class="form-label">Referencia <span class="text-hint">(opcional)</span></label>
-          <input type="text" id="fe-referencia" placeholder="ej. frente al parque, edificio azul...">
+          <label class="f5-label">Dirección exacta *</label>
+          <input class="f5-input" id="f5-direccion" placeholder="Calle, número, dpto...">
+          <label class="f5-label">Referencia</label>
+          <input class="f5-input" id="f5-referencia" placeholder="ej. frente al parque, portón azul...">
         </div>
 
-        <!-- resumen costo -->
-        <div id="fe-costo-box" style="display:none;background:var(--gray-light);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px">
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:3px">
-            <span>Subtotal prendas</span><span id="fe-sub">S/ 0</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:6px">
-            <span>Envío</span><span id="fe-env-costo">S/ —</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-weight:600;font-size:14px">
-            <span>Total</span><span id="fe-total-final">S/ 0</span>
+        <div class="f5-error" id="f5-err-2"></div>
+      </div>
+      <div class="f5-nav">
+        <button class="f5-btn-back" onclick="f5Back()">← Atrás</button>
+        <button class="f5-btn-next" onclick="f5Next()">Continuar →</button>
+      </div>
+    </div>
+
+    <!-- PASO 3: Resumen del pedido -->
+    <div id="f5-paso-3" class="f5-paso" style="display:none">
+      <div class="f5-body">
+        <div class="f5-title">Resumen de tu pedido</div>
+        <div class="f5-desc">Verifica que todo esté correcto antes de continuar</div>
+        <div id="f5-resumen-prendas" style="margin-bottom:14px"></div>
+        <div id="f5-resumen-envio" style="background:#F1EFE8;border-radius:8px;padding:12px 14px;font-size:12px;color:#5F5E5A;margin-bottom:4px"></div>
+      </div>
+      <div class="f5-nav">
+        <button class="f5-btn-back" onclick="f5Back()">← Atrás</button>
+        <button class="f5-btn-next" onclick="f5Next()">Confirmar →</button>
+      </div>
+    </div>
+
+    <!-- PASO 4: Términos -->
+    <div id="f5-paso-4" class="f5-paso" style="display:none">
+      <div class="f5-body">
+        <div class="f5-title">Términos y condiciones</div>
+        <div class="f5-desc">Lee y acepta para continuar</div>
+        <div class="f5-tc-box">
+          <h4>📦 Tiempos de despacho</h4>
+          <ul>
+            <li>Los pedidos salen en <strong>48 horas hábiles</strong> desde la confirmación.</li>
+            <li>Despachamos de <strong>lunes a sábado</strong>. No trabajamos domingos ni feriados.</li>
+          </ul>
+          <br>
+          <h4>🏷️ Acumulación de prendas</h4>
+          <ul>
+            <li>Plazo máximo de acumulación: <strong>15 días calendario</strong> desde la fecha de compra.</li>
+            <li>Pasado el plazo se cobrará una penalidad de <strong>S/ 5.00 por día</strong>.</li>
+          </ul>
+          <br>
+          <h4>🏍️ Motorizado — S/ 14</h4>
+          <ul>
+            <li>Precio fijo de S/ 14 para todos los distritos de Lima.</li>
+            <li>Debes adjuntar el comprobante de pago al programar.</li>
+            <li>Si el paquete es grande se coordinará un monto adicional.</li>
+            <li>Rango de entrega: lunes a sábado de 10am a 9pm.</li>
+          </ul>
+          <br>
+          <h4>🚛 Shalom — Sin costo adicional</h4>
+          <ul>
+            <li>Recoge tu paquete en la agencia Shalom que indicaste.</li>
+            <li>No debes pagar ningún monto de envío al programar.</li>
+          </ul>
+          <br>
+          <h4>⚠️ Responsabilidades</h4>
+          <ul>
+            <li>No nos responsabilizamos por retrasos por datos incorrectos.</li>
+            <li>El número de WhatsApp debe ser el mismo con el que compraste.</li>
+          </ul>
+        </div>
+        <div class="f5-check-row">
+          <input type="checkbox" id="f5-acepto" onchange="document.getElementById('f5-btn-4').disabled=!this.checked">
+          <label class="f5-check-label" for="f5-acepto">He leído y acepto los términos y condiciones del servicio de envío de Jassmin.</label>
+        </div>
+        <div class="f5-error" id="f5-err-4"></div>
+      </div>
+      <div class="f5-nav">
+        <button class="f5-btn-back" onclick="f5Back()">← Atrás</button>
+        <button class="f5-btn-next" id="f5-btn-4" onclick="f5Next()" disabled>Continuar →</button>
+      </div>
+    </div>
+
+    <!-- PASO 5: Pago (solo motorizado) / Confirmar (shalom) -->
+    <div id="f5-paso-5" class="f5-paso" style="display:none">
+      <!-- SHALOM: sin pago -->
+      <div id="f5-shalom-confirm" style="display:none">
+        <div class="f5-body">
+          <div class="f5-title">¡Todo listo! 🌸</div>
+          <div class="f5-desc">Tu pedido será enviado a la agencia Shalom que indicaste.</div>
+          <div class="f5-info-box green" style="margin-bottom:0">
+            ✓ <strong>No debes pagar nada ahora.</strong> El envío es sin costo adicional con Shalom. Solo recoge tu paquete en la agencia cuando te avisemos.
           </div>
         </div>
-
-        <div id="fe-error" style="display:none;background:var(--red-light);color:var(--red);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;margin-bottom:10px"></div>
-
-        <button class="btn btn-primary w-full" style="justify-content:center" onclick="feConfirmar()">
-          Confirmar datos y ver mi pedido →
-        </button>
+        <div class="f5-nav">
+          <button class="f5-btn-back" onclick="f5Back()">← Atrás</button>
+          <button class="f5-btn-next" onclick="f5Confirmar()">Confirmar pedido →</button>
+        </div>
       </div>
 
-      <!-- ya confirmado (clienta recurrente) -->
-      <div id="fe-ya-confirmado" style="display:none" class="card">
-        <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:6px">✓ Dirección guardada</div>
-        <div style="font-size:12px;color:var(--text2)" id="fe-dir-guardada"></div>
-        <button class="btn btn-primary w-full mt-12" style="justify-content:center" onclick="feIrASeguimiento()">Ver seguimiento de mi pedido →</button>
-        <button class="btn btn-sm w-full mt-8" style="justify-content:center;color:var(--text2)" onclick="feCambiarDireccion()">Cambiar dirección</button>
-      </div>
+      <!-- MOTORIZADO: con pago -->
+      <div id="f5-motor-pago" style="display:none">
+        <div class="f5-body">
+          <div class="f5-title">Pago del envío</div>
+          <div class="f5-desc">Transfiere S/ 14 por Yape o Plin y sube tu comprobante</div>
 
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9C9A92;margin-bottom:8px">Método de pago</div>
+          <div class="f5-pago-metodo">
+            <div class="f5-pago-btn" id="f5-yape-btn" onclick="selPago('yape')">
+              <div style="font-size:18px;margin-bottom:3px">💜</div>
+              <div>Yape</div>
+            </div>
+            <div class="f5-pago-btn" id="f5-plin-btn" onclick="selPago('plin')">
+              <div style="font-size:18px;margin-bottom:3px">💙</div>
+              <div>Plin</div>
+            </div>
+          </div>
+
+          <div id="f5-datos-pago" style="display:none;background:#F1EFE8;border-radius:8px;padding:12px 14px;margin-bottom:14px;text-align:center">
+            <div style="font-size:12px;color:#5F5E5A;margin-bottom:4px">Transfiere <strong>S/ 14.00</strong> a:</div>
+            <div style="font-size:18px;font-weight:700;color:#1A1A18;letter-spacing:.05em" id="f5-num-pago">921 328 731</div>
+            <div style="font-size:11px;color:#5F5E5A;margin-top:3px">A nombre de Jassmin</div>
+          </div>
+
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9C9A92;margin-bottom:8px">Sube tu comprobante *</div>
+          <div class="f5-upload-area" id="f5-upload-area" onclick="document.getElementById('f5-file-input').click()">
+            <div id="f5-upload-text">
+              <div style="font-size:24px;margin-bottom:6px">📷</div>
+              <div style="font-size:13px;font-weight:500;color:#5F5E5A">Toca para subir captura</div>
+              <div style="font-size:11px;color:#9C9A92;margin-top:3px">JPG, PNG · máx 5MB</div>
+            </div>
+            <img id="f5-preview" style="display:none;max-width:100%;border-radius:6px;margin-top:8px">
+          </div>
+          <input type="file" id="f5-file-input" accept="image/*" style="display:none" onchange="f5HandleFile(this)">
+
+          <div class="f5-error" id="f5-err-5"></div>
+        </div>
+        <div class="f5-nav">
+          <button class="f5-btn-back" onclick="f5Back()">← Atrás</button>
+          <button class="f5-btn-next" onclick="f5Confirmar()">Confirmar pedido →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ÉXITO -->
+    <div id="f5-paso-ok" style="display:none">
+      <div class="f5-success">
+        <div class="f5-success-icon">🎉</div>
+        <div style="font-size:18px;font-weight:700;color:#1A1A18;margin-bottom:6px">¡Pedido programado!</div>
+        <div style="font-size:12.5px;color:#5F5E5A;margin-bottom:16px;line-height:1.6">Nos estaremos comunicando contigo pronto.<br>El despacho sale en <strong>48 horas hábiles</strong>.</div>
+        <div style="background:#F1EFE8;border-radius:10px;padding:14px;margin-bottom:16px">
+          <div style="font-size:11px;color:#9C9A92;margin-bottom:4px">Código de seguimiento</div>
+          <div style="font-size:18px;font-weight:700;color:#D4537E" id="f5-codigo-ok">—</div>
+        </div>
+        <button class="f5-btn-full" onclick="window.location.href=location.pathname+'?tracking='+document.getElementById('f5-codigo-ok').textContent">🔍 Ver estado de mi pedido</button>
+        <div style="font-size:12px;color:#9C9A92;margin-top:8px">¿Dudas? Escríbenos al <strong style="color:#1A1A18">921 328 731</strong></div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════ REGISTRO PÚBLICO ═══ -->
+<!-- REGISTRO PÚBLICO (link fijo ?registro) -->
 <div id="registro-page" style="display:none">
-  <div class="trk-wrap">
-    <div style="text-align:center;margin-bottom:20px">
-      <div style="font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--text)">JASSMIN</div>
-      <div style="font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-top:2px">Registra tus datos de envío</div>
+  <div class="f5-wrap">
+    <div class="f5-header">
+      <div class="f5-logo">JASSMIN</div>
+      <div class="f5-subtitle">Registra tus datos</div>
     </div>
-    <div style="max-width:400px;margin:0 auto">
+    <div class="f5-card">
       <div id="rg-form-wrap">
-        <div style="background:var(--pink-light);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--pink-dark);text-align:center">
-          Llena tus datos una sola vez y úsalos en todos tus pedidos 🌸
-        </div>
-        <div class="card">
-          <div class="form-row">
-            <label class="form-label">Tu nombre completo</label>
-            <input type="text" id="rg-nombre" placeholder="Nombre y apellido">
-          </div>
-          <div class="form-row">
-            <label class="form-label">Tu número WhatsApp</label>
-            <input type="tel" id="rg-tel" placeholder="987 654 321" maxlength="12">
-            <div style="font-size:11px;color:var(--text3);margin-top:3px">Con este número te identificamos en cada pedido</div>
-          </div>
-          <div class="form-row">
-            <label class="form-label">Distrito</label>
-            <select id="rg-distrito">
-              <option value="">— seleccionar distrito —</option>
-              <optgroup label="Lima Centro">
-                <option value="Miraflores|13">Miraflores</option>
-                <option value="San Isidro|13">San Isidro</option>
-                <option value="Barranco|13">Barranco</option>
-                <option value="Surquillo|13">Surquillo</option>
-                <option value="Lince|13">Lince</option>
-                <option value="Jesus Maria|13">Jesús María</option>
-                <option value="Pueblo Libre|13">Pueblo Libre</option>
-                <option value="San Miguel|13">San Miguel</option>
-                <option value="Magdalena|13">Magdalena</option>
-              </optgroup>
-              <optgroup label="Lima Norte / Este / Sur">
-                <option value="Surco|14">Santiago de Surco</option>
-                <option value="La Molina|14">La Molina</option>
-                <option value="San Borja|14">San Borja</option>
-                <option value="Chorrillos|14">Chorrillos</option>
-                <option value="Villa Maria|15">Villa María del Triunfo</option>
-                <option value="Ate|15">Ate</option>
-                <option value="San Juan Lurigancho|15">San Juan de Lurigancho</option>
-                <option value="Comas|15">Comas</option>
-                <option value="Los Olivos|15">Los Olivos</option>
-                <option value="Independencia|15">Independencia</option>
-                <option value="Villa El Salvador|15">Villa El Salvador</option>
-                <option value="San Martin de Porres|15">San Martín de Porres</option>
-                <option value="Otro Lima|15">Otro distrito Lima</option>
-              </optgroup>
-              <optgroup label="Provincias">
-                <option value="Provincias|20">Provincias (Shalom)</option>
-              </optgroup>
-            </select>
-          </div>
-          <div class="form-row">
-            <label class="form-label">Dirección</label>
-            <input type="text" id="rg-direccion" placeholder="Calle, número, dpto.">
-          </div>
-          <div class="form-row">
-            <label class="form-label">Referencia <span class="text-hint">(opcional)</span></label>
-            <input type="text" id="rg-referencia" placeholder="ej. frente al parque, portón azul...">
-          </div>
-          <div id="rg-error" style="display:none;background:var(--red-light);color:var(--red);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;margin-bottom:10px"></div>
-          <button class="btn btn-primary w-full" style="justify-content:center" onclick="rgGuardar()">Guardar mis datos →</button>
+        <div class="f5-body">
+          <div class="f5-title">Registra tus datos de envío 🌸</div>
+          <div class="f5-desc">Llénalo una sola vez y úsalo en todos tus pedidos. Así programar tu envío será mucho más rápido.</div>
+          <label class="f5-label">Nombre completo *</label>
+          <input class="f5-input" id="rg-nombre" placeholder="Nombre y apellido">
+          <label class="f5-label">Tu número WhatsApp *</label>
+          <input class="f5-input" id="rg-tel" placeholder="987 654 321" type="tel" maxlength="12">
+          <div style="font-size:11px;color:#9C9A92;margin-top:-8px;margin-bottom:12px">Con este número te identificamos en cada pedido</div>
+          <label class="f5-label">Distrito (si eres de Lima)</label>
+          <select class="f5-select" id="rg-distrito">
+            <option value="">— seleccionar —</option>
+            <optgroup label="Lima Centro"><option>Miraflores</option><option>San Isidro</option><option>Barranco</option><option>Surquillo</option><option>Lince</option><option>Jesús María</option><option>Pueblo Libre</option><option>San Miguel</option><option>Magdalena del Mar</option></optgroup>
+            <optgroup label="Lima Sur"><option>Santiago de Surco</option><option>Chorrillos</option><option>San Juan de Miraflores</option><option>Villa María del Triunfo</option><option>Villa El Salvador</option></optgroup>
+            <optgroup label="Lima Este"><option>Ate</option><option>San Juan de Lurigancho</option><option>La Molina</option><option>Santa Anita</option></optgroup>
+            <optgroup label="Lima Norte"><option>Los Olivos</option><option>Independencia</option><option>Comas</option><option>San Martín de Porres</option><option>Puente Piedra</option></optgroup>
+            <optgroup label="Callao"><option>Callao</option><option>Ventanilla</option></optgroup>
+            <option value="Provincias">Soy de provincias</option>
+          </select>
+          <label class="f5-label">Dirección</label>
+          <input class="f5-input" id="rg-direccion" placeholder="Calle, número, dpto.">
+          <label class="f5-label">Referencia <span style="color:#9C9A92;font-weight:400">(opcional)</span></label>
+          <input class="f5-input" id="rg-referencia" placeholder="ej. frente al parque...">
+          <div class="f5-error" id="rg-error"></div>
+          <button class="f5-btn-full" onclick="rgGuardar()">Guardar mis datos →</button>
         </div>
       </div>
       <div id="rg-confirm-wrap" style="display:none">
-        <div class="card" style="text-align:center">
-          <div style="width:52px;height:52px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px">✓</div>
-          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">¡Datos guardados!</div>
-          <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Ya puedes comprar en nuestros lives sin preocuparte por llenar tu dirección cada vez.</div>
-          <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;text-align:left;margin-bottom:14px">
-            <div style="font-size:11px;color:var(--text3);margin-bottom:6px">TUS DATOS GUARDADOS</div>
-            <div id="rg-confirm-detalle" style="font-size:12.5px;color:var(--text);line-height:1.8"></div>
+        <div class="f5-success">
+          <div class="f5-success-icon">✅</div>
+          <div style="font-size:18px;font-weight:700;color:#1A1A18;margin-bottom:6px">¡Datos guardados!</div>
+          <div style="font-size:12.5px;color:#5F5E5A;margin-bottom:16px;line-height:1.6">Ya puedes comprar en nuestros lives sin preocuparte por llenar tu dirección cada vez.</div>
+          <div style="background:#F1EFE8;border-radius:10px;padding:14px;text-align:left;margin-bottom:16px">
+            <div style="font-size:11px;color:#9C9A92;margin-bottom:6px">TUS DATOS</div>
+            <div id="rg-confirm-detalle" style="font-size:12.5px;color:#1A1A18;line-height:1.8"></div>
           </div>
-          <button class="btn w-full" style="justify-content:center;font-size:12px" onclick="rgEditar()">Actualizar mis datos</button>
-        </div>
-        <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--text3)">
-          ¿Preguntas? Escríbenos al <strong style="color:var(--text)">921 328 731</strong>
+          <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A" onclick="document.getElementById('rg-confirm-wrap').style.display='none';document.getElementById('rg-form-wrap').style.display='block'">Actualizar mis datos</button>
+          <div style="font-size:12px;color:#9C9A92;margin-top:8px">¿Dudas? Escríbenos al <strong style="color:#1A1A18">921 328 731</strong></div>
         </div>
       </div>
     </div>
   </div>
 </div>
-
 <!-- ═══════════════════════════════════════ APP ═══ -->
 <div id="app-page" class="app" style="display:none">
 
@@ -1576,6 +1750,235 @@ function feCambiarDireccion(){
   document.getElementById('fe-ya-confirmado').style.display='none';
   document.getElementById('fe-form-card').style.display='block';
 }
+
+// ═══════════════════════════ FORMULARIO 5 PASOS ═══════════════════════════
+let f5Paso = 1;
+let f5Courier = null;
+let f5PagoMetodo = null;
+let f5CapturaBase64 = null;
+let f5PedidoData = null;
+
+const F5_PASOS = ['Envío','Datos','Resumen','Términos','Pago'];
+
+function f5InitProgress(){
+  document.getElementById('f5-progress-bar').innerHTML = F5_PASOS.map((label,i)=>{
+    const n = i+1;
+    const cls = n < f5Paso ? 'done' : n === f5Paso ? 'active' : '';
+    return `<div class="f5-step-tab ${cls}"><span class="f5-step-num">${n < f5Paso ? '✓' : n}</span>${label}</div>`;
+  }).join('');
+}
+
+function f5ShowPaso(n){
+  document.querySelectorAll('.f5-paso').forEach(p=>p.style.display='none');
+  const el = document.getElementById(`f5-paso-${n}`);
+  if(el) el.style.display='block';
+  else document.getElementById('f5-paso-ok').style.display='block';
+  f5Paso = n;
+  f5InitProgress();
+}
+
+function selCourier(tipo){
+  f5Courier = tipo;
+  document.getElementById('opt-shalom').classList.toggle('selected', tipo==='shalom');
+  document.getElementById('opt-motorizado').classList.toggle('selected', tipo==='motorizado');
+  document.getElementById('f5-shalom-info').style.display = tipo==='shalom'?'block':'none';
+  document.getElementById('f5-motor-info').style.display = tipo==='motorizado'?'block':'none';
+  // Mostrar/ocultar campos según courier
+  document.getElementById('f5-campos-shalom').style.display = 'none';
+  document.getElementById('f5-campos-motor').style.display = 'none';
+}
+
+function selPago(metodo){
+  f5PagoMetodo = metodo;
+  document.getElementById('f5-yape-btn').classList.toggle('selected', metodo==='yape');
+  document.getElementById('f5-plin-btn').classList.toggle('selected', metodo==='plin');
+  document.getElementById('f5-datos-pago').style.display = 'block';
+}
+
+function f5HandleFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 5*1024*1024){ alert('La imagen es muy grande. Máximo 5MB.'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    f5CapturaBase64 = e.target.result;
+    document.getElementById('f5-preview').src = e.target.result;
+    document.getElementById('f5-preview').style.display = 'block';
+    document.getElementById('f5-upload-text').style.display = 'none';
+    document.getElementById('f5-upload-area').classList.add('has-file');
+  };
+  reader.readAsDataURL(file);
+}
+
+function f5Next(){
+  if(f5Paso === 1){
+    if(!f5Courier){ alert('Selecciona un tipo de envío'); return; }
+    // Mostrar campos según courier
+    document.getElementById('f5-campos-shalom').style.display = f5Courier==='shalom'?'block':'none';
+    document.getElementById('f5-campos-motor').style.display = f5Courier==='motorizado'?'block':'none';
+    f5ShowPaso(2);
+
+  } else if(f5Paso === 2){
+    const nombre = document.getElementById('f5-nombre').value.trim();
+    const tel = document.getElementById('f5-tel').value.replace(/\s/g,'');
+    const dni = document.getElementById('f5-dni').value.trim();
+    const errEl = document.getElementById('f5-err-2');
+    if(!nombre){ errEl.textContent='Ingresa tu nombre completo.'; errEl.style.display='block'; return; }
+    if(tel.length < 9){ errEl.textContent='Ingresa tu número de WhatsApp (9 dígitos).'; errEl.style.display='block'; return; }
+    if(!dni || dni.length < 8){ errEl.textContent='Ingresa tu DNI (8 dígitos).'; errEl.style.display='block'; return; }
+    if(f5Courier==='shalom'){
+      const agencia = document.getElementById('f5-agencia').value.trim();
+      const ciudad = document.getElementById('f5-ciudad').value.trim();
+      if(!agencia){ errEl.textContent='Ingresa la agencia Shalom de recojo.'; errEl.style.display='block'; return; }
+      if(!ciudad){ errEl.textContent='Ingresa tu ciudad o provincia.'; errEl.style.display='block'; return; }
+    }
+    if(f5Courier==='motorizado'){
+      const distrito = document.getElementById('f5-distrito').value;
+      const dir = document.getElementById('f5-direccion').value.trim();
+      if(!distrito){ errEl.textContent='Selecciona tu distrito.'; errEl.style.display='block'; return; }
+      if(!dir){ errEl.textContent='Ingresa tu dirección exacta.'; errEl.style.display='block'; return; }
+    }
+    errEl.style.display='none';
+    f5BuildResumen();
+    f5ShowPaso(3);
+
+  } else if(f5Paso === 3){
+    f5ShowPaso(4);
+
+  } else if(f5Paso === 4){
+    if(!document.getElementById('f5-acepto').checked){
+      document.getElementById('f5-err-4').textContent='Debes aceptar los términos.';
+      document.getElementById('f5-err-4').style.display='block'; return;
+    }
+    document.getElementById('f5-err-4').style.display='none';
+    // Mostrar paso 5 según courier
+    if(f5Courier==='shalom'){
+      document.getElementById('f5-shalom-confirm').style.display='block';
+      document.getElementById('f5-motor-pago').style.display='none';
+    } else {
+      document.getElementById('f5-shalom-confirm').style.display='none';
+      document.getElementById('f5-motor-pago').style.display='block';
+    }
+    f5ShowPaso(5);
+  }
+}
+
+function f5Back(){
+  if(f5Paso > 1) f5ShowPaso(f5Paso - 1);
+}
+
+function f5BuildResumen(){
+  const ped = trackingPedidoData;
+  const items = ped?.carrito_items || [];
+  const subtotal = ped?.subtotal || 0;
+  const costoEnvio = f5Courier==='motorizado' ? 14 : 0;
+  const total = subtotal + costoEnvio;
+
+  document.getElementById('f5-resumen-prendas').innerHTML = `
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9C9A92;margin-bottom:8px">Prendas</div>
+    <div style="border:0.5px solid #E8E6E0;border-radius:8px;overflow:hidden">
+      ${items.map(it=>`<div class="f5-resumen-item" style="padding:7px 12px"><span>${it.prendas?.nombre||'Prenda'} <span style="color:#9C9A92">T-${it.talla}</span></span><span style="font-weight:500">S/ ${it.precio_unitario}</span></div>`).join('')}
+      <div class="f5-resumen-item" style="padding:7px 12px"><span>Envío ${f5Courier==='motorizado'?'Motorizado':'Shalom'}</span><span style="font-weight:500;color:${costoEnvio===0?'#1D9E75':'#1A1A18'}">${costoEnvio===0?'Gratis':'S/ '+costoEnvio}</span></div>
+      <div class="f5-total-row" style="padding:10px 12px"><span>Total</span><span>S/ ${total}</span></div>
+    </div>`;
+
+  const nombre = document.getElementById('f5-nombre').value;
+  const tel = document.getElementById('f5-tel').value;
+  const distrito = f5Courier==='motorizado' ? document.getElementById('f5-distrito').value : '';
+  const dir = f5Courier==='motorizado' ? document.getElementById('f5-direccion').value : '';
+  const agencia = f5Courier==='shalom' ? document.getElementById('f5-agencia').value : '';
+  const ciudad = f5Courier==='shalom' ? document.getElementById('f5-ciudad').value : '';
+
+  document.getElementById('f5-resumen-envio').innerHTML = `
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9C9A92;margin-bottom:8px">Datos de entrega</div>
+    <div style="line-height:1.7;font-size:12.5px;color:#1A1A18">
+      <strong>${nombre}</strong> · ${tel}<br>
+      ${f5Courier==='motorizado' ? `${dir}${distrito?', '+distrito:''}` : `Agencia: ${agencia}, ${ciudad}`}
+    </div>`;
+}
+
+async function f5Confirmar(){
+  if(f5Courier==='motorizado'){
+    if(!f5PagoMetodo){ document.getElementById('f5-err-5').textContent='Selecciona Yape o Plin.'; document.getElementById('f5-err-5').style.display='block'; return; }
+    if(!f5CapturaBase64){ document.getElementById('f5-err-5').textContent='Sube la captura de tu pago.'; document.getElementById('f5-err-5').style.display='block'; return; }
+  }
+
+  const ped = trackingPedidoData;
+  if(!ped) return;
+
+  const nombre = document.getElementById('f5-nombre').value.trim();
+  const tel = document.getElementById('f5-tel').value.replace(/\s/g,'');
+  const dni = document.getElementById('f5-dni').value.trim();
+  const costoEnvio = f5Courier==='motorizado' ? 14 : 0;
+  const distrito = f5Courier==='motorizado' ? document.getElementById('f5-distrito').value : document.getElementById('f5-ciudad')?.value||'';
+  const dir = f5Courier==='motorizado' ? document.getElementById('f5-direccion').value : document.getElementById('f5-agencia')?.value||'';
+  const ref = f5Courier==='motorizado' ? (document.getElementById('f5-referencia')?.value||'') : '';
+
+  try {
+    // Actualizar clienta
+    await dbPatch(`clientes?id=eq.${ped.cliente_id}`, {
+      nombre, dni, distrito, direccion:dir, referencia:ref,
+      costo_envio:costoEnvio
+    });
+    // Actualizar pedido
+    await dbPatch(`pedidos?id=eq.${ped.id}`, {
+      tipo_envio: f5Courier,
+      distrito, direccion:dir,
+      costo_envio:costoEnvio,
+      total: ped.subtotal + costoEnvio
+    });
+    // Si motorizado, registrar pago pendiente
+    if(f5Courier==='motorizado'){
+      await dbPost('pagos', {
+        pedido_id: ped.id,
+        metodo: f5PagoMetodo==='yape'?'Yape':'Plin',
+        monto: 14,
+        estado: 'pendiente',
+        captura_url: f5CapturaBase64?.slice(0,500)||''
+      });
+    }
+    // Mostrar éxito
+    document.querySelectorAll('.f5-paso').forEach(p=>p.style.display='none');
+    document.getElementById('f5-paso-ok').style.display='block';
+    document.getElementById('f5-codigo-ok').textContent = ped.numero;
+    document.getElementById('f5-progress-bar').innerHTML='';
+  } catch(e){
+    alert('Error al confirmar: '+e.message);
+  }
+}
+
+function showFormEnvio(ped){
+  trackingPedidoData = ped;
+  f5Paso = 1; f5Courier = null; f5PagoMetodo = null; f5CapturaBase64 = null;
+  hideAllRootPages();
+  document.getElementById('form-envio-page').style.display='block';
+
+  // Si clienta ya tiene dirección, pre-llenar datos
+  const cl = ped.clientes;
+  if(cl?.nombre && cl.nombre !== 'Nueva clienta'){
+    document.getElementById('f5-nombre').value = cl.nombre;
+  }
+  if(cl?.telefono) document.getElementById('f5-tel').value = cl.telefono;
+  if(cl?.direccion) document.getElementById('f5-direccion').value = cl.direccion;
+  if(cl?.distrito) document.getElementById('f5-distrito').value = cl.distrito;
+  if(cl?.referencia) document.getElementById('f5-referencia').value = cl.referencia;
+
+  // Mostrar primer paso
+  document.querySelectorAll('.f5-paso').forEach(p=>p.style.display='none');
+  document.getElementById('f5-paso-ok').style.display='none';
+  document.getElementById('f5-paso-1').style.display='block';
+  document.getElementById('f5-paso-4').querySelector('#f5-acepto').checked=false;
+  document.getElementById('f5-btn-4').disabled=true;
+  f5InitProgress();
+}
+
+function feIrASeguimiento(){ renderTrackingPage(trackingPedidoData); }
+function feCambiarDireccion(){
+  document.getElementById('fe-ya-confirmado').style.display='none';
+  document.getElementById('fe-form-card').style.display='block';
+}
+function feUpdateCosto(){}
+async function feConfirmar(){ await f5Confirmar(); }
 
 // ═══════════════════════════ REGISTRO PÚBLICO ═══════════════════════════
 function showRegistro(){
