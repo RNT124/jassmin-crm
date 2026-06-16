@@ -1753,6 +1753,54 @@ function hideAllRootPages(){
 
 // ── FORMULARIO Y SEGUIMIENTO — ver funciones showTracking/showFormEnvio/renderTrackingPage arriba ──
 
+function renderTrackingPage(ped){
+  hideAllRootPages();
+  document.getElementById('tracking-page').style.display='block';
+  const cl = ped.clientes;
+  document.getElementById('trk-num').textContent='Pedido #'+ped.numero;
+  document.getElementById('trk-name').textContent=cl?.nombre||'Clienta';
+  document.getElementById('trk-meta').innerHTML=`<span>${ped.creado_en?.slice(0,10)||''}</span><span>${ped.tipo_envio==='shalom'?'Shalom':'Motorizado'}</span><span>${ped.distrito||''}</span>`;
+  const banners={
+    pago_pendiente:{bg:'#FAEEDA',c:'#633806',lbl:'Pendiente de pago',sub:`Yape o Plin al 921 328 731 · Total S/${ped.total}`},
+    pago_parcial:{bg:'#FAEEDA',c:'#633806',lbl:'Pago parcial recibido',sub:`Abono S/${ped.monto_pagado} · faltan S/${ped.total-ped.monto_pagado}`},
+    pago_completo:{bg:'#E6F1FB',c:'#0C447C',lbl:'Pago confirmado',sub:'Tu pedido está en preparación'},
+    empaquetado:{bg:'#E1F5EE',c:'#085041',lbl:'Pedido empaquetado',sub:'Listo para el próximo despacho'},
+    en_camino:{bg:'#F1EFE8',c:'#2C2C2A',lbl:'Tu pedido va en camino',sub:`Código: ${ped.courier_codigo||'—'} · ${ped.distrito||''}`},
+    entregado:{bg:'#EAF3DE',c:'#27500A',lbl:'¡Pedido entregado!',sub:'Gracias por tu compra en Jassmin 🌸'}
+  };
+  const b=banners[ped.estado]||banners.pago_pendiente;
+  document.getElementById('trk-banner').style.cssText=`background:${b.bg};color:${b.c};border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:3px;margin:12px 16px 0`;
+  document.getElementById('trk-banner').innerHTML=`<div style="font-weight:600;font-size:13px">${b.lbl}</div><div style="font-size:12px;opacity:.85">${b.sub}</div>`;
+  const ORDEN=['pago_pendiente','pago_parcial','pago_completo','empaquetado','en_camino','entregado'];
+  const steps=[
+    {key:'pago_pendiente',lbl:'Pedido creado'},
+    {key:'pago_completo',lbl:'Pago confirmado'},
+    {key:'empaquetado',lbl:'Empaquetado'},
+    {key:'en_camino',lbl:ped.tipo_envio==='shalom'?'Entregado a Shalom':'Entregado a motorizado'},
+    {key:'entregado',lbl:'Entregado'}
+  ];
+  const curIdx=ORDEN.indexOf(ped.estado);
+  document.getElementById('trk-timeline').innerHTML=steps.map((s,i)=>{
+    const done=curIdx>=ORDEN.indexOf(s.key);
+    const isLast=i===steps.length-1;
+    return `<div class="tl-item">
+      <div class="tl-left">
+        <div class="tl-dot" style="background:${done?'#1D9E75':'#D3D1C7'};color:${done?'#fff':'#9C9A92'};font-size:11px">${done?'✓':'○'}</div>
+        ${!isLast?`<div class="tl-line" style="background:${done?'#1D9E75':'#D3D1C7'}"></div>`:''}
+      </div>
+      <div class="tl-body">
+        <div class="tl-step" style="color:${done?'#1A1A18':'#9C9A92'}">${s.lbl}</div>
+        <div class="tl-date">${done?'Completado':'Pendiente'}</div>
+      </div>
+    </div>`;
+  }).join('');
+  const items = ped.carrito_items||[];
+  document.getElementById('trk-items').innerHTML=
+    items.map(it=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:12.5px"><span>${it.prendas?.nombre||'Prenda'} <span style="color:var(--text3)">T-${it.talla}</span></span><span style="font-weight:500">S/${it.precio_unitario}</span></div>`).join('')+
+    `<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);padding:6px 0;border-bottom:0.5px solid var(--border)"><span>Envío ${ped.tipo_envio==='shalom'?'Shalom':'Motorizado'}</span><span>${ped.costo_envio===0?'Gratis':'S/'+ped.costo_envio}</span></div>`+
+    `<div style="display:flex;justify-content:space-between;margin-top:8px;font-weight:600;font-size:14px"><span>Total</span><span>S/${ped.total}</span></div>`;
+}
+
 function feIrASeguimiento(){ renderTrackingPage(trackingPedidoData); }
 
 function feCambiarDireccion(){
