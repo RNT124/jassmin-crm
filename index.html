@@ -2412,14 +2412,52 @@ async function confirmarPagoCorte(){
   const nuevoPagado=(pagadoActual||0)+monto;
   const nuevoEstado=nuevoPagado>=total?'confirmado':'parcial';
   try {
+    // 1. Actualizar el item del carrito
     await dbPatch(`carrito_items?id=eq.${itemId}`,{
       estado_pago:nuevoEstado,
       monto_pagado:nuevoPagado
     });
-    // Registrar en tabla pagos si el item pertenece a un pedido
+
+    // 2. Buscar el carrito al que pertenece este item
+    const itemData = await dbGet(`carrito_items?id=eq.${itemId}&select=carrito_id`);
+    if(itemData.length){
+      const carritoId = itemData[0].carrito_id;
+
+      // 3. Recalcular total pagado del carrito sumando todos sus items confirmados
+      const todosItems = await dbGet(`carrito_items?carrito_id=eq.${carritoId}&select=precio_unitario,estado_pago,monto_pagado`);
+      const totalCarrito = todosItems.reduce((a,it)=>a+(it.precio_unitario||0),0);
+      const totalPagadoCarrito = todosItems.reduce((a,it)=>a+(it.monto_pagado||0),0);
+
+      // 4. Si hay un pedido asociado a este carrito, actualizarlo
+      const pedidos = await dbGet(`pedidos?carrito_id=eq.${carritoId}&select=id,total,costo_envio`);
+      if(pedidos.length){
+        const ped = pedidos[0];
+        const totalConEnvio = ped.total || (totalCarrito + (ped.costo_envio||0));
+        const estadoPedido = totalPagadoCarrito >= totalConEnvio ? 'pago_completo' :
+                             totalPagadoCarrito > 0 ? 'pago_parcial' : 'pago_pendiente';
+        await dbPatch(`pedidos?id=eq.${ped.id}`,{
+          monto_pagado: totalPagadoCarrito,
+          estado: estadoPedido
+        });
+        // 5. Registrar en tabla pagos
+        await dbPost('pagos',{
+          pedido_id: ped.id,
+          metodo,
+          monto,
+          estado:'confirmado',
+          confirmado_por: currentUser?.nombre||'operador'
+        });
+      }
+    }
+
     closeModal('modal-pago-corte');
-    toast(`✓ Pago registrado — ${nuevoEstado==='confirmado'?'Pagado completo':'Pago parcial'}`);
+    toast(`✓ ${nuevoEstado==='confirmado'?'Pago completo confirmado':'Abono registrado — queda S/'+(total-nuevoPagado)+' pendiente'}`);
+
+    // 6. Recargar vistas afectadas
     loadCortes(corteFiltro);
+    // Si estamos en carritos o pedidos también refrescar en background
+    loadDashboard();
+
   } catch(e){ toast('Error: '+e.message); }
 }
 function initials(n){ return n.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'; }
