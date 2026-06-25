@@ -1557,9 +1557,18 @@ async function toggleBolsaItem(i, el){
 
 async function removeCartItem(i){
   const item=liveCart[i];
-  try { if(item.id) await dbPatch(`carrito_items?id=eq.${item.id}`,{estado_bolsa:'eliminado'}); } catch(e){}
-  liveCart.splice(i,1);
-  renderLiveCart();
+  try {
+    if(item.id) await dbPatch(`carrito_items?id=eq.${item.id}`,{estado_bolsa:'eliminado'});
+    liveCart.splice(i,1);
+    renderLiveCart();
+    // Actualizar total del pedido
+    if(currentPedidoActivo){
+      const nuevoSubtotal = liveCart.reduce((a,it)=>a+it.precio,0);
+      await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(currentPedidoActivo.costo_envio||0)});
+      currentPedidoActivo.subtotal = nuevoSubtotal;
+    }
+    toast('✓ Prenda eliminada');
+  } catch(e){ toast('Error eliminando: '+e.message); }
 }
 
 function openEnvioModal(){
