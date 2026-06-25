@@ -1233,7 +1233,7 @@ async function loadDashboard(){
     const hoyDate=new Date();
     pedidos.forEach(p=>{ const d=new Date(p.creado_en); const diff=Math.floor((hoyDate-d)/86400000); if(diff>=0&&diff<7) semana[6-diff]+=(p.subtotal||0); });
     const totalSemana=semana.reduce((a,b)=>a+b,0);
-    document.getElementById('db-semana-total').textContent='S/ '+totalSemana;
+    const dbSemEl=document.getElementById('db-semana-total'); if(dbSemEl) dbSemEl.textContent='S/ '+totalSemana;
     const mx=Math.max(...semana,1);
     const labels=[];
     for(let i=6;i>=0;i--){ const d=new Date(hoyDate); d.setDate(d.getDate()-i); labels.push(dias[d.getDay()]); }
@@ -2545,6 +2545,20 @@ async function confirmarPagoCorte(){
 }
 function initials(n){ return n.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'; }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function toast(msg, tipo='info'){
+  let el = document.getElementById('toast-msg');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'toast-msg';
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.style.opacity='0'; }, 2800);
+}
 document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
 
 // Check URL params — routing público
