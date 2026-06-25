@@ -1653,64 +1653,105 @@ async function openPedidoModal(id){
     const p = rows[0];
     const items = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&select=*,prendas(nombre)`);
     document.getElementById('mp-title').textContent=p.numero;
-    const falta=p.total-p.monto_pagado;
+    const falta=p.total-(p.monto_pagado||0);
     const actionLabel=ESTADOS_ACTION[p.estado];
     const btn=document.getElementById('mp-action-btn');
-    if(actionLabel){ btn.style.display='inline-flex'; btn.textContent=actionLabel; btn.onclick=()=>avanzarEstadoDirecto(p.id,p.estado); }
-    else btn.style.display='none';
+
+    // Botón de acción principal — solo para estados que no son pago
+    if(actionLabel && !['pago_pendiente','pago_parcial'].includes(p.estado)){
+      btn.style.display='inline-flex';
+      btn.textContent=actionLabel;
+      btn.onclick=()=>avanzarEstadoDirecto(p.id,p.estado);
+    } else {
+      btn.style.display='none';
+    }
+
     document.getElementById('mp-content').innerHTML=`
       <div class="grid-2 mb-12">
         <div><div class="text-xs text-hint">Clienta</div><div class="font-500">${p.clientes?.nombre||'—'}</div></div>
         <div><div class="text-xs text-hint">Fecha</div><div>${p.creado_en?.slice(0,10)||'—'}</div></div>
         <div><div class="text-xs text-hint">Estado</div><div><span class="badge ${ESTADOS_BADGE[p.estado]}">${ESTADOS_LABEL[p.estado]}</span></div></div>
-        <div><div class="text-xs text-hint">Envío</div><div>${p.distrito||'Sin dirección'} · S/${p.costo_envio}</div></div>
+        <div><div class="text-xs text-hint">Envío</div><div>${p.distrito||'Sin dirección'} · S/${p.costo_envio||0}</div></div>
         <div><div class="text-xs text-hint">Total</div><div class="font-600">S/ ${p.total}</div></div>
-        <div><div class="text-xs text-hint">Pagado</div><div class="${falta>0?'delta-dn':'delta-up'} font-500">S/${p.monto_pagado}${falta>0?' (falta S/'+falta+')':' ✓'}</div></div>
+        <div><div class="text-xs text-hint">Pagado</div><div class="${falta>0?'delta-dn':'delta-up'} font-500">S/${p.monto_pagado||0}${falta>0?' <span style="color:var(--red)">(falta S/'+falta+')</span>':' ✓'}</div></div>
       </div>
-      ${p.courier_codigo?`<div class="mb-12"><div class="text-xs text-hint">Código courier</div><div class="font-500">${p.courier_codigo}</div></div>`:''}
-      <div class="card-title">Prendas</div>
-      <div class="tbl-wrap mb-12">${items.map(it=>`<div class="cart-item" style="padding:7px 12px">${it.prendas?.nombre||'Prenda'} T-${it.talla} <span class="font-500" style="margin-left:auto">S/ ${it.precio_unitario}</span></div>`).join('')||'<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin items</div>'}</div>
+      ${p.courier_codigo?`<div class="card mb-12" style="background:var(--blue-light)"><div class="text-xs text-hint">Código courier</div><div class="font-500">${p.courier_codigo}</div></div>`:''}
+      <div class="card-title">Prendas del pedido</div>
+      <div class="tbl-wrap mb-12">${items.length?items.map(it=>`
+        <div class="cart-item" style="padding:7px 12px;display:flex;justify-content:space-between">
+          <span>${it.prendas?.nombre||'Prenda'} ${it.talla?'T-'+it.talla:''} ${it.color?'· '+it.color:''}</span>
+          <span class="font-500">S/ ${it.precio_unitario}</span>
+        </div>`).join(''):'<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin items</div>'}</div>
       ${['pago_pendiente','pago_parcial'].includes(p.estado)?`
         <div class="card-title">Registrar pago</div>
         <div class="grid-2">
-          <div class="form-row"><label class="form-label">Monto (S/)</label><input type="number" id="mp-monto" placeholder="${falta}"></div>
-          <div class="form-row"><label class="form-label">Método</label><select id="mp-metodo"><option>Yape</option><option>Plin</option><option>Transferencia</option></select></div>
+          <div class="form-row">
+            <label class="form-label">Monto recibido (S/)</label>
+            <input type="number" id="mp-monto" placeholder="${falta}" step="0.01">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Método</label>
+            <select id="mp-metodo"><option>Yape</option><option>Plin</option><option>Transferencia</option></select>
+          </div>
         </div>
-        <button class="btn btn-success w-full" onclick="registrarPago('${p.id}','${p.total}','${p.monto_pagado}')">Confirmar pago</button>`:''}`;
+        <button class="btn btn-success w-full" style="justify-content:center" onclick="registrarPago('${p.id}',${p.total},${p.monto_pagado||0})">
+          ✓ Confirmar pago recibido
+        </button>`:''}
+      ${p.estado==='pago_completo'?`
+        <div style="background:var(--green-light);border-radius:var(--radius-sm);padding:10px 14px;margin-top:8px;font-size:12px;color:var(--green)">
+          ✓ Pago completo — listo para empaquetar
+        </div>`:''}`;
     document.getElementById('modal-pedido').classList.add('open');
-  } catch(e){ alert('Error: '+e.message); }
+  } catch(e){ toast('Error cargando pedido: '+e.message); }
 }
 
-async function registrarPago(pedidoId,total,pagadoActual){
+async function registrarPago(pedidoId, total, pagadoActual){
   const monto=parseFloat(document.getElementById('mp-monto')?.value||0);
   const metodo=document.getElementById('mp-metodo')?.value||'Yape';
-  if(!monto){ alert('Ingresa el monto'); return; }
+  if(!monto||monto<=0){ toast('Ingresa el monto recibido'); return; }
+  const nuevoPagado = (pagadoActual||0)+monto;
+  const nuevoEstado = nuevoPagado>=total ? 'pago_completo' : 'pago_parcial';
   try {
-    await dbPost('pagos', {pedido_id:pedidoId, metodo, monto, estado:'confirmado'});
-    alert('Pago registrado ✓');
+    // Registrar pago
+    await dbPost('pagos',{pedido_id:pedidoId, metodo, monto, estado:'confirmado', confirmado_por:currentUser?.nombre||'operador'});
+    // Actualizar estado del pedido
+    await dbPatch(`pedidos?id=eq.${pedidoId}`,{monto_pagado:nuevoPagado, estado:nuevoEstado});
+    toast(`✓ ${nuevoEstado==='pago_completo'?'Pago completo — listo para empaquetar':'Abono registrado — falta S/'+(total-nuevoPagado)}`);
     closeModal('modal-pedido');
-    loadPedidos(pedidoFiltro);
+    // Recargar vistas en tiempo real
+    await loadPedidos(pedidoFiltro);
     loadDashboard();
-  } catch(e){ alert('Error: '+e.message); }
+  } catch(e){ toast('Error: '+e.message); }
 }
 
-async function avanzarEstadoDirecto(id,estadoActual){
+async function avanzarEstadoDirecto(id, estadoActual){
   const next=ESTADOS_NEXT[estadoActual];
   if(!next) return;
   try {
     if(estadoActual==='empaquetado'){
-      const codigo=prompt('Código de seguimiento del courier:');
-      if(!codigo) return;
-      await dbPatch(`pedidos?id=eq.${id}`, {estado:next, courier_codigo:codigo});
-    } else if(['pago_pendiente','pago_parcial'].includes(estadoActual)){
-      openPedidoModal(id); return;
+      closeModal('modal-pedido');
+      // Pedir código de courier con un input en el modal
+      const codigo=prompt('Ingresa el código de seguimiento del courier (Shalom/Motorizado):');
+      if(!codigo){ toast('Cancelado — no se ingresó código'); return; }
+      await dbPatch(`pedidos?id=eq.${id}`,{estado:next, courier_codigo:codigo});
+      toast('✓ Pedido despachado — código registrado');
+    } else if(estadoActual==='en_camino'){
+      await dbPatch(`pedidos?id=eq.${id}`,{estado:next});
+      toast('✓ Pedido marcado como entregado');
+      closeModal('modal-pedido');
+    } else if(estadoActual==='pago_completo'){
+      await dbPatch(`pedidos?id=eq.${id}`,{estado:next});
+      toast('✓ Pedido marcado como empaquetado');
+      closeModal('modal-pedido');
     } else {
-      await dbPatch(`pedidos?id=eq.${id}`, {estado:next});
+      await dbPatch(`pedidos?id=eq.${id}`,{estado:next});
+      toast('✓ Estado actualizado');
+      closeModal('modal-pedido');
     }
-    closeModal('modal-pedido');
-    loadPedidos(pedidoFiltro);
+    // Recargar vistas en tiempo real
+    await loadPedidos(pedidoFiltro);
     loadDashboard();
-  } catch(e){ alert('Error: '+e.message); }
+  } catch(e){ toast('Error actualizando estado: '+e.message); }
 }
 
 // ═══════════════════════════ CLIENTES ═══════════════════════════
@@ -1768,23 +1809,26 @@ function openModalNuevaCliente(){
   document.getElementById('modal-cliente').classList.add('open');
 }
 async function guardarCliente(){
-  const data = { nombre:document.getElementById('nc-nombre').value, telefono:document.getElementById('nc-tel').value,
-    talla:document.getElementById('nc-talla').value, distrito:document.getElementById('nc-distrito').value };
-  if(!data.telefono){ alert('El teléfono es obligatorio'); return; }
+  const data={
+    nombre:document.getElementById('nc-nombre').value.trim(),
+    telefono:document.getElementById('nc-tel').value.trim(),
+    talla:document.getElementById('nc-talla').value,
+    distrito:document.getElementById('nc-distrito').value.trim()
+  };
+  if(!data.telefono){ toast('El teléfono es obligatorio'); return; }
+  if(!data.nombre){ toast('El nombre es obligatorio'); return; }
   try {
     if(editingClienteId){
-      await dbPatch(`clientes?id=eq.${editingClienteId}`, data);
-      const c=DB.clientes.find(x=>x.id===editingClienteId); if(c) Object.assign(c,data);
+      await dbPatch(`clientes?id=eq.${editingClienteId}`,data);
+      toast('✓ Clienta actualizada');
     } else {
-      const rows = await dbPost('clientes', {...data, pedidos_count:0, total_gastado:0});
-      const nuevo = Array.isArray(rows)?rows[0]:rows;
-      DB.clientes.push({...data, id:nuevo.id, total:0, pedidos_count:0});
+      await dbPost('clientes',{...data, pedidos_count:0, total_gastado:0});
+      toast('✓ Clienta registrada');
     }
-  } catch(e) {
-    if(editingClienteId){ const c=DB.clientes.find(x=>x.id===editingClienteId); if(c) Object.assign(c,data); }
-    else { DB.clientes.push({ id:'c'+Date.now(), ...data, total:0, pedidos_count:0 }); }
-  }
-  closeModal('modal-cliente'); renderClientes();
+    closeModal('modal-cliente');
+    await loadClientes();
+    await loadCatalogoLive(); // actualizar búsqueda en live
+  } catch(e){ toast('Error guardando: '+e.message); }
 }
 
 // ═══════════════════════════ CATÁLOGO ═══════════════════════════
@@ -1829,22 +1873,29 @@ function updateTallasModal(){
 async function guardarPrenda(){
   const tallas=[...document.querySelectorAll('.talla-chk:checked')].map(c=>c.value);
   if(!tallas.length){ toast('Selecciona al menos una talla'); return; }
-  const colores = document.getElementById('pr-colores').value.trim();
+  const nombre=document.getElementById('pr-nombre').value.trim();
+  if(!nombre){ toast('El nombre es obligatorio'); return; }
+  const colores=document.getElementById('pr-colores').value.trim();
   const data={
-    nombre:document.getElementById('pr-nombre').value,
-    codigo:document.getElementById('pr-codigo').value,
+    nombre,
+    codigo:document.getElementById('pr-codigo').value.trim(),
     precio:parseFloat(document.getElementById('pr-precio').value)||0,
     costo:parseFloat(document.getElementById('pr-costo').value)||0,
     categoria:document.getElementById('pr-cat').value,
     tallas, colores, activo:true
   };
-  if(!data.nombre){ toast('El nombre es obligatorio'); return; }
   try {
-    if(editingPrendaIdx){ await dbPatch(`prendas?id=eq.${editingPrendaIdx}`,data); }
-    else { await dbPost('prendas',data); }
-    toast('✓ Prenda guardada');
-  } catch(e){ toast('Error: '+e.message); return; }
-  closeModal('modal-prenda'); loadCatalogo(); loadCatalogoLive();
+    if(editingPrendaIdx){
+      await dbPatch(`prendas?id=eq.${editingPrendaIdx}`,data);
+      toast('✓ Prenda actualizada');
+    } else {
+      await dbPost('prendas',data);
+      toast('✓ Prenda agregada al catálogo');
+    }
+    closeModal('modal-prenda');
+    await loadCatalogo();
+    await loadCatalogoLive();
+  } catch(e){ toast('Error guardando prenda: '+e.message); }
 }
 
 async function togglePrenda(id, activo){
