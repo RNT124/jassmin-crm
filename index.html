@@ -1727,27 +1727,21 @@ async function avanzarEstadoDirecto(id, estadoActual){
   const next=ESTADOS_NEXT[estadoActual];
   if(!next) return;
   try {
+    let patch={estado:next};
+    let msg='✓ Estado actualizado';
     if(estadoActual==='empaquetado'){
-      closeModal('modal-pedido');
-      // Pedir código de courier con un input en el modal
       const codigo=prompt('Ingresa el código de seguimiento del courier (Shalom/Motorizado):');
       if(!codigo){ toast('Cancelado — no se ingresó código'); return; }
-      await dbPatch(`pedidos?id=eq.${id}`,{estado:next, courier_codigo:codigo});
-      toast('✓ Pedido despachado — código registrado');
-    } else if(estadoActual==='en_camino'){
-      await dbPatch(`pedidos?id=eq.${id}`,{estado:next});
-      toast('✓ Pedido marcado como entregado');
-      closeModal('modal-pedido');
+      patch.courier_codigo=codigo;
+      msg='✓ Pedido despachado — código registrado';
     } else if(estadoActual==='pago_completo'){
-      await dbPatch(`pedidos?id=eq.${id}`,{estado:next});
-      toast('✓ Pedido marcado como empaquetado');
-      closeModal('modal-pedido');
-    } else {
-      await dbPatch(`pedidos?id=eq.${id}`,{estado:next});
-      toast('✓ Estado actualizado');
-      closeModal('modal-pedido');
+      msg='✓ Pedido marcado como empaquetado';
+    } else if(estadoActual==='en_camino'){
+      msg='✓ Pedido marcado como entregado';
     }
-    // Recargar vistas en tiempo real
+    await dbPatch(`pedidos?id=eq.${id}`,patch);
+    closeModal('modal-pedido');
+    toast(msg);
     await loadPedidos(pedidoFiltro);
     loadDashboard();
   } catch(e){ toast('Error actualizando estado: '+e.message); }
