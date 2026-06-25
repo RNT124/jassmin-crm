@@ -1101,6 +1101,7 @@ const USERS = {
 let currentUser = null;
 let currentLiveClient = null;
 let currentCarritoId = null;
+let currentPedidoActivo = null;
 let liveCart = [];
 let trackingPedidoData = null;
 let currentPedidoIdx = null;
@@ -1133,10 +1134,10 @@ let DB = {
 };
 
 const ESTADOS_ORDEN = ['pago_pendiente','pago_parcial','pago_completo','empaquetado','en_camino','entregado'];
-const ESTADOS_LABEL = { pago_pendiente:'Pendiente pago', pago_parcial:'Pago parcial', pago_completo:'Pago completo', empaquetado:'Empaquetado', en_camino:'En camino', entregado:'Entregado' };
-const ESTADOS_BADGE = { pago_pendiente:'badge-danger', pago_parcial:'badge-warn', pago_completo:'badge-ok', empaquetado:'badge-info', en_camino:'badge-pink', entregado:'badge-gray' };
-const ESTADOS_ACTION = { pago_pendiente:'Confirmar pago', pago_parcial:'Confirmar pago restante', pago_completo:'Marcar empaquetado', empaquetado:'Registrar despacho', en_camino:'Confirmar entrega', entregado:null };
-const ESTADOS_NEXT = { pago_pendiente:'pago_completo', pago_parcial:'pago_completo', pago_completo:'empaquetado', empaquetado:'en_camino', en_camino:'entregado' };
+const ESTADOS_LABEL = { acumulando:'Acumulando', listo_envio:'Listo para envío', pago_pendiente:'Pendiente pago', pago_parcial:'Pago parcial', pago_completo:'Pago completo', empaquetado:'Empaquetado', en_camino:'En camino', entregado:'Entregado' };
+const ESTADOS_BADGE = { acumulando:'badge-gray', listo_envio:'badge-warn', pago_pendiente:'badge-danger', pago_parcial:'badge-warn', pago_completo:'badge-ok', empaquetado:'badge-info', en_camino:'badge-pink', entregado:'badge-gray' };
+const ESTADOS_ACTION = { acumulando:'', listo_envio:'Marcar empaquetado', pago_pendiente:'', pago_parcial:'', pago_completo:'Marcar empaquetado', empaquetado:'Registrar despacho', en_camino:'Confirmar entrega', entregado:null };
+const ESTADOS_NEXT = { acumulando:'', listo_envio:'empaquetado', pago_pendiente:'', pago_parcial:'', pago_completo:'empaquetado', empaquetado:'en_camino', en_camino:'entregado' };
 
 // ═══════════════════════════ AUTH ═══════════════════════════
 async function doLogin(){
@@ -1246,8 +1247,12 @@ async function loadDashboard(){
 async function loadCarritos(){
   document.getElementById('carritos-lista').innerHTML='<div class="loading">Cargando carritos...</div>';
   try {
-    // Cargar carritos abiertos con sus items y clientas
-    const carritos = await dbGet('carritos?estado=eq.abierto&select=*,clientes(nombre,telefono,talla),carrito_items(id,talla,precio_unitario,prendas(nombre))&order=actualizado_en.desc');
+    // Cargar pedidos en acumulando (bolsas activas sin envío solicitado)
+    const pedActivos = await dbGet('pedidos?estado=eq.acumulando&select=id,numero,subtotal,total,monto_pagado,carrito_id,cliente_id,creado_en,clientes(nombre,telefono,talla)&order=creado_en.desc');
+    const carritos = await Promise.all(pedActivos.map(async p=>{
+      const items = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&select=*,prendas(nombre)`);
+      return {...p, carrito_items:items, actualizado_en:p.creado_en};
+    }));
 
     // Actualizar badge en sidebar
     const badge = document.getElementById('badge-carritos');
@@ -1317,7 +1322,7 @@ async function loadCarritos(){
         </div>
 
         <div style="display:flex;gap:8px">
-          <button class="btn btn-primary btn-sm" onclick="generarPedidoDesdeCarrito('${c.id}','${c.cliente_id}',${total})">
+          <button class="btn btn-primary btn-sm" onclick="generarPedidoDesdeCarrito('${c.id}','${c.cliente_id||c.clientes?.id}',${total})">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
             Generar pedido de envío
           </button>
@@ -1330,21 +1335,15 @@ async function loadCarritos(){
   } catch(e){ document.getElementById('carritos-lista').innerHTML='<div style="color:var(--red);font-size:12px">Error cargando carritos: '+e.message+'</div>'; }
 }
 
-async function generarPedidoDesdeCarrito(carritoId, clienteId, subtotal){
-  const tipoOpts = [
-    {val:13, label:'Motorizado Lima — S/ 13'},
-    {val:14, label:'Motorizado Lima zona media — S/ 14'},
-    {val:15, label:'Motorizado Lima zona lejana — S/ 15'},
-    {val:20, label:'Shalom provincias — S/ 20'}
-  ];
-  // Mostrar modal de envío
-  currentCarritoId = carritoId;
+async function generarPedidoDesdeCarrito(pedidoId, clienteId, subtotal){
+  // Cargamos el pedido activo y preparamos el modal de envío
   try {
     const rows = await dbGet(`clientes?id=eq.${clienteId}`);
     currentLiveClient = rows[0];
-    // Cargar items del carrito en liveCart
-    const items = await dbGet(`carrito_items?carrito_id=eq.${carritoId}&select=*,prendas(nombre)`);
-    liveCart = items.map(it=>({id:it.id, prenda_id:it.prenda_id, nombre:it.prendas?.nombre||'Prenda', talla:it.talla, precio:it.precio_unitario}));
+    const pedRows = await dbGet(`pedidos?id=eq.${pedidoId}&select=*`);
+    currentPedidoActivo = pedRows[0];
+    const items = await dbGet(`carrito_items?carrito_id=eq.${currentPedidoActivo.carrito_id}&select=*,prendas(nombre)`);
+    liveCart = items.map(it=>({id:it.id, prenda_id:it.prenda_id, nombre:it.prendas?.nombre||'Prenda', talla:it.talla, color:it.color||'', precio:it.precio_unitario, estado_pago:it.estado_pago, estado_bolsa:it.estado_bolsa}));
     document.getElementById('env-subtotal').textContent = 'S/ '+subtotal;
     updateEnvCosto();
     document.getElementById('modal-envio').classList.add('open');
@@ -1432,14 +1431,16 @@ async function selectLiveClient(id){
     const c = rows[0];
     if(!c) return;
     currentLiveClient=c;
-    // Cargar carrito abierto existente desde Supabase
-    const carritoRows = await dbGet(`carritos?cliente_id=eq.${id}&estado=eq.abierto&order=creado_en.desc&limit=1`);
-    if(carritoRows.length){
-      currentCarritoId = carritoRows[0].id;
-      const items = await dbGet(`carrito_items?carrito_id=eq.${currentCarritoId}&select=*,prendas(nombre)`);
-      liveCart = items.map(it=>({id:it.id, prenda_id:it.prenda_id, nombre:it.prendas?.nombre||'Prenda', talla:it.talla, precio:it.precio_unitario}));
+    // Buscar pedido activo (acumulando o listo_envio = aún puede recibir prendas)
+    const pedActivos = await dbGet(`pedidos?cliente_id=eq.${id}&estado=in.(acumulando,listo_envio)&order=creado_en.desc&limit=1`);
+    if(pedActivos.length){
+      currentCarritoId = pedActivos[0].id; // reutilizamos currentCarritoId para guardar el pedido activo
+      const items = await dbGet(`carrito_items?carrito_id=eq.${pedActivos[0].carrito_id}&select=*,prendas(nombre)`);
+      liveCart = items.map(it=>({id:it.id, prenda_id:it.prenda_id, nombre:it.prendas?.nombre||'Prenda', talla:it.talla, color:it.color||'', precio:it.precio_unitario, estado_pago:it.estado_pago, estado_bolsa:it.estado_bolsa}));
+      currentPedidoActivo = pedActivos[0];
     } else {
       currentCarritoId = null;
+      currentPedidoActivo = null;
       liveCart = [];
     }
     const pedidos = await dbGet(`pedidos?cliente_id=eq.${id}&order=creado_en.desc&limit=3`);
@@ -1483,28 +1484,43 @@ async function addToCart(){
   const prenda = DB.prendas.find(p=>p.id===prendaId);
   if(!prenda) return;
   try {
-    if(!currentCarritoId){
+    // Si no hay pedido activo, crear carrito + pedido en estado "acumulando"
+    let carritoId;
+    if(!currentPedidoActivo){
       const carritoRows = await dbPost('carritos', {cliente_id:currentLiveClient.id, estado:'abierto', total:0});
       const carrito = Array.isArray(carritoRows)?carritoRows[0]:carritoRows;
-      currentCarritoId = carrito.id;
+      carritoId = carrito.id;
+      const pedRows = await dbPost('pedidos', {
+        numero:'', cliente_id:currentLiveClient.id, carrito_id:carritoId,
+        subtotal:0, costo_envio:0, total:0, monto_pagado:0, estado:'acumulando'
+      });
+      currentPedidoActivo = Array.isArray(pedRows)?pedRows[0]:pedRows;
+      currentCarritoId = currentPedidoActivo.id;
+    } else {
+      carritoId = currentPedidoActivo.carrito_id;
     }
     const itemRows = await dbPost('carrito_items', {
-      carrito_id:currentCarritoId,
+      carrito_id:carritoId,
       prenda_id:prendaId,
       talla, color: color||'',
       precio_unitario:prenda.precio,
       estado_bolsa:'sin_agregar',
-      estado_pago:'pendiente'
+      estado_pago:'pendiente',
+      monto_pagado:0
     });
     const item = Array.isArray(itemRows)?itemRows[0]:itemRows;
-    liveCart.push({id:item.id, prenda_id:prendaId, nombre:prenda.nombre, talla, color:color||'', precio:prenda.precio});
+    liveCart.push({id:item.id, prenda_id:prendaId, nombre:prenda.nombre, talla, color:color||'', precio:prenda.precio, estado_pago:'pendiente', estado_bolsa:'sin_agregar'});
+    // Recalcular total del pedido
+    const nuevoSubtotal = liveCart.reduce((a,i)=>a+i.precio,0);
+    await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(currentPedidoActivo.costo_envio||0)});
+    currentPedidoActivo.subtotal = nuevoSubtotal;
     document.getElementById('lv-prenda').value='';
     document.getElementById('lv-talla').innerHTML='<option value="">— talla —</option>';
     document.getElementById('lv-color').innerHTML='<option value="">— color —</option>';
     document.getElementById('lv-search').value='';
     renderPrendasSelect(DB.prendas);
     renderLiveCart();
-    toast('✓ Prenda agregada al carrito');
+    toast('✓ Prenda agregada');
   } catch(e){ toast('Error: '+e.message); }
 }
 
@@ -1566,38 +1582,38 @@ function updateEnvCosto(){
 
 async function confirmarPedido(){
   const tipo=document.getElementById('env-tipo').value;
-  const costo=parseInt(tipo)||13;
+  const costo=DISTRITOS_COSTO[tipo]||13;
   const sub=liveCart.reduce((a,i)=>a+i.precio,0);
+  const total=sub+costo;
   let numPedido='';
   try {
-    // Usar carrito existente o crear uno nuevo
-    let carritoId = currentCarritoId;
-    if(!carritoId){
-      const carritoRows = await dbPost('carritos', {cliente_id:currentLiveClient.id, estado:'en_pedido', total:sub});
-      const carrito = Array.isArray(carritoRows)?carritoRows[0]:carritoRows;
-      carritoId = carrito.id;
-      // Agregar items si no estaban en Supabase aún
-      for(const item of liveCart){
-        await dbPost('carrito_items', {carrito_id:carritoId, prenda_id:item.prenda_id, talla:item.talla, precio_unitario:item.precio});
-      }
+    if(currentPedidoActivo){
+      // Pedido ya existe — solo actualizar a listo_envio y agregar costo envío
+      const pagado = currentPedidoActivo.monto_pagado||0;
+      const estadoPago = pagado>=total?'pago_completo': pagado>0?'pago_parcial':'listo_envio';
+      await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,{
+        estado: estadoPago,
+        subtotal:sub, costo_envio:costo, total
+      });
+      numPedido = currentPedidoActivo.numero;
     } else {
-      // Actualizar estado del carrito existente
-      await dbPatch(`carritos?id=eq.${carritoId}`, {estado:'en_pedido', total:sub});
+      // No había pedido — crear carrito + pedido nuevo
+      const carritoRows = await dbPost('carritos',{cliente_id:currentLiveClient.id,estado:'en_pedido',total:sub});
+      const carrito = Array.isArray(carritoRows)?carritoRows[0]:carritoRows;
+      for(const item of liveCart){
+        await dbPost('carrito_items',{carrito_id:carrito.id,prenda_id:item.prenda_id,talla:item.talla,color:item.color||'',precio_unitario:item.precio,estado_bolsa:'sin_agregar',estado_pago:'pendiente',monto_pagado:0});
+      }
+      const pedRows = await dbPost('pedidos',{
+        numero:'',cliente_id:currentLiveClient.id,carrito_id:carrito.id,
+        subtotal:sub,costo_envio:costo,total,monto_pagado:0,estado:'listo_envio'
+      });
+      const ped = Array.isArray(pedRows)?pedRows[0]:pedRows;
+      numPedido = ped.numero;
+      await dbPatch(`clientes?id=eq.${currentLiveClient.id}`,{pedidos_count:(currentLiveClient.pedidos_count||0)+1});
     }
-    // Crear pedido
-    const pedRows = await dbPost('pedidos', {
-      numero:'', cliente_id:currentLiveClient.id, carrito_id:carritoId,
-      subtotal:sub, costo_envio:costo, total:sub+costo, monto_pagado:0, estado:'pago_pendiente'
-    });
-    const ped = Array.isArray(pedRows)?pedRows[0]:pedRows;
-    numPedido = ped.numero;
-    // Actualizar contador clienta
-    await dbPatch(`clientes?id=eq.${currentLiveClient.id}`, {pedidos_count:(currentLiveClient.pedidos_count||0)+1});
-  } catch(e){
-    alert('Error creando pedido: '+e.message); return;
-  }
+  } catch(e){ alert('Error: '+e.message); return; }
   closeModal('modal-envio');
-  liveCart=[]; currentCarritoId=null; renderLiveCart();
+  liveCart=[]; currentCarritoId=null; currentPedidoActivo=null; renderLiveCart();
   currentLiveClient=null; hideClientCard();
   document.getElementById('live-search').value='';
   document.getElementById('live-search-results').innerHTML='';
@@ -1606,7 +1622,7 @@ async function confirmarPedido(){
   const linkReg=`${base}?registro`;
   document.getElementById('link-url').textContent=linkPedido;
   document.getElementById('link-registro').textContent=linkReg;
-  document.getElementById('link-wa-msg').textContent=`WA: "Hola! Tu pedido ${numPedido} está listo. Total aprox. S/${sub+costo}. Sigue tu pedido aquí: ${linkPedido}"`;
+  document.getElementById('link-wa-msg').textContent=`WA: "Hola! Tu pedido ${numPedido} está registrado. Total S/${total}. Sigue tu pedido aquí: ${linkPedido}"`;
   document.getElementById('modal-link').classList.add('open');
 }
 function copyLink(){ navigator.clipboard.writeText(document.getElementById('link-url').textContent).catch(()=>{}); }
@@ -1728,17 +1744,29 @@ async function avanzarEstadoDirecto(id, estadoActual){
   const next=ESTADOS_NEXT[estadoActual];
   if(!next) return;
   try {
+    // Bloquear despacho si pago incompleto
+    if(estadoActual==='empaquetado'){
+      const pedData = await dbGet(`pedidos?id=eq.${id}&select=total,monto_pagado`);
+      const ped = pedData[0];
+      if(!ped||(ped.monto_pagado||0)<ped.total){
+        toast('⚠️ No se puede despachar — falta S/'+(ped.total-(ped.monto_pagado||0))+' por cobrar');
+        closeModal('modal-pedido');
+        return;
+      }
+    }
     let patch={estado:next};
     let msg='✓ Estado actualizado';
     if(estadoActual==='empaquetado'){
-      const codigo=prompt('Ingresa el código de seguimiento del courier (Shalom/Motorizado):');
-      if(!codigo){ toast('Cancelado — no se ingresó código'); return; }
+      const codigo=prompt('Código de seguimiento courier (Shalom / Motorizado):');
+      if(!codigo){ toast('Cancelado'); return; }
       patch.courier_codigo=codigo;
       msg='✓ Pedido despachado — código registrado';
     } else if(estadoActual==='pago_completo'){
-      msg='✓ Pedido marcado como empaquetado';
+      msg='✓ Listo para empaquetar';
     } else if(estadoActual==='en_camino'){
-      msg='✓ Pedido marcado como entregado';
+      msg='✓ Entrega confirmada';
+    } else if(estadoActual==='listo_envio'){
+      msg='✓ Marcado como empaquetado';
     }
     await dbPatch(`pedidos?id=eq.${id}`,patch);
     closeModal('modal-pedido');
@@ -2472,13 +2500,20 @@ async function confirmarPagoCorte(){
       const totalCarrito = todosItems.reduce((a,it)=>a+(it.precio_unitario||0),0);
       const totalPagadoCarrito = todosItems.reduce((a,it)=>a+(it.monto_pagado||0),0);
 
-      // 4. Si hay un pedido asociado a este carrito, actualizarlo
-      const pedidos = await dbGet(`pedidos?carrito_id=eq.${carritoId}&select=id,total,costo_envio`);
+      // 4. Buscar pedido asociado a este carrito (cualquier estado activo)
+      const pedidos = await dbGet(`pedidos?carrito_id=eq.${carritoId}&order=creado_en.desc&limit=1`);
       if(pedidos.length){
         const ped = pedidos[0];
-        const totalConEnvio = ped.total || (totalCarrito + (ped.costo_envio||0));
-        const estadoPedido = totalPagadoCarrito >= totalConEnvio ? 'pago_completo' :
-                             totalPagadoCarrito > 0 ? 'pago_parcial' : 'pago_pendiente';
+        const totalConEnvio = ped.total||totalCarrito;
+        const estadoActual = ped.estado;
+        // Calcular nuevo estado — respetar estados de despacho/entrega
+        let estadoPedido = estadoActual;
+        if(!['despachado','entregado'].includes(estadoActual)){
+          estadoPedido = totalPagadoCarrito >= totalConEnvio ? 'pago_completo' :
+                         totalPagadoCarrito > 0 ? (estadoActual==='listo_envio'?'listo_envio':'acumulando') : estadoActual;
+          // Si tenía listo_envio y ahora pagó completo → pago_completo
+          if(estadoActual==='listo_envio' && totalPagadoCarrito>=totalConEnvio) estadoPedido='pago_completo';
+        }
         await dbPatch(`pedidos?id=eq.${ped.id}`,{
           monto_pagado: totalPagadoCarrito,
           estado: estadoPedido
@@ -2491,6 +2526,9 @@ async function confirmarPagoCorte(){
           estado:'confirmado',
           confirmado_por: currentUser?.nombre||'operador'
         });
+      } else {
+        // No hay pedido aún (clienta pagando para separar sin envío solicitado)
+        // El pago queda registrado en carrito_items — se aplicará al pedido cuando se genere
       }
     }
 
