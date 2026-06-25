@@ -1311,8 +1311,9 @@ async function loadCarritos(){
               </div>
               <div style="display:flex;align-items:center;gap:6px">
                 <span class="font-500">S/ ${it.precio_unitario}</span>
-                <span class="badge ${it.estado_pago==='confirmado'?'badge-ok':'badge-warn'}" style="font-size:9px">${it.estado_pago==='confirmado'?'✓ Pago':'Pendiente'}</span>
-                <span class="badge ${it.estado_bolsa==='en_bolsa'?'badge-info':'badge-gray'}" style="font-size:9px">${it.estado_bolsa==='en_bolsa'?'📦 En bolsa':'Sin agregar'}</span>
+                <span class="badge ${it.estado_pago==='confirmado'?'badge-ok':'badge-warn'}" style="font-size:9px">${it.estado_pago==='confirmado'?'✓ Pagado':'Pendiente'}</span>
+                <span class="badge ${it.estado_bolsa==='en_bolsa'?'badge-info':'badge-gray'}" style="font-size:9px;cursor:pointer" onclick="toggleBolsaCarritoItem('${it.id}',this)">${it.estado_bolsa==='en_bolsa'?'📦 En bolsa':'Sin agregar'}</span>
+                <span style="cursor:pointer;color:var(--text3);font-size:13px;padding:0 2px" title="${it.estado_pago==='confirmado'?'Ya pagada — no se puede eliminar':'Eliminar prenda'}" onclick="removeCarritoItem('${it.id}',${it.precio_unitario},'${c.id}',${it.estado_pago==='confirmado'})">✕</span>
               </div>
             </div>
             <div style="font-size:10px;color:var(--text3);padding:2px 0">${it.agregado_en?new Date(it.agregado_en).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}</div>`).join('')}
@@ -1555,20 +1556,57 @@ async function toggleBolsaItem(i, el){
   renderLiveCart();
 }
 
+async function toggleBolsaCarritoItem(itemId, el){
+  const actual = el.textContent.includes('En bolsa') ? 'en_bolsa' : 'sin_agregar';
+  const nuevo = actual==='en_bolsa' ? 'sin_agregar' : 'en_bolsa';
+  try {
+    await dbPatch(`carrito_items?id=eq.${itemId}`,{estado_bolsa:nuevo});
+    el.textContent = nuevo==='en_bolsa' ? '📦 En bolsa' : 'Sin agregar';
+    el.className = `badge ${nuevo==='en_bolsa'?'badge-info':'badge-gray'}`;
+    el.style.cssText='font-size:9px;cursor:pointer';
+  } catch(e){ toast('Error: '+e.message); }
+}
+
 async function removeCartItem(i){
   const item=liveCart[i];
+  if(item.estado_pago==='confirmado'){
+    toast('⚠️ Esta prenda ya fue pagada — para retirarla debes hacer una devolución');
+    return;
+  }
   try {
     if(item.id) await dbPatch(`carrito_items?id=eq.${item.id}`,{estado_bolsa:'eliminado'});
     liveCart.splice(i,1);
     renderLiveCart();
-    // Actualizar total del pedido
     if(currentPedidoActivo){
       const nuevoSubtotal = liveCart.reduce((a,it)=>a+it.precio,0);
       await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(currentPedidoActivo.costo_envio||0)});
       currentPedidoActivo.subtotal = nuevoSubtotal;
     }
+    loadCarritos();
     toast('✓ Prenda eliminada');
   } catch(e){ toast('Error eliminando: '+e.message); }
+}
+
+async function removeCarritoItem(itemId, precio, pedidoId, pagado){
+  if(pagado){
+    toast('⚠️ Esta prenda ya fue pagada — para retirarla debes hacer una devolución');
+    return;
+  }
+  if(!confirm('¿Eliminar esta prenda del carrito?')) return;
+  try {
+    await dbPatch(`carrito_items?id=eq.${itemId}`,{estado_bolsa:'eliminado'});
+    // Recalcular total del pedido
+    const items = await dbGet(`carrito_items?pedido_id=eq.${pedidoId}&estado_bolsa=neq.eliminado&select=precio_unitario`);
+    // buscar por carrito
+    const ped = await dbGet(`pedidos?id=eq.${pedidoId}&select=carrito_id,costo_envio,monto_pagado`);
+    if(ped.length){
+      const allItems = await dbGet(`carrito_items?carrito_id=eq.${ped[0].carrito_id}&estado_bolsa=neq.eliminado&select=precio_unitario`);
+      const nuevoSubtotal = allItems.reduce((a,it)=>a+(it.precio_unitario||0),0);
+      await dbPatch(`pedidos?id=eq.${pedidoId}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(ped[0].costo_envio||0)});
+    }
+    toast('✓ Prenda eliminada');
+    loadCarritos();
+  } catch(e){ toast('Error: '+e.message); }
 }
 
 function openEnvioModal(){
