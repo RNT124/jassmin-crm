@@ -1640,6 +1640,7 @@ async function loadPedidos(f='todos'){
         <td>S/ ${p.total}</td>
         <td>${falta(p)>0?`<span style="color:var(--red)">S/${p.monto_pagado} (-S/${falta(p)})</span>`:`<span style="color:var(--green)">S/${p.monto_pagado} ✓</span>`}</td>
         <td><span class="badge ${ESTADOS_BADGE[p.estado]}">${ESTADOS_LABEL[p.estado]}</span></td>
+        <td>${p.courier_codigo?`<span style="font-size:11px;font-family:monospace">${p.courier_codigo}</span>`:'—'}</td>
         <td style="display:flex;gap:4px;align-items:center">
           <button class="btn btn-xs" onclick="openPedidoModal('${p.id}')">Ver</button>
           ${['pago_pendiente','pago_parcial'].includes(p.estado)
@@ -1742,8 +1743,7 @@ async function avanzarEstadoDirecto(id, estadoActual){
     await dbPatch(`pedidos?id=eq.${id}`,patch);
     closeModal('modal-pedido');
     toast(msg);
-    await loadPedidos(pedidoFiltro);
-    loadDashboard();
+    setTimeout(async()=>{ await loadPedidos(pedidoFiltro); loadDashboard(); }, 150);
   } catch(e){ toast('Error actualizando estado: '+e.message); }
 }
 
