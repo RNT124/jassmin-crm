@@ -2499,7 +2499,8 @@ async function confirmarPagoCorte(){
 
     // 6. Recargar vistas afectadas
     loadCortes(corteFiltro);
-    // Si estamos en carritos o pedidos también refrescar en background
+    loadPedidos(pedidoFiltro);
+    loadCarritos();
     loadDashboard();
 
   } catch(e){ toast('Error: '+e.message); }
