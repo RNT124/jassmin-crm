@@ -1305,30 +1305,28 @@ async function loadCarritos(){
           ${items.map(it=>{
             const pagado = it.estado_pago==='confirmado';
             const enBolsa = it.estado_bolsa==='en_bolsa';
-            const colorX = pagado ? 'var(--text3)' : 'var(--red)';
             const badgePago = pagado ? 'badge-ok' : 'badge-warn';
             const textPago = pagado ? '✓ Pagado' : 'Pendiente';
             const badgeBolsa = enBolsa ? 'badge-info' : 'badge-gray';
             const textBolsa = enBolsa ? '📦 En bolsa' : 'Sin agregar';
             const hora = it.agregado_en ? new Date(it.agregado_en).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
             const nombre = it.prendas?.nombre||'Prenda';
-            const talla = it.talla ? '<span class="badge badge-gray" style="font-size:10px;flex-shrink:0">T-'+it.talla+'</span>' : '';
-            return '<div style="padding:6px 0;border-bottom:0.5px solid var(--border);font-size:12.5px">'
-              + '<div style="display:flex;justify-content:space-between;align-items:center">'
-                + '<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">'
-                  + '<span>📦</span>'
-                  + '<span style="font-weight:500">'+nombre+'</span>'
-                  + talla
-                + '</div>'
-                + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">'
-                  + '<span class="font-500">S/ '+it.precio_unitario+'</span>'
-                  + '<span onclick="removeCarritoItem(''+it.id+'','+it.precio_unitario+',''+c.id+'','+pagado+')" style="cursor:pointer;font-size:18px;font-weight:700;color:'+colorX+';line-height:1;padding:2px 6px">×</span>'
+            const talla = it.talla ? ' · T-'+it.talla : '';
+            const btnEliminar = pagado
+              ? '<button disabled style="border:none;background:none;color:var(--text3);font-size:11px;cursor:not-allowed;padding:2px 6px;border-radius:4px" title="Ya pagada">🔒</button>'
+              : '<button onclick="removeCarritoItem(''+it.id+'','+it.precio_unitario+',''+c.id+'',false)" style="border:none;background:var(--red-light);color:var(--red);font-size:11px;font-weight:600;cursor:pointer;padding:2px 8px;border-radius:4px" title="Eliminar">Quitar</button>';
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--border);gap:8px">'
+              + '<div style="flex:1;min-width:0">'
+                + '<div style="font-size:12.5px;font-weight:500">📦 '+nombre+'<span style="color:var(--text3);font-weight:400">'+talla+'</span></div>'
+                + '<div style="display:flex;gap:5px;margin-top:3px;align-items:center;flex-wrap:wrap">'
+                  + '<span class="badge '+badgePago+'" style="font-size:9px">'+textPago+'</span>'
+                  + '<span class="badge '+badgeBolsa+'" style="font-size:9px;cursor:pointer" onclick="toggleBolsaCarritoItem(''+it.id+'',this)">'+textBolsa+'</span>'
+                  + '<span style="font-size:10px;color:var(--text3)">'+hora+'</span>'
                 + '</div>'
               + '</div>'
-              + '<div style="display:flex;gap:5px;margin-top:4px;align-items:center">'
-                + '<span class="badge '+badgePago+'" style="font-size:9px">'+textPago+'</span>'
-                + '<span class="badge '+badgeBolsa+'" style="font-size:9px;cursor:pointer" onclick="toggleBolsaCarritoItem(''+it.id+'',this)">'+textBolsa+'</span>'
-                + '<span style="font-size:10px;color:var(--text3)">'+hora+'</span>'
+              + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
+                + '<span style="font-weight:600;font-size:13px">S/ '+it.precio_unitario+'</span>'
+                + btnEliminar
               + '</div>'
             + '</div>';
           }).join('')}
