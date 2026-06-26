@@ -1316,8 +1316,8 @@ async function loadCarritos(){
             const nombre = it.prendas?.nombre||'Prenda';
             const talla = it.talla ? ' · T-'+it.talla : '';
             const btnEliminar = pagado
-              ? '<button disabled style="border:none;background:none;color:var(--text3);font-size:11px;cursor:not-allowed;padding:2px 6px;border-radius:4px" title="Ya pagada">🔒</button>'
-              : '<button onclick="removeCarritoItem(''+it.id+'','+it.precio_unitario+',''+c.id+'',false)" style="border:none;background:var(--red-light);color:var(--red);font-size:11px;font-weight:600;cursor:pointer;padding:2px 8px;border-radius:4px" title="Eliminar">Quitar</button>';
+              ? '<button disabled style="border:none;background:none;color:var(--text3);font-size:11px;cursor:not-allowed">🔒</button>'
+              : '<button class="btn-quitar-item" data-item="' + it.id + '" data-precio="' + it.precio_unitario + '" data-pedido="' + c.id + '" style="border:none;background:var(--red-light);color:var(--red);font-size:11px;font-weight:600;cursor:pointer;padding:2px 8px;border-radius:4px">Quitar</button>';
             return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--border);gap:8px">'
               + '<div style="flex:1;min-width:0">'
                 + '<div style="font-size:12.5px;font-weight:500">📦 '+nombre+'<span style="color:var(--text3);font-weight:400">'+talla+'</span></div>'
@@ -1602,6 +1602,16 @@ async function removeCartItem(i){
     toast('✓ Prenda eliminada');
   } catch(e){ toast('Error eliminando: '+e.message); }
 }
+
+// Event delegation para botones Quitar en carritos
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('.btn-quitar-item');
+  if(!btn) return;
+  const itemId = btn.dataset.item;
+  const precio = parseFloat(btn.dataset.precio);
+  const pedidoId = btn.dataset.pedido;
+  removeCarritoItem(itemId, precio, pedidoId, false);
+});
 
 async function removeCarritoItem(itemId, precio, pedidoId, pagado){
   if(pagado===true||pagado==='true'){
