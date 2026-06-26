@@ -1323,7 +1323,7 @@ async function loadCarritos(){
                 + '<div style="font-size:12.5px;font-weight:500">📦 '+nombre+'<span style="color:var(--text3);font-weight:400">'+talla+'</span></div>'
                 + '<div style="display:flex;gap:5px;margin-top:3px;align-items:center;flex-wrap:wrap">'
                   + '<span class="badge '+badgePago+'" style="font-size:9px">'+textPago+'</span>'
-                  + '<span class="badge '+badgeBolsa+'" style="font-size:9px;cursor:pointer" onclick="toggleBolsaCarritoItem(''+it.id+'',this)">'+textBolsa+'</span>'
+                  + '<span class="badge '+badgeBolsa+'" style="font-size:9px;cursor:pointer" data-bolsa-id="' + it.id + '">'+textBolsa+'</span>'
                   + '<span style="font-size:10px;color:var(--text3)">'+hora+'</span>'
                 + '</div>'
               + '</div>'
@@ -1603,14 +1603,17 @@ async function removeCartItem(i){
   } catch(e){ toast('Error eliminando: '+e.message); }
 }
 
-// Event delegation para botones Quitar en carritos
+// Event delegation para carritos abiertos
 document.addEventListener('click', function(e){
   const btn = e.target.closest('.btn-quitar-item');
-  if(!btn) return;
-  const itemId = btn.dataset.item;
-  const precio = parseFloat(btn.dataset.precio);
-  const pedidoId = btn.dataset.pedido;
-  removeCarritoItem(itemId, precio, pedidoId, false);
+  if(btn){
+    removeCarritoItem(btn.dataset.item, parseFloat(btn.dataset.precio), btn.dataset.pedido, false);
+    return;
+  }
+  const bolsa = e.target.closest('[data-bolsa-id]');
+  if(bolsa){
+    toggleBolsaCarritoItem(bolsa.dataset.bolsaId, bolsa);
+  }
 });
 
 async function removeCarritoItem(itemId, precio, pedidoId, pagado){
