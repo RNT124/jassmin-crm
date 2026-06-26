@@ -1250,7 +1250,7 @@ async function loadCarritos(){
     // Cargar pedidos en acumulando (bolsas activas sin envío solicitado)
     const pedActivos = await dbGet('pedidos?estado=eq.acumulando&select=id,numero,subtotal,total,monto_pagado,carrito_id,cliente_id,creado_en,clientes(nombre,telefono,talla)&order=creado_en.desc');
     const carritos = await Promise.all(pedActivos.map(async p=>{
-      const items = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&select=*,prendas(nombre)`);
+      const items = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&estado_bolsa=neq.eliminado&select=*,prendas(nombre)`);
       return {...p, carrito_items:items, actualizado_en:p.creado_en};
     }));
 
@@ -1313,7 +1313,7 @@ async function loadCarritos(){
                 <span class="font-500">S/ ${it.precio_unitario}</span>
                 <span class="badge ${it.estado_pago==='confirmado'?'badge-ok':'badge-warn'}" style="font-size:9px">${it.estado_pago==='confirmado'?'✓ Pagado':'Pendiente'}</span>
                 <span class="badge ${it.estado_bolsa==='en_bolsa'?'badge-info':'badge-gray'}" style="font-size:9px;cursor:pointer" onclick="toggleBolsaCarritoItem('${it.id}',this)">${it.estado_bolsa==='en_bolsa'?'📦 En bolsa':'Sin agregar'}</span>
-                <span style="cursor:pointer;color:var(--text3);font-size:13px;padding:0 2px" title="${it.estado_pago==='confirmado'?'Ya pagada — no se puede eliminar':'Eliminar prenda'}" onclick="removeCarritoItem('${it.id}',${it.precio_unitario},'${c.id}',${it.estado_pago==='confirmado'})">✕</span>
+                <span style="cursor:pointer;color:${it.estado_pago==='confirmado'?'var(--text3)':'var(--red)'};font-size:14px;font-weight:600;padding:0 4px;opacity:.7" title="${it.estado_pago==='confirmado'?'Ya pagada — no se puede eliminar':'Eliminar prenda'}" onclick="removeCarritoItem('${it.id}',${it.precio_unitario},'${c.id}',${it.estado_pago==='confirmado'})">✕</span>
               </div>
             </div>
             <div style="font-size:10px;color:var(--text3);padding:2px 0">${it.agregado_en?new Date(it.agregado_en).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}</div>`).join('')}
@@ -1588,17 +1588,15 @@ async function removeCartItem(i){
 }
 
 async function removeCarritoItem(itemId, precio, pedidoId, pagado){
-  if(pagado){
+  if(pagado===true||pagado==='true'){
     toast('⚠️ Esta prenda ya fue pagada — para retirarla debes hacer una devolución');
     return;
   }
-  if(!confirm('¿Eliminar esta prenda del carrito?')) return;
+  if(!confirm('¿Eliminar esta prenda?')) return;
   try {
     await dbPatch(`carrito_items?id=eq.${itemId}`,{estado_bolsa:'eliminado'});
-    // Recalcular total del pedido
-    const items = await dbGet(`carrito_items?pedido_id=eq.${pedidoId}&estado_bolsa=neq.eliminado&select=precio_unitario`);
-    // buscar por carrito
-    const ped = await dbGet(`pedidos?id=eq.${pedidoId}&select=carrito_id,costo_envio,monto_pagado`);
+    // Recalcular total del pedido directo por id
+    const ped = await dbGet(`pedidos?id=eq.${pedidoId}&select=id,carrito_id,costo_envio`);
     if(ped.length){
       const allItems = await dbGet(`carrito_items?carrito_id=eq.${ped[0].carrito_id}&estado_bolsa=neq.eliminado&select=precio_unitario`);
       const nuevoSubtotal = allItems.reduce((a,it)=>a+(it.precio_unitario||0),0);
