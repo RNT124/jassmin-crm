@@ -1303,20 +1303,24 @@ async function loadCarritos(){
 
         <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:10px">
           ${items.map(it=>`
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid var(--border);font-size:12.5px">
-              <div>
-                <span>📦 ${it.prendas?.nombre||'Prenda'}</span>
-                ${it.talla?`<span class="badge badge-gray" style="font-size:10px;margin-left:4px">T-${it.talla}</span>`:''}
-                ${it.color?`<span class="badge badge-gray" style="font-size:10px;margin-left:2px">${it.color}</span>`:''}
+            <div style="padding:6px 0;border-bottom:0.5px solid var(--border);font-size:12.5px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+                  <span>📦</span>
+                  <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.prendas?.nombre||'Prenda'}</span>
+                  ${it.talla?`<span class="badge badge-gray" style="font-size:10px;flex-shrink:0">T-${it.talla}</span>`:''}
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">
+                  <span class="font-500">S/ ${it.precio_unitario}</span>
+                  <span onclick="removeCarritoItem('${it.id}',${it.precio_unitario},'${c.id}',${it.estado_pago==='confirmado'})" style="cursor:pointer;font-size:16px;font-weight:700;color:${it.estado_pago==='confirmado'?'var(--text3)':'var(--red)'};line-height:1;padding:2px 4px" title="${it.estado_pago==='confirmado'?'Ya pagada':'Eliminar'}">×</span>
+                </div>
               </div>
-              <div style="display:flex;align-items:center;gap:6px">
-                <span class="font-500">S/ ${it.precio_unitario}</span>
+              <div style="display:flex;gap:5px;margin-top:4px;align-items:center">
                 <span class="badge ${it.estado_pago==='confirmado'?'badge-ok':'badge-warn'}" style="font-size:9px">${it.estado_pago==='confirmado'?'✓ Pagado':'Pendiente'}</span>
                 <span class="badge ${it.estado_bolsa==='en_bolsa'?'badge-info':'badge-gray'}" style="font-size:9px;cursor:pointer" onclick="toggleBolsaCarritoItem('${it.id}',this)">${it.estado_bolsa==='en_bolsa'?'📦 En bolsa':'Sin agregar'}</span>
-                <span style="cursor:pointer;color:${it.estado_pago==='confirmado'?'var(--text3)':'var(--red)'};font-size:14px;font-weight:600;padding:0 4px;opacity:.7" title="${it.estado_pago==='confirmado'?'Ya pagada — no se puede eliminar':'Eliminar prenda'}" onclick="removeCarritoItem('${it.id}',${it.precio_unitario},'${c.id}',${it.estado_pago==='confirmado'})">✕</span>
+                <span style="font-size:10px;color:var(--text3)">${it.agregado_en?new Date(it.agregado_en).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}</span>
               </div>
-            </div>
-            <div style="font-size:10px;color:var(--text3);padding:2px 0">${it.agregado_en?new Date(it.agregado_en).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}</div>`).join('')}
+            </div>`).join('')}
           <div style="display:flex;justify-content:space-between;font-weight:600;font-size:13px;padding-top:6px;margin-top:2px">
             <span>Total carrito</span><span>S/ ${total}</span>
           </div>
