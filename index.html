@@ -1359,7 +1359,7 @@ async function generarPedidoDesdeCarrito(pedidoId, clienteId, subtotal){
     currentLiveClient = rows[0];
     const pedRows = await dbGet(`pedidos?id=eq.${pedidoId}&select=*`);
     currentPedidoActivo = pedRows[0];
-    const items = await dbGet(`carrito_items?carrito_id=eq.${currentPedidoActivo.carrito_id}&select=*,prendas(nombre)`);
+    const items = await dbGet(`carrito_items?carrito_id=eq.${currentPedidoActivo.carrito_id}&estado_bolsa=neq.eliminado&select=*,prendas(nombre)`);
     liveCart = items.map(it=>({id:it.id, prenda_id:it.prenda_id, nombre:it.prendas?.nombre||'Prenda', talla:it.talla, color:it.color||'', precio:it.precio_unitario, estado_pago:it.estado_pago, estado_bolsa:it.estado_bolsa}));
     document.getElementById('env-subtotal').textContent = 'S/ '+subtotal;
     updateEnvCosto();
@@ -1452,7 +1452,7 @@ async function selectLiveClient(id){
     const pedActivos = await dbGet(`pedidos?cliente_id=eq.${id}&estado=in.(acumulando,listo_envio)&order=creado_en.desc&limit=1`);
     if(pedActivos.length){
       currentCarritoId = pedActivos[0].id; // reutilizamos currentCarritoId para guardar el pedido activo
-      const items = await dbGet(`carrito_items?carrito_id=eq.${pedActivos[0].carrito_id}&select=*,prendas(nombre)`);
+      const items = await dbGet(`carrito_items?carrito_id=eq.${pedActivos[0].carrito_id}&estado_bolsa=neq.eliminado&select=*,prendas(nombre)`);
       liveCart = items.map(it=>({id:it.id, prenda_id:it.prenda_id, nombre:it.prendas?.nombre||'Prenda', talla:it.talla, color:it.color||'', precio:it.precio_unitario, estado_pago:it.estado_pago, estado_bolsa:it.estado_bolsa}));
       currentPedidoActivo = pedActivos[0];
     } else {
@@ -1748,7 +1748,7 @@ async function openPedidoModal(id){
   try {
     const rows = await dbGet(`pedidos?id=eq.${id}&select=*,clientes(nombre,telefono)`);
     const p = rows[0];
-    const items = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&select=*,prendas(nombre)`);
+    const items = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&estado_bolsa=neq.eliminado&select=*,prendas(nombre)`);
     document.getElementById('mp-title').textContent=p.numero;
     const falta=p.total-(p.monto_pagado||0);
     const actionLabel=ESTADOS_ACTION[p.estado];
