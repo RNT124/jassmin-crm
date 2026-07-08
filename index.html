@@ -2043,7 +2043,7 @@ async function showTracking(num){
     const ped=rows[0];
     // Traer items del carrito por separado
     if(ped.carrito_id){
-      const items = await dbGet(`carrito_items?carrito_id=eq.${ped.carrito_id}&select=*,prendas(nombre)`);
+      const items = await dbGet(`carrito_items?carrito_id=eq.${ped.carrito_id}&estado_bolsa=neq.eliminado&select=*,prendas(nombre)`);
       ped.carrito_items = items;
     } else {
       ped.carrito_items = [];
@@ -2425,7 +2425,7 @@ async function loadCortes(f){
     else if(f==='semana'){ desde=new Date(ahora); desde.setDate(ahora.getDate()-7); }
     else { desde=new Date(ahora.getFullYear(),ahora.getMonth(),1); }
 
-    const items=await dbGet(`carrito_items?agregado_en=gte.${desde.toISOString()}&select=*,prendas(nombre,precio),carritos(cliente_id,clientes(nombre,telefono))&order=agregado_en.desc`);
+    const items=await dbGet(`carrito_items?agregado_en=gte.${desde.toISOString()}&estado_bolsa=neq.eliminado&select=*,prendas(nombre,precio),carritos(cliente_id,clientes(nombre,telefono))&order=agregado_en.desc`);
 
     // Agrupar por clienta+fecha para vista de corte
     const totalVendido=items.reduce((a,it)=>a+(it.precio_unitario||0),0);
@@ -2505,7 +2505,7 @@ async function crearCorte(){
   closeModal('modal-corte');
   // Filtrar items en ese rango
   try {
-    const items=await dbGet(`carrito_items?agregado_en=gte.${new Date(inicio).toISOString()}&agregado_en=lte.${new Date(fin).toISOString()}&select=*,prendas(nombre,precio),carritos(cliente_id,clientes(nombre,telefono))&order=agregado_en.asc`);
+    const items=await dbGet(`carrito_items?agregado_en=gte.${new Date(inicio).toISOString()}&agregado_en=lte.${new Date(fin).toISOString()}&estado_bolsa=neq.eliminado&select=*,prendas(nombre,precio),carritos(cliente_id,clientes(nombre,telefono))&order=agregado_en.asc`);
     DB_cortes=items;
     const total=items.reduce((a,it)=>a+(it.precio_unitario||0),0);
     // Mostrar resultados del corte
@@ -2577,7 +2577,7 @@ async function confirmarPagoCorte(){
       const carritoId = itemData[0].carrito_id;
 
       // 3. Recalcular total pagado del carrito sumando todos sus items confirmados
-      const todosItems = await dbGet(`carrito_items?carrito_id=eq.${carritoId}&select=precio_unitario,estado_pago,monto_pagado`);
+      const todosItems = await dbGet(`carrito_items?carrito_id=eq.${carritoId}&estado_bolsa=neq.eliminado&select=precio_unitario,estado_pago,monto_pagado`);
       const totalCarrito = todosItems.reduce((a,it)=>a+(it.precio_unitario||0),0);
       const totalPagadoCarrito = todosItems.reduce((a,it)=>a+(it.monto_pagado||0),0);
 
