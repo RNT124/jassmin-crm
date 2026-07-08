@@ -1595,8 +1595,15 @@ async function removeCartItem(i){
     renderLiveCart();
     if(currentPedidoActivo){
       const nuevoSubtotal = liveCart.reduce((a,it)=>a+it.precio,0);
-      await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(currentPedidoActivo.costo_envio||0)});
-      currentPedidoActivo.subtotal = nuevoSubtotal;
+      if(liveCart.length === 0){
+        // No quedan prendas — cancelar pedido zombie
+        await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,{estado:'cancelado',subtotal:0,total:0});
+        currentPedidoActivo = null;
+        currentCarritoId = null;
+      } else {
+        await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(currentPedidoActivo.costo_envio||0)});
+        currentPedidoActivo.subtotal = nuevoSubtotal;
+      }
     }
     loadCarritos();
     toast('✓ Prenda eliminada');
