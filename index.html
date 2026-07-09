@@ -1077,23 +1077,25 @@ textarea{resize:vertical;min-height:72px}
 const SUPA_URL = 'https://qnuirdkwfxyfngrhohsh.supabase.co';
 const SUPA_KEY = 'sb_publishable_6C793L_1WnQdbAEFHFo1vg___kezg4E';
 
-async function supaFetch(path, opts={}) {
+async function supaFetch(path, method='GET', body=null, prefer='return=representation') {
   const url = `${SUPA_URL}/rest/v1/${path}`;
-  const res = await fetch(url, {
+  const fetchOpts = {
+    method,
     headers: {
       'apikey': SUPA_KEY,
       'Content-Type': 'application/json',
-      'Prefer': opts.prefer || 'return=representation',
+      'Prefer': prefer,
     },
-    ...opts
-  });
+  };
+  if(body) fetchOpts.body = body;
+  const res = await fetch(url, fetchOpts);
   if (!res.ok) { const e = await res.text(); throw new Error(e); }
   const t = await res.text();
   return t ? JSON.parse(t) : null;
 }
-const dbGet    = p => supaFetch(p, {method:'GET'});
-const dbPost   = (p,b) => supaFetch(p, {method:'POST', body:JSON.stringify(b)});
-const dbPatch  = (p,b) => supaFetch(p, {method:'PATCH', body:JSON.stringify(b), prefer:'return=representation'});
+const dbGet   = p => supaFetch(p, 'GET');
+const dbPost  = (p,b) => supaFetch(p, 'POST', JSON.stringify(b), 'return=representation');
+const dbPatch = (p,b) => supaFetch(p, 'PATCH', JSON.stringify(b), 'return=representation');
 
 // ══════════════ LOCAL FALLBACK DATA ══════════════
 const USERS = {
@@ -1526,6 +1528,7 @@ async function addToCart(){
       monto_pagado:0
     });
     const item = Array.isArray(itemRows)?itemRows[0]:itemRows;
+    if(!item || !item.id){ toast('Error guardando prenda — intenta de nuevo'); return; }
     liveCart.push({id:item.id, prenda_id:prendaId, nombre:prenda.nombre, talla, color:color||'', precio:prenda.precio, estado_pago:'pendiente', estado_bolsa:'sin_agregar'});
     // Recalcular total del pedido
     const nuevoSubtotal = liveCart.reduce((a,i)=>a+i.precio,0);
@@ -1589,8 +1592,12 @@ async function removeCartItem(i){
     toast('⚠️ Esta prenda ya fue pagada — para retirarla debes hacer una devolución');
     return;
   }
+  if(!item.id){
+    toast('⚠️ Error: esta prenda no tiene ID guardado. Recarga la página e intenta de nuevo.');
+    return;
+  }
   try {
-    if(item.id) await dbPatch(`carrito_items?id=eq.${item.id}`,{estado_bolsa:'eliminado'});
+    await dbPatch(`carrito_items?id=eq.${item.id}`,{estado_bolsa:'eliminado'});
     liveCart.splice(i,1);
     renderLiveCart();
     if(currentPedidoActivo){
