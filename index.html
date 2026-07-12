@@ -650,62 +650,23 @@ textarea{resize:vertical;min-height:72px}
 
       <!-- ── DASHBOARD ── -->
       <div id="pg-dashboard" class="page active">
-        <div class="metrics-grid">
-          <div class="metric">
-            <div class="metric-val">S/ 347</div>
-            <div class="metric-lbl">Vendido hoy</div>
-            <div class="metric-delta delta-up">↑ 18% vs semana pasada</div>
-          </div>
-          <div class="metric">
-            <div class="metric-val">8</div>
-            <div class="metric-lbl">Pedidos activos</div>
-            <div class="metric-delta text-hint">3 nuevos hoy</div>
-          </div>
-          <div class="metric">
-            <div class="metric-val">S/ 214</div>
-            <div class="metric-lbl">Pagos recibidos hoy</div>
-            <div class="metric-delta delta-up">2 confirmados</div>
-          </div>
-          <div class="metric">
-            <div class="metric-val">23</div>
-            <div class="metric-lbl">Clientas totales</div>
-            <div class="metric-delta delta-up">↑ 2 nuevas esta semana</div>
-          </div>
-        </div>
+        <div class="metrics-grid" id="db-metrics"></div>
 
         <div class="grid-2 mb-16">
           <div>
             <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Alertas</div>
-            <div class="alert-item" onclick="nav('pedidos',document.querySelector('[onclick*=pedidos]'))">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M20 7l-8-4-8 4v10l8 4 8-4V7z"/></svg>
-              <div style="flex:1"><div class="alert-text">3 pedidos para empaquetar</div><div class="alert-sub">Pago confirmado — sin preparar</div></div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-            </div>
-            <div class="alert-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-              <div style="flex:1"><div class="alert-text">2 carritos +7 días sin cerrar</div><div class="alert-sub">Clientas con prendas acumuladas</div></div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-            </div>
-            <div class="alert-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              <div style="flex:1"><div class="alert-text">1 pago parcial +5 días</div><div class="alert-sub">JAS-0038 · Lucia M. · falta S/ 64</div></div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-            </div>
+            <div id="db-alertas"><div class="loading">Cargando...</div></div>
           </div>
 
           <div>
             <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Pedidos en curso</div>
-            <div class="kanban-grid" style="grid-template-columns:1fr 1fr 1fr;gap:8px">
-              <div class="kcol"><div class="kcol-title">Por pagar</div><div class="kcol-num">4</div><div class="kcol-lbl">pendiente / parcial</div></div>
-              <div class="kcol"><div class="kcol-title">Preparando</div><div class="kcol-num">3</div><div class="kcol-lbl">empaquetando</div></div>
-              <div class="kcol"><div class="kcol-title">En camino</div><div class="kcol-num">1</div><div class="kcol-lbl">con courier</div></div>
-            </div>
+            <div class="kanban-grid" id="db-kanban" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px"></div>
 
             <div class="card card-sm mt-8">
               <div class="card-title">Ventas esta semana</div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
                 <span class="text-muted text-sm">Total</span>
-                <span class="font-600" style="font-size:15px">S/ 892</span>
+                <span class="font-600" style="font-size:15px" id="db-semana-total">S/ 0</span>
               </div>
               <div class="bars" id="db-bars"></div>
             </div>
@@ -718,12 +679,7 @@ textarea{resize:vertical;min-height:72px}
         <div class="tbl-wrap">
           <table class="tbl">
             <thead><tr><th>#</th><th>Prenda</th><th>Unidades</th><th>Ingresos</th></tr></thead>
-            <tbody>
-              <tr><td class="text-hint">1</td><td>Vestido lino manga larga</td><td>12</td><td>S/ 1,068</td></tr>
-              <tr><td class="text-hint">2</td><td>Conjunto jogger rosa</td><td>9</td><td>S/ 882</td></tr>
-              <tr><td class="text-hint">3</td><td>Blusa flores bordadas</td><td>7</td><td>S/ 385</td></tr>
-              <tr><td class="text-hint">4</td><td>Pantalon palazzo beige</td><td>5</td><td>S/ 375</td></tr>
-            </tbody>
+            <tbody id="db-top-prendas"><tr><td colspan="4" class="loading">Cargando...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1263,44 +1219,102 @@ async function initApp(){
 
 async function loadDashboard(){
   try {
-    const [pedidos, clientes] = await Promise.all([
+    const hoy = new Date();
+    const hoyStr = hoy.toISOString().slice(0,10);
+    const ayer = new Date(hoy); ayer.setDate(ayer.getDate()-1);
+    const ayerStr = ayer.toISOString().slice(0,10);
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString();
+    const inicioSemana = new Date(hoy); inicioSemana.setDate(inicioSemana.getDate()-6); inicioSemana.setHours(0,0,0,0);
+
+    const [pedidos, clientes, variantes] = await Promise.all([
       dbGet('pedidos?select=*&order=creado_en.desc'),
-      dbGet('clientes?select=id')
+      dbGet('clientes?select=id,creado_en'),
+      dbGet('prenda_variantes?select=stock').catch(()=>[])
     ]);
-    const hoy = new Date().toISOString().slice(0,10);
-    const ventasHoy = pedidos.filter(p=>p.creado_en?.slice(0,10)===hoy).reduce((a,p)=>a+(p.subtotal||0),0);
-    const pagosHoy = pedidos.filter(p=>p.creado_en?.slice(0,10)===hoy&&p.monto_pagado>0).reduce((a,p)=>a+p.monto_pagado,0);
-    const activos = pedidos.filter(p=>p.estado!=='entregado').length;
+
+    const noCancel = pedidos.filter(p=>p.estado!=='cancelado');
+    const activos = noCancel.filter(p=>!['entregado','acumulando'].includes(p.estado));
+
+    // ── Métricas ──
+    const vendidoHoy = noCancel.filter(p=>p.creado_en?.slice(0,10)===hoyStr).reduce((a,p)=>a+(p.subtotal||0),0);
+    const vendidoAyer = noCancel.filter(p=>p.creado_en?.slice(0,10)===ayerStr).reduce((a,p)=>a+(p.subtotal||0),0);
+    const deltaHoy = vendidoAyer>0 ? Math.round((vendidoHoy-vendidoAyer)/vendidoAyer*100) : (vendidoHoy>0?100:0);
+    const porCobrar = activos.reduce((a,p)=>a+Math.max((p.total||0)-(p.monto_pagado||0),0),0);
+    const nuevosHoy = pedidos.filter(p=>p.creado_en?.slice(0,10)===hoyStr).length;
+    const ticketProm = noCancel.length ? Math.round(noCancel.reduce((a,p)=>a+(p.total||0),0)/noCancel.length) : 0;
+    const clientesNuevasSemana = clientes.filter(c=>c.creado_en && new Date(c.creado_en) >= inicioSemana).length;
+    const stockBajo = variantes.filter(v=>v.stock<=STOCK_BAJO_LIMITE).length;
+
     document.getElementById('db-metrics').innerHTML=`
-      <div class="metric"><div class="metric-val">S/ ${ventasHoy}</div><div class="metric-lbl">Vendido hoy</div></div>
-      <div class="metric"><div class="metric-val">${activos}</div><div class="metric-lbl">Pedidos activos</div></div>
-      <div class="metric"><div class="metric-val">S/ ${pagosHoy}</div><div class="metric-lbl">Pagos recibidos hoy</div></div>
-      <div class="metric"><div class="metric-val">${clientes.length}</div><div class="metric-lbl">Clientas totales</div></div>`;
-    const empaquetar=pedidos.filter(p=>p.estado==='pago_completo').length;
-    const sinDir=pedidos.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado)&&!p.direccion).length;
-    const porPagar=pedidos.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado)).length;
-    const preparando=pedidos.filter(p=>['pago_completo','empaquetado'].includes(p.estado)).length;
-    const enCamino=pedidos.filter(p=>p.estado==='en_camino').length;
-    document.getElementById('db-alertas').innerHTML=`
-      ${empaquetar>0?`<div class="alert-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M20 7l-8-4-8 4v10l8 4 8-4V7z"/></svg><div style="flex:1"><div class="alert-text">${empaquetar} pedido${empaquetar>1?'s':''} para empaquetar</div><div class="alert-sub">Pago confirmado</div></div></div>`:''}
-      ${sinDir>0?`<div class="alert-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div style="flex:1"><div class="alert-text">${sinDir} pedido${sinDir>1?'s':''} sin dirección</div><div class="alert-sub">Clienta no completó datos</div></div></div>`:''}
-      ${empaquetar===0&&sinDir===0?'<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin alertas ✓</div>':''}`;
+      <div class="metric"><div class="metric-val">S/ ${vendidoHoy.toFixed(0)}</div><div class="metric-lbl">Vendido hoy</div><div class="metric-delta ${deltaHoy>=0?'delta-up':''}" style="${deltaHoy<0?'color:var(--red)':''}">${deltaHoy>=0?'↑':'↓'} ${Math.abs(deltaHoy)}% vs ayer</div></div>
+      <div class="metric"><div class="metric-val">S/ ${porCobrar.toFixed(0)}</div><div class="metric-lbl">Por cobrar</div><div class="metric-delta text-hint">en pedidos activos</div></div>
+      <div class="metric"><div class="metric-val">${activos.length}</div><div class="metric-lbl">Pedidos activos</div><div class="metric-delta text-hint">${nuevosHoy} nuevo${nuevosHoy!==1?'s':''} hoy</div></div>
+      <div class="metric"><div class="metric-val">S/ ${ticketProm}</div><div class="metric-lbl">Ticket promedio</div></div>
+      <div class="metric"><div class="metric-val">${clientes.length}</div><div class="metric-lbl">Clientas totales</div><div class="metric-delta ${clientesNuevasSemana>0?'delta-up':'text-hint'}">${clientesNuevasSemana>0?'↑ ':''}${clientesNuevasSemana} nueva${clientesNuevasSemana!==1?'s':''} esta semana</div></div>
+      <div class="metric" ${stockBajo>0?'style="cursor:pointer" onclick="nav(\'stock\',document.getElementById(\'sb-stock\'))"':''}><div class="metric-val" style="${stockBajo>0?'color:var(--red)':''}">${stockBajo}</div><div class="metric-lbl">Prendas con stock bajo</div></div>`;
+
+    // ── Alertas reales ──
+    const empaquetar = activos.filter(p=>p.estado==='pago_completo');
+    const sinDir = activos.filter(p=>['pago_pendiente','pago_parcial','listo_envio'].includes(p.estado)&&!p.direccion);
+    const tresDiasMs = 3*86400000, cincoDiasMs = 5*86400000;
+    const abandonados = activos.filter(p=>p.estado==='acumulando' && p.actualizado_en && (hoy-new Date(p.actualizado_en))>tresDiasMs);
+    const pagoParcialVencido = activos.filter(p=>p.estado==='pago_parcial' && p.actualizado_en && (hoy-new Date(p.actualizado_en))>cincoDiasMs);
+
+    let alertasHtml = '';
+    if(empaquetar.length) alertasHtml += `<div class="alert-item" onclick="nav('pedidos',document.querySelector('[onclick*=pedidos]'))"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M20 7l-8-4-8 4v10l8 4 8-4V7z"/></svg><div style="flex:1"><div class="alert-text">${empaquetar.length} pedido${empaquetar.length!==1?'s':''} para empaquetar</div><div class="alert-sub">Pago confirmado — sin preparar</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>`;
+    if(abandonados.length) alertasHtml += `<div class="alert-item" onclick="nav('carritos',document.querySelector('[onclick*=carritos]'))"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><div style="flex:1"><div class="alert-text">${abandonados.length} carrito${abandonados.length!==1?'s':''} +3 días sin cerrar</div><div class="alert-sub">Clientas con prendas acumuladas</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>`;
+    if(sinDir.length) alertasHtml += `<div class="alert-item" onclick="nav('pedidos',document.querySelector('[onclick*=pedidos]'))"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div style="flex:1"><div class="alert-text">${sinDir.length} pedido${sinDir.length!==1?'s':''} sin dirección</div><div class="alert-sub">Clienta no completó datos</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>`;
+    if(pagoParcialVencido.length){
+      const peor = pagoParcialVencido.sort((a,b)=>(b.total-b.monto_pagado)-(a.total-a.monto_pagado))[0];
+      alertasHtml += `<div class="alert-item" onclick="nav('pedidos',document.querySelector('[onclick*=pedidos]'))"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><div style="flex:1"><div class="alert-text">${pagoParcialVencido.length} pago${pagoParcialVencido.length!==1?'s':''} parcial${pagoParcialVencido.length!==1?'es':''} +5 días</div><div class="alert-sub">${peor.numero||''} · falta S/ ${(peor.total-peor.monto_pagado).toFixed(0)}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>`;
+    }
+    if(stockBajo>0) alertasHtml += `<div class="alert-item" onclick="nav('stock',document.getElementById('sb-stock'))"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg><div style="flex:1"><div class="alert-text">${stockBajo} variante${stockBajo!==1?'s':''} con stock bajo</div><div class="alert-sub">2 unidades o menos</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>`;
+    if(!alertasHtml) alertasHtml = '<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin alertas ✓</div>';
+    document.getElementById('db-alertas').innerHTML = alertasHtml;
+
+    // ── Kanban / pipeline ──
+    const acumulando = pedidos.filter(p=>p.estado==='acumulando').length;
+    const porCobrarCount = activos.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado)).length;
+    const preparando = activos.filter(p=>['pago_completo','listo_envio','empaquetado'].includes(p.estado)).length;
+    const enCamino = activos.filter(p=>p.estado==='en_camino').length;
     document.getElementById('db-kanban').innerHTML=`
-      <div class="kcol"><div class="kcol-title">Por pagar</div><div class="kcol-num">${porPagar}</div><div class="kcol-lbl">pendiente/parcial</div></div>
-      <div class="kcol"><div class="kcol-title">Preparando</div><div class="kcol-num">${preparando}</div><div class="kcol-lbl">empaquetando</div></div>
+      <div class="kcol"><div class="kcol-title">Acumulando</div><div class="kcol-num">${acumulando}</div><div class="kcol-lbl">en el carrito</div></div>
+      <div class="kcol"><div class="kcol-title">Por cobrar</div><div class="kcol-num">${porCobrarCount}</div><div class="kcol-lbl">pendiente/parcial</div></div>
+      <div class="kcol"><div class="kcol-title">Preparando</div><div class="kcol-num">${preparando}</div><div class="kcol-lbl">pago ok / empacando</div></div>
       <div class="kcol"><div class="kcol-title">En camino</div><div class="kcol-num">${enCamino}</div><div class="kcol-lbl">con courier</div></div>`;
+
+    // ── Ventas de la semana ──
     const dias=['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
     const semana=Array(7).fill(0);
-    const hoyDate=new Date();
-    pedidos.forEach(p=>{ const d=new Date(p.creado_en); const diff=Math.floor((hoyDate-d)/86400000); if(diff>=0&&diff<7) semana[6-diff]+=(p.subtotal||0); });
+    noCancel.forEach(p=>{ const d=new Date(p.creado_en); const diff=Math.floor((hoy-d)/86400000); if(diff>=0&&diff<7) semana[6-diff]+=(p.subtotal||0); });
     const totalSemana=semana.reduce((a,b)=>a+b,0);
-    const dbSemEl=document.getElementById('db-semana-total'); if(dbSemEl) dbSemEl.textContent='S/ '+totalSemana;
+    document.getElementById('db-semana-total').textContent='S/ '+totalSemana.toFixed(0);
     const mx=Math.max(...semana,1);
     const labels=[];
-    for(let i=6;i>=0;i--){ const d=new Date(hoyDate); d.setDate(d.getDate()-i); labels.push(dias[d.getDay()]); }
+    for(let i=6;i>=0;i--){ const d=new Date(hoy); d.setDate(d.getDate()-i); labels.push(dias[d.getDay()]); }
     document.getElementById('db-bars').innerHTML=semana.map((v,i)=>
-      `<div class="bar-col"><div class="bar" style="height:${Math.max(Math.round(v/mx*62),4)}px;background:${i===6?'var(--pink)':'var(--gray-mid)'}"></div><div class="bar-lbl">${labels[i]}</div></div>`
+      `<div class="bar-col"><div class="bar" style="height:${Math.max(Math.round(v/mx*62),4)}px;background:${i===6?'var(--pink)':'var(--gray-mid)'}" title="S/ ${v.toFixed(0)}"></div><div class="bar-lbl">${labels[i]}</div></div>`
     ).join('');
+
+    // ── Prendas más vendidas (este mes, pedidos no cancelados) ──
+    const pedidosMes = noCancel.filter(p=>p.creado_en >= inicioMes);
+    const carritoIds = [...new Set(pedidosMes.map(p=>p.carrito_id).filter(Boolean))];
+    if(carritoIds.length){
+      const itemsMes = await dbGet(`carrito_items?carrito_id=in.(${carritoIds.join(',')})&estado_bolsa=neq.eliminado&select=precio_unitario,prenda_id,prendas(nombre)`);
+      const porPrenda = {};
+      itemsMes.forEach(it=>{
+        const key = it.prenda_id||'?';
+        if(!porPrenda[key]) porPrenda[key] = {nombre: it.prendas?.nombre||'(sin nombre)', unidades:0, ingresos:0};
+        porPrenda[key].unidades += 1;
+        porPrenda[key].ingresos += (it.precio_unitario||0);
+      });
+      const top = Object.values(porPrenda).sort((a,b)=>b.ingresos-a.ingresos).slice(0,8);
+      document.getElementById('db-top-prendas').innerHTML = top.length ? top.map((t,i)=>
+        `<tr><td class="text-hint">${i+1}</td><td>${t.nombre}</td><td>${t.unidades}</td><td>S/ ${t.ingresos.toFixed(0)}</td></tr>`
+      ).join('') : '<tr><td colspan="4" class="loading">Sin ventas este mes</td></tr>';
+    } else {
+      document.getElementById('db-top-prendas').innerHTML = '<tr><td colspan="4" class="loading">Sin ventas este mes</td></tr>';
+    }
   } catch(e){ console.error('Dashboard error:',e); }
 }
 
