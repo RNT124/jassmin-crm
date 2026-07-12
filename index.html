@@ -650,6 +650,14 @@ textarea{resize:vertical;min-height:72px}
 
       <!-- ── DASHBOARD ── -->
       <div id="pg-dashboard" class="page active">
+        <div class="sec-header" style="margin-bottom:12px">
+          <div class="sec-title" style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Resumen</div>
+          <div id="db-periodo-toggle" style="display:flex;gap:4px">
+            <button class="btn btn-xs" data-p="dia" onclick="setDashboardPeriodo('dia')" style="background:var(--pink);color:#fff;border-color:var(--pink)">Hoy</button>
+            <button class="btn btn-xs" data-p="semana" onclick="setDashboardPeriodo('semana')">Semana</button>
+            <button class="btn btn-xs" data-p="mes" onclick="setDashboardPeriodo('mes')">Mes</button>
+          </div>
+        </div>
         <div class="metrics-grid" id="db-metrics"></div>
 
         <div class="grid-2 mb-16">
@@ -663,7 +671,7 @@ textarea{resize:vertical;min-height:72px}
             <div class="kanban-grid" id="db-kanban" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px"></div>
 
             <div class="card card-sm mt-8">
-              <div class="card-title">Ventas esta semana</div>
+              <div class="card-title" id="db-ventas-titulo">Ventas de hoy</div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
                 <span class="text-muted text-sm">Total</span>
                 <span class="font-600" style="font-size:15px" id="db-semana-total">S/ 0</span>
@@ -674,7 +682,7 @@ textarea{resize:vertical;min-height:72px}
         </div>
 
         <div class="sec-header">
-          <div class="sec-title" style="font-size:13px">Prendas más vendidas — este mes</div>
+          <div class="sec-title" style="font-size:13px" id="db-top-prendas-titulo">Prendas más vendidas — hoy</div>
         </div>
         <div class="tbl-wrap">
           <table class="tbl">
@@ -1225,6 +1233,7 @@ async function loadDashboard(){
     const ayerStr = ayer.toISOString().slice(0,10);
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString();
     const inicioSemana = new Date(hoy); inicioSemana.setDate(inicioSemana.getDate()-6); inicioSemana.setHours(0,0,0,0);
+    const periodo = window.dashboardPeriodo || 'dia';
 
     const [pedidos, clientes, variantes] = await Promise.all([
       dbGet('pedidos?select=*&order=creado_en.desc'),
@@ -1235,25 +1244,47 @@ async function loadDashboard(){
     const noCancel = pedidos.filter(p=>p.estado!=='cancelado');
     const activos = noCancel.filter(p=>!['entregado','acumulando'].includes(p.estado));
 
+    // ── Rango según período seleccionado ──
+    let rangoInicio, rangoLabel, rangoAntInicio, rangoAntFin;
+    if(periodo==='dia'){
+      rangoInicio = new Date(hoy); rangoInicio.setHours(0,0,0,0);
+      rangoLabel = 'hoy';
+      rangoAntInicio = new Date(ayer); rangoAntInicio.setHours(0,0,0,0);
+      rangoAntFin = new Date(rangoInicio);
+    } else if(periodo==='semana'){
+      rangoInicio = new Date(inicioSemana);
+      rangoLabel = 'esta semana';
+      rangoAntInicio = new Date(rangoInicio); rangoAntInicio.setDate(rangoAntInicio.getDate()-7);
+      rangoAntFin = new Date(rangoInicio);
+    } else {
+      rangoInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      rangoLabel = 'este mes';
+      rangoAntInicio = new Date(hoy.getFullYear(), hoy.getMonth()-1, 1);
+      rangoAntFin = new Date(hoy.getFullYear(), hoy.getMonth()-1, hoy.getDate());
+    }
+    const enRango = p => new Date(p.creado_en) >= rangoInicio;
+    const enRangoAnt = p => { const d=new Date(p.creado_en); return d>=rangoAntInicio && d<rangoAntFin; };
+
     // ── Métricas ──
-    const vendidoHoy = noCancel.filter(p=>p.creado_en?.slice(0,10)===hoyStr).reduce((a,p)=>a+(p.subtotal||0),0);
-    const vendidoAyer = noCancel.filter(p=>p.creado_en?.slice(0,10)===ayerStr).reduce((a,p)=>a+(p.subtotal||0),0);
-    const deltaHoy = vendidoAyer>0 ? Math.round((vendidoHoy-vendidoAyer)/vendidoAyer*100) : (vendidoHoy>0?100:0);
+    const vendidoPeriodo = noCancel.filter(enRango).reduce((a,p)=>a+(p.subtotal||0),0);
+    const vendidoAnt = noCancel.filter(enRangoAnt).reduce((a,p)=>a+(p.subtotal||0),0);
+    const deltaPeriodo = vendidoAnt>0 ? Math.round((vendidoPeriodo-vendidoAnt)/vendidoAnt*100) : (vendidoPeriodo>0?100:0);
+    const deltaTxt = periodo==='dia'?'vs ayer':periodo==='semana'?'vs semana pasada':'vs mes pasado';
     const porCobrar = activos.reduce((a,p)=>a+Math.max((p.total||0)-(p.monto_pagado||0),0),0);
-    const nuevosHoy = pedidos.filter(p=>p.creado_en?.slice(0,10)===hoyStr).length;
+    const nuevosPeriodo = pedidos.filter(enRango).length;
     const ticketProm = noCancel.length ? Math.round(noCancel.reduce((a,p)=>a+(p.total||0),0)/noCancel.length) : 0;
-    const clientesNuevasSemana = clientes.filter(c=>c.creado_en && new Date(c.creado_en) >= inicioSemana).length;
+    const clientesNuevasPeriodo = clientes.filter(c=>c.creado_en && new Date(c.creado_en) >= rangoInicio).length;
     const stockBajo = variantes.filter(v=>v.stock<=STOCK_BAJO_LIMITE).length;
 
     document.getElementById('db-metrics').innerHTML=`
-      <div class="metric"><div class="metric-val">S/ ${vendidoHoy.toFixed(0)}</div><div class="metric-lbl">Vendido hoy</div><div class="metric-delta ${deltaHoy>=0?'delta-up':''}" style="${deltaHoy<0?'color:var(--red)':''}">${deltaHoy>=0?'↑':'↓'} ${Math.abs(deltaHoy)}% vs ayer</div></div>
+      <div class="metric"><div class="metric-val">S/ ${vendidoPeriodo.toFixed(0)}</div><div class="metric-lbl">Vendido ${rangoLabel}</div><div class="metric-delta ${deltaPeriodo>=0?'delta-up':''}" style="${deltaPeriodo<0?'color:var(--red)':''}">${deltaPeriodo>=0?'↑':'↓'} ${Math.abs(deltaPeriodo)}% ${deltaTxt}</div></div>
       <div class="metric"><div class="metric-val">S/ ${porCobrar.toFixed(0)}</div><div class="metric-lbl">Por cobrar</div><div class="metric-delta text-hint">en pedidos activos</div></div>
-      <div class="metric"><div class="metric-val">${activos.length}</div><div class="metric-lbl">Pedidos activos</div><div class="metric-delta text-hint">${nuevosHoy} nuevo${nuevosHoy!==1?'s':''} hoy</div></div>
+      <div class="metric"><div class="metric-val">${activos.length}</div><div class="metric-lbl">Pedidos activos</div><div class="metric-delta text-hint">${nuevosPeriodo} nuevo${nuevosPeriodo!==1?'s':''} ${rangoLabel}</div></div>
       <div class="metric"><div class="metric-val">S/ ${ticketProm}</div><div class="metric-lbl">Ticket promedio</div></div>
-      <div class="metric"><div class="metric-val">${clientes.length}</div><div class="metric-lbl">Clientas totales</div><div class="metric-delta ${clientesNuevasSemana>0?'delta-up':'text-hint'}">${clientesNuevasSemana>0?'↑ ':''}${clientesNuevasSemana} nueva${clientesNuevasSemana!==1?'s':''} esta semana</div></div>
+      <div class="metric"><div class="metric-val">${clientes.length}</div><div class="metric-lbl">Clientas totales</div><div class="metric-delta ${clientesNuevasPeriodo>0?'delta-up':'text-hint'}">${clientesNuevasPeriodo>0?'↑ ':''}${clientesNuevasPeriodo} nueva${clientesNuevasPeriodo!==1?'s':''} ${rangoLabel}</div></div>
       <div class="metric" ${stockBajo>0?'style="cursor:pointer" onclick="nav(\'stock\',document.getElementById(\'sb-stock\'))"':''}><div class="metric-val" style="${stockBajo>0?'color:var(--red)':''}">${stockBajo}</div><div class="metric-lbl">Prendas con stock bajo</div></div>`;
 
-    // ── Alertas reales ──
+    // ── Alertas reales (siempre snapshot actual, no dependen del período) ──
     const empaquetar = activos.filter(p=>p.estado==='pago_completo');
     const sinDir = activos.filter(p=>['pago_pendiente','pago_parcial','listo_envio'].includes(p.estado)&&!p.direccion);
     const tresDiasMs = 3*86400000, cincoDiasMs = 5*86400000;
@@ -1272,7 +1303,7 @@ async function loadDashboard(){
     if(!alertasHtml) alertasHtml = '<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin alertas ✓</div>';
     document.getElementById('db-alertas').innerHTML = alertasHtml;
 
-    // ── Kanban / pipeline ──
+    // ── Kanban / pipeline (snapshot actual, no depende del período) ──
     const acumulando = pedidos.filter(p=>p.estado==='acumulando').length;
     const porCobrarCount = activos.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado)).length;
     const preparando = activos.filter(p=>['pago_completo','listo_envio','empaquetado'].includes(p.estado)).length;
@@ -1283,26 +1314,45 @@ async function loadDashboard(){
       <div class="kcol"><div class="kcol-title">Preparando</div><div class="kcol-num">${preparando}</div><div class="kcol-lbl">pago ok / empacando</div></div>
       <div class="kcol"><div class="kcol-title">En camino</div><div class="kcol-num">${enCamino}</div><div class="kcol-lbl">con courier</div></div>`;
 
-    // ── Ventas de la semana ──
-    const dias=['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
-    const semana=Array(7).fill(0);
-    noCancel.forEach(p=>{ const d=new Date(p.creado_en); const diff=Math.floor((hoy-d)/86400000); if(diff>=0&&diff<7) semana[6-diff]+=(p.subtotal||0); });
-    const totalSemana=semana.reduce((a,b)=>a+b,0);
-    document.getElementById('db-semana-total').textContent='S/ '+totalSemana.toFixed(0);
-    const mx=Math.max(...semana,1);
-    const labels=[];
-    for(let i=6;i>=0;i--){ const d=new Date(hoy); d.setDate(d.getDate()-i); labels.push(dias[d.getDay()]); }
-    document.getElementById('db-bars').innerHTML=semana.map((v,i)=>
-      `<div class="bar-col"><div class="bar" style="height:${Math.max(Math.round(v/mx*62),4)}px;background:${i===6?'var(--pink)':'var(--gray-mid)'}" title="S/ ${v.toFixed(0)}"></div><div class="bar-lbl">${labels[i]}</div></div>`
-    ).join('');
+    // ── Gráfico de ventas — se adapta al período ──
+    document.getElementById('db-ventas-titulo').textContent = periodo==='dia'?'Ventas de hoy por hora':periodo==='semana'?'Ventas de la semana':'Ventas del mes';
+    let barsHtml = '', totalPeriodo = 0;
+    if(periodo==='dia'){
+      const bloques = ['12am','4am','8am','12pm','4pm','8pm'];
+      const valores = Array(6).fill(0);
+      noCancel.filter(p=>p.creado_en?.slice(0,10)===hoyStr).forEach(p=>{
+        const h = new Date(p.creado_en).getHours();
+        valores[Math.floor(h/4)] += (p.subtotal||0);
+      });
+      totalPeriodo = valores.reduce((a,b)=>a+b,0);
+      const mx = Math.max(...valores,1);
+      barsHtml = valores.map((v,i)=>`<div class="bar-col"><div class="bar" style="height:${Math.max(Math.round(v/mx*62),4)}px;background:var(--pink)" title="S/ ${v.toFixed(0)}"></div><div class="bar-lbl">${bloques[i]}</div></div>`).join('');
+    } else if(periodo==='semana'){
+      const dias=['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+      const valores=Array(7).fill(0);
+      noCancel.forEach(p=>{ const d=new Date(p.creado_en); const diff=Math.floor((hoy-d)/86400000); if(diff>=0&&diff<7) valores[6-diff]+=(p.subtotal||0); });
+      totalPeriodo = valores.reduce((a,b)=>a+b,0);
+      const mx=Math.max(...valores,1);
+      const labels=[]; for(let i=6;i>=0;i--){ const d=new Date(hoy); d.setDate(d.getDate()-i); labels.push(dias[d.getDay()]); }
+      barsHtml = valores.map((v,i)=>`<div class="bar-col"><div class="bar" style="height:${Math.max(Math.round(v/mx*62),4)}px;background:${i===6?'var(--pink)':'var(--gray-mid)'}" title="S/ ${v.toFixed(0)}"></div><div class="bar-lbl">${labels[i]}</div></div>`).join('');
+    } else {
+      const valores=[0,0,0,0,0];
+      noCancel.filter(enRango).forEach(p=>{ const dia=new Date(p.creado_en).getDate(); const semanaIdx=Math.min(Math.floor((dia-1)/7),4); valores[semanaIdx]+=(p.subtotal||0); });
+      totalPeriodo = valores.reduce((a,b)=>a+b,0);
+      const mx=Math.max(...valores,1);
+      barsHtml = valores.map((v,i)=>`<div class="bar-col"><div class="bar" style="height:${Math.max(Math.round(v/mx*62),4)}px;background:${i===valores.length-1?'var(--pink)':'var(--gray-mid)'}" title="S/ ${v.toFixed(0)}"></div><div class="bar-lbl">Sem ${i+1}</div></div>`).join('');
+    }
+    document.getElementById('db-semana-total').textContent='S/ '+totalPeriodo.toFixed(0);
+    document.getElementById('db-bars').innerHTML = barsHtml;
 
-    // ── Prendas más vendidas (este mes, pedidos no cancelados) ──
-    const pedidosMes = noCancel.filter(p=>p.creado_en >= inicioMes);
-    const carritoIds = [...new Set(pedidosMes.map(p=>p.carrito_id).filter(Boolean))];
+    // ── Prendas más vendidas — según período ──
+    document.getElementById('db-top-prendas-titulo').textContent = 'Prendas más vendidas — '+rangoLabel;
+    const pedidosPeriodo = noCancel.filter(enRango);
+    const carritoIds = [...new Set(pedidosPeriodo.map(p=>p.carrito_id).filter(Boolean))];
     if(carritoIds.length){
-      const itemsMes = await dbGet(`carrito_items?carrito_id=in.(${carritoIds.join(',')})&estado_bolsa=neq.eliminado&select=precio_unitario,prenda_id,prendas(nombre)`);
+      const itemsPeriodo = await dbGet(`carrito_items?carrito_id=in.(${carritoIds.join(',')})&estado_bolsa=neq.eliminado&select=precio_unitario,prenda_id,prendas(nombre)`);
       const porPrenda = {};
-      itemsMes.forEach(it=>{
+      itemsPeriodo.forEach(it=>{
         const key = it.prenda_id||'?';
         if(!porPrenda[key]) porPrenda[key] = {nombre: it.prendas?.nombre||'(sin nombre)', unidades:0, ingresos:0};
         porPrenda[key].unidades += 1;
@@ -1311,11 +1361,22 @@ async function loadDashboard(){
       const top = Object.values(porPrenda).sort((a,b)=>b.ingresos-a.ingresos).slice(0,8);
       document.getElementById('db-top-prendas').innerHTML = top.length ? top.map((t,i)=>
         `<tr><td class="text-hint">${i+1}</td><td>${t.nombre}</td><td>${t.unidades}</td><td>S/ ${t.ingresos.toFixed(0)}</td></tr>`
-      ).join('') : '<tr><td colspan="4" class="loading">Sin ventas este mes</td></tr>';
+      ).join('') : `<tr><td colspan="4" class="loading">Sin ventas ${rangoLabel}</td></tr>`;
     } else {
-      document.getElementById('db-top-prendas').innerHTML = '<tr><td colspan="4" class="loading">Sin ventas este mes</td></tr>';
+      document.getElementById('db-top-prendas').innerHTML = `<tr><td colspan="4" class="loading">Sin ventas ${rangoLabel}</td></tr>`;
     }
   } catch(e){ console.error('Dashboard error:',e); }
+}
+
+function setDashboardPeriodo(p){
+  window.dashboardPeriodo = p;
+  document.querySelectorAll('#db-periodo-toggle .btn').forEach(b=>{
+    const activo = b.dataset.p===p;
+    b.style.background = activo ? 'var(--pink)' : '';
+    b.style.color = activo ? '#fff' : '';
+    b.style.borderColor = activo ? 'var(--pink)' : '';
+  });
+  loadDashboard();
 }
 
 // ═══════════════════════════ CARRITOS ABIERTOS ═══════════════════════════
