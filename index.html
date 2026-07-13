@@ -843,7 +843,7 @@ textarea{resize:vertical;min-height:72px}
         </div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>Prenda</th><th>Código</th><th>Precio</th><th>Tallas</th><th>Categoría</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Prenda</th><th>Código</th><th>Precio</th><th>Tallas</th><th>Categoría</th><th>Stock</th><th>Estado</th><th></th></tr></thead>
             <tbody id="catalogo-tbody"></tbody>
           </table>
         </div>
@@ -854,10 +854,11 @@ textarea{resize:vertical;min-height:72px}
           <div class="sec-title">Stock</div>
           <button class="btn btn-primary btn-sm" onclick="openModalStock()">+ Agregar / reponer stock</button>
         </div>
+        <div class="text-hint text-sm mb-8">El stock es por modelo (todas las tallas y colores juntos). Al vender, la talla y el color se anotan en el carrito pero no descuentan por separado.</div>
         <div id="stock-alerta" style="display:none;background:var(--red-light);color:var(--red);border-radius:var(--radius-sm);padding:10px 14px;font-size:12.5px;font-weight:500;margin-bottom:12px"></div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>Prenda</th><th>Talla</th><th>Color</th><th>Stock</th><th>Actualizado</th><th></th></tr></thead>
+            <thead><tr><th>Prenda</th><th>Categoría</th><th>Stock</th><th></th></tr></thead>
             <tbody id="stock-tbody"></tbody>
           </table>
         </div>
@@ -973,6 +974,10 @@ textarea{resize:vertical;min-height:72px}
       <input type="text" id="pr-colores" placeholder="ej. Azul, Celeste, Negro, Blanco">
       <div style="font-size:11px;color:var(--text3);margin-top:3px">Estos colores aparecerán al registrar ventas de esta prenda</div>
     </div>
+    <div class="form-row" id="pr-stock-wrap">
+      <label class="form-label">Stock inicial <span class="text-hint">(unidades totales, todas las tallas/colores juntos)</span></label>
+      <input type="number" id="pr-stock" placeholder="10" min="0">
+    </div>
     <div class="modal-footer">
       <button class="btn btn-sm" onclick="closeModal('modal-prenda')">Cancelar</button>
       <button class="btn btn-primary btn-sm" onclick="guardarPrenda()">Guardar</button>
@@ -1002,10 +1007,6 @@ textarea{resize:vertical;min-height:72px}
           <select id="st-cat"><option>Vestido</option><option>Blusa</option><option>Pantalon</option><option>Jean</option><option>Conjunto</option><option>Top</option><option>Casaca</option><option>Falda</option><option>Otro</option></select>
         </div>
       </div>
-    </div>
-    <div class="grid-2">
-      <div class="form-row"><label class="form-label">Talla</label><input type="text" id="st-talla" placeholder="ej. M"></div>
-      <div class="form-row"><label class="form-label">Color</label><input type="text" id="st-color" placeholder="ej. Azul"></div>
     </div>
     <div class="form-row"><label class="form-label">Unidades a agregar</label><input type="number" id="st-cantidad" placeholder="5" min="1" value="1"></div>
     <div class="modal-footer">
@@ -1238,7 +1239,7 @@ async function loadDashboard(){
     const [pedidos, clientes, variantes] = await Promise.all([
       dbGet('pedidos?select=*&order=creado_en.desc'),
       dbGet('clientes?select=id,creado_en'),
-      dbGet('prenda_variantes?select=stock').catch(()=>[])
+      dbGet('prendas?select=id,nombre,stock&activo=eq.true').catch(()=>[])
     ]);
 
     const noCancel = pedidos.filter(p=>p.estado!=='cancelado');
@@ -1450,7 +1451,7 @@ async function loadCarritos(){
             const talla = it.talla ? ' · T-'+it.talla : '';
             const btnEliminar = pagado
               ? '<button disabled style="border:none;background:none;color:var(--text3);font-size:11px;cursor:not-allowed">🔒</button>'
-              : '<button class="btn-quitar-item" data-item="' + it.id + '" data-precio="' + it.precio_unitario + '" data-pedido="' + c.id + '" style="border:none;background:var(--red-light);color:var(--red);font-size:11px;font-weight:600;cursor:pointer;padding:2px 8px;border-radius:4px">Quitar</button>';
+              : '<button class="btn-quitar-item" data-item="' + it.id + '" data-precio="' + it.precio_unitario + '" data-pedido="' + c.id + '" data-prenda="' + (it.prenda_id||'') + '" style="border:none;background:var(--red-light);color:var(--red);font-size:11px;font-weight:600;cursor:pointer;padding:2px 8px;border-radius:4px">Quitar</button>';
             return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--border);gap:8px">'
               + '<div style="flex:1;min-width:0">'
                 + '<div style="font-size:12.5px;font-weight:500">📦 '+nombre+'<span style="color:var(--text3);font-weight:400">'+talla+'</span></div>'
@@ -1661,6 +1662,16 @@ async function addToCart(){
     const item = Array.isArray(itemRows)?itemRows[0]:itemRows;
     if(!item || !item.id){ toast('Error guardando prenda — intenta de nuevo'); return; }
     liveCart.push({id:item.id, prenda_id:prendaId, nombre:prenda.nombre, talla, color:color||'', precio:prenda.precio, estado_pago:'pendiente', estado_bolsa:'sin_agregar'});
+    // Descontar 1 unidad de stock del modelo (best-effort, no bloquea la venta)
+    let avisoStock = '';
+    try {
+      const nuevoStock = (prenda.stock||0)-1;
+      await dbPatch(`prendas?id=eq.${prendaId}`,{stock:nuevoStock});
+      prenda.stock = nuevoStock;
+      const idx = DB.prendas.findIndex(p=>p.id===prendaId);
+      if(idx>-1) DB.prendas[idx].stock = nuevoStock;
+      if(nuevoStock<=0) avisoStock = ' — ⚠️ sin stock';
+    } catch(e){ console.warn('No se pudo descontar stock:', e.message); }
     // Recalcular total del pedido
     const nuevoSubtotal = liveCart.reduce((a,i)=>a+i.precio,0);
     await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(currentPedidoActivo.costo_envio||0)});
@@ -1671,7 +1682,7 @@ async function addToCart(){
     document.getElementById('lv-search').value='';
     renderPrendasSelect(DB.prendas);
     renderLiveCart();
-    toast('✓ Prenda agregada');
+    toast('✓ Prenda agregada'+avisoStock);
   } catch(e){ toast('Error: '+e.message); }
 }
 
@@ -1731,6 +1742,13 @@ async function removeCartItem(i){
     await dbPatch(`carrito_items?id=eq.${item.id}`,{estado_bolsa:'eliminado'});
     liveCart.splice(i,1);
     renderLiveCart();
+    // Devolver 1 unidad de stock del modelo (best-effort)
+    if(item.prenda_id){
+      try {
+        const rows = await dbGet(`prendas?id=eq.${item.prenda_id}&select=stock`);
+        if(rows.length) await dbPatch(`prendas?id=eq.${item.prenda_id}`,{stock:(rows[0].stock||0)+1});
+      } catch(e){ console.warn('No se pudo devolver stock:', e.message); }
+    }
     if(currentPedidoActivo){
       const nuevoSubtotal = liveCart.reduce((a,it)=>a+it.precio,0);
       if(liveCart.length === 0){
@@ -1752,7 +1770,7 @@ async function removeCartItem(i){
 document.addEventListener('click', function(e){
   const btn = e.target.closest('.btn-quitar-item');
   if(btn){
-    removeCarritoItem(btn.dataset.item, parseFloat(btn.dataset.precio), btn.dataset.pedido, false);
+    removeCarritoItem(btn.dataset.item, parseFloat(btn.dataset.precio), btn.dataset.pedido, false, btn.dataset.prenda);
     return;
   }
   const bolsa = e.target.closest('[data-bolsa-id]');
@@ -1761,7 +1779,7 @@ document.addEventListener('click', function(e){
   }
 });
 
-async function removeCarritoItem(itemId, precio, pedidoId, pagado){
+async function removeCarritoItem(itemId, precio, pedidoId, pagado, prendaId){
   if(pagado===true||pagado==='true'){
     toast('⚠️ Esta prenda ya fue pagada — para retirarla debes hacer una devolución');
     return;
@@ -1775,6 +1793,13 @@ async function removeCarritoItem(itemId, precio, pedidoId, pagado){
       const allItems = await dbGet(`carrito_items?carrito_id=eq.${ped[0].carrito_id}&estado_bolsa=neq.eliminado&select=precio_unitario`);
       const nuevoSubtotal = allItems.reduce((a,it)=>a+(it.precio_unitario||0),0);
       await dbPatch(`pedidos?id=eq.${pedidoId}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(ped[0].costo_envio||0)});
+    }
+    // Devolver 1 unidad de stock del modelo (best-effort)
+    if(prendaId){
+      try {
+        const rows = await dbGet(`prendas?id=eq.${prendaId}&select=stock`);
+        if(rows.length) await dbPatch(`prendas?id=eq.${prendaId}`,{stock:(rows[0].stock||0)+1});
+      } catch(e){ console.warn('No se pudo devolver stock:', e.message); }
     }
     toast('✓ Prenda eliminada');
     loadCarritos();
@@ -2089,12 +2114,13 @@ function renderCatalogoTabla(prendas){
       <td>S/ ${p.precio}${currentUser?.rol==='admin'?` <span class="text-hint">(costo S/${p.costo||0})</span>`:''}</td>
       <td>${(p.tallas||[]).join(', ')}</td>
       <td>${p.categoria||'—'}</td>
+      <td><span class="badge ${(p.stock||0)<=STOCK_BAJO_LIMITE?'badge-warn':'badge-ok'}">${p.stock||0}</span></td>
       <td><span class="badge ${p.activo?'badge-ok':'badge-gray'}">${p.activo?'Activo':'Inactivo'}</span></td>
       <td style="display:flex;gap:4px">
         <button class="btn btn-xs" onclick="openModalPrenda('${p.id}')">Editar</button>
         <button class="btn btn-xs" onclick="togglePrenda('${p.id}',${p.activo})">${p.activo?'Desactivar':'Activar'}</button>
       </td>
-    </tr>`).join(''):'<tr><td colspan="7" class="loading">Sin prendas aún</td></tr>';
+    </tr>`).join(''):'<tr><td colspan="8" class="loading">Sin prendas aún</td></tr>';
 }
 
 function updateTallasModal(){
@@ -2124,6 +2150,10 @@ async function guardarPrenda(){
     categoria:document.getElementById('pr-cat').value,
     tallas, colores, activo:true
   };
+  if(!editingPrendaIdx){
+    // Solo al crear: fija el stock inicial. Al editar no se toca (usa Stock para reponer).
+    data.stock = parseInt(document.getElementById('pr-stock').value)||0;
+  }
   try {
     if(editingPrendaIdx){
       await dbPatch(`prendas?id=eq.${editingPrendaIdx}`,data);
@@ -2149,50 +2179,47 @@ async function togglePrenda(id, activo){
 const STOCK_BAJO_LIMITE = 2;
 
 async function loadStock(){
-  document.getElementById('stock-tbody').innerHTML='<tr><td colspan="6" class="loading">Cargando stock...</td></tr>';
+  document.getElementById('stock-tbody').innerHTML='<tr><td colspan="4" class="loading">Cargando stock...</td></tr>';
   try {
-    const variantes = await dbGet('prenda_variantes?select=*,prendas(nombre,activo)&order=stock.asc');
-    renderStockTabla(variantes);
-    const bajos = variantes.filter(v=>v.stock<=STOCK_BAJO_LIMITE);
+    const prendas = await dbGet('prendas?select=id,nombre,categoria,stock,activo&activo=eq.true&order=stock.asc');
+    renderStockTabla(prendas);
+    const bajos = prendas.filter(p=>p.stock<=STOCK_BAJO_LIMITE);
     const badge = document.getElementById('badge-stock-bajo');
     if(bajos.length>0){ badge.textContent=bajos.length; badge.style.display='inline-block'; }
     else { badge.style.display='none'; }
     const alerta = document.getElementById('stock-alerta');
     if(bajos.length>0){
       alerta.style.display='block';
-      alerta.textContent = '⚠️ '+bajos.length+' variante'+(bajos.length!==1?'s':'')+' con stock bajo (2 o menos unidades): '+bajos.map(v=>`${v.prendas?.nombre||'?'} ${v.talla}/${v.color}`).join(', ');
+      alerta.textContent = '⚠️ '+bajos.length+' prenda'+(bajos.length!==1?'s':'')+' con stock bajo (2 o menos unidades): '+bajos.map(p=>p.nombre).join(', ');
     } else { alerta.style.display='none'; }
   } catch(e){
-    document.getElementById('stock-tbody').innerHTML='<tr><td colspan="6" style="color:var(--red);font-size:12px">Error cargando stock: '+e.message+' — recuerda ejecutar el SQL de la tabla prenda_variantes en Supabase</td></tr>';
+    document.getElementById('stock-tbody').innerHTML='<tr><td colspan="4" style="color:var(--red);font-size:12px">Error cargando stock: '+e.message+' — recuerda ejecutar el SQL que agrega la columna stock a prendas en Supabase</td></tr>';
   }
 }
 
-function renderStockTabla(variantes){
-  document.getElementById('stock-tbody').innerHTML = variantes.length ? variantes.map(v=>{
-    const bajo = v.stock<=STOCK_BAJO_LIMITE;
-    const fecha = v.actualizado_en ? new Date(v.actualizado_en).toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'}) : '—';
+function renderStockTabla(prendas){
+  document.getElementById('stock-tbody').innerHTML = prendas.length ? prendas.map(p=>{
+    const bajo = p.stock<=STOCK_BAJO_LIMITE;
     return `<tr>
-      <td class="font-500">${v.prendas?.nombre||'—'}</td>
-      <td>${v.talla}</td>
-      <td>${v.color||'—'}</td>
-      <td><span class="badge ${bajo?'badge-warn':'badge-ok'}">${v.stock} ${bajo?'⚠️':''}</span></td>
-      <td class="text-muted">${fecha}</td>
+      <td class="font-500">${p.nombre}</td>
+      <td class="text-muted">${p.categoria||'—'}</td>
+      <td><span class="badge ${bajo?'badge-warn':'badge-ok'}">${p.stock} ${bajo?'⚠️':''}</span></td>
       <td style="display:flex;gap:4px;align-items:center">
-        <input type="number" min="1" value="1" id="qty-${v.id}" style="width:52px;padding:3px 6px;font-size:12px">
-        <button class="btn btn-xs" onclick="reponerRapido('${v.id}')">+ Reponer</button>
+        <input type="number" min="1" value="1" id="qty-${p.id}" style="width:52px;padding:3px 6px;font-size:12px">
+        <button class="btn btn-xs" onclick="reponerRapido('${p.id}')">+ Reponer</button>
       </td>
     </tr>`;
-  }).join('') : '<tr><td colspan="6" class="loading">Sin variantes registradas — usa "+ Agregar / reponer stock"</td></tr>';
+  }).join('') : '<tr><td colspan="4" class="loading">Sin prendas con stock registrado — usa "+ Agregar / reponer stock"</td></tr>';
 }
 
-async function reponerRapido(varianteId){
-  const input = document.getElementById('qty-'+varianteId);
+async function reponerRapido(prendaId){
+  const input = document.getElementById('qty-'+prendaId);
   const cantidad = parseInt(input.value||1);
   if(!cantidad||cantidad<1){ toast('Ingresa una cantidad válida'); return; }
   try {
-    const rows = await dbGet(`prenda_variantes?id=eq.${varianteId}&select=stock`);
+    const rows = await dbGet(`prendas?id=eq.${prendaId}&select=stock`);
     const stockActual = rows[0]?.stock||0;
-    await dbPatch(`prenda_variantes?id=eq.${varianteId}`,{stock:stockActual+cantidad, actualizado_en:new Date().toISOString()});
+    await dbPatch(`prendas?id=eq.${prendaId}`,{stock:stockActual+cantidad});
     toast('✓ Stock actualizado');
     loadStock();
   } catch(e){ toast('Error: '+e.message); }
@@ -2201,10 +2228,8 @@ async function reponerRapido(varianteId){
 function openModalStock(){
   const sel = document.getElementById('st-prenda');
   sel.innerHTML = '<option value="">— seleccionar —</option><option value="__nueva__">+ Es una prenda nueva</option>'
-    + (DB.prendas||[]).filter(p=>p.activo).map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
+    + (DB.prendas||[]).filter(p=>p.activo).map(p=>`<option value="${p.id}">${p.nombre} (stock actual: ${p.stock||0})</option>`).join('');
   document.getElementById('st-nueva-wrap').style.display='none';
-  document.getElementById('st-talla').value='';
-  document.getElementById('st-color').value='';
   document.getElementById('st-cantidad').value='1';
   document.getElementById('modal-stock').classList.add('open');
 }
@@ -2216,16 +2241,11 @@ function onCambioStockPrenda(){
 
 async function guardarStock(){
   const prendaSel = document.getElementById('st-prenda').value;
-  const talla = document.getElementById('st-talla').value.trim();
-  const color = document.getElementById('st-color').value.trim();
   const cantidad = parseInt(document.getElementById('st-cantidad').value||0);
   if(!prendaSel){ toast('Selecciona una prenda'); return; }
-  if(!talla){ toast('Ingresa la talla'); return; }
   if(!cantidad||cantidad<1){ toast('Ingresa una cantidad válida'); return; }
 
   try {
-    let prendaId = prendaSel;
-
     if(prendaSel==='__nueva__'){
       const nombre = document.getElementById('st-nombre').value.trim();
       const precio = parseFloat(document.getElementById('st-precio').value)||0;
@@ -2233,24 +2253,17 @@ async function guardarStock(){
       if(!precio){ toast('Ingresa el precio de venta'); return; }
       const costo = parseFloat(document.getElementById('st-costo').value)||0;
       const categoria = document.getElementById('st-cat').value;
-      const nuevaPrenda = await dbPost('prendas',{
-        nombre, precio, costo, categoria, tallas:[talla], colores:color, activo:true
-      });
-      const p = Array.isArray(nuevaPrenda)?nuevaPrenda[0]:nuevaPrenda;
-      prendaId = p.id;
-    }
-
-    // Ver si ya existe la variante (misma prenda + talla + color)
-    const existente = await dbGet(`prenda_variantes?prenda_id=eq.${prendaId}&talla=eq.${encodeURIComponent(talla)}&color=eq.${encodeURIComponent(color)}`);
-    if(existente.length){
-      await dbPatch(`prenda_variantes?id=eq.${existente[0].id}`,{stock:(existente[0].stock||0)+cantidad, actualizado_en:new Date().toISOString()});
+      await dbPost('prendas',{ nombre, precio, costo, categoria, tallas:['S','M','L'], activo:true, stock:cantidad });
     } else {
-      await dbPost('prenda_variantes',{prenda_id:prendaId, talla, color, stock:cantidad});
+      const rows = await dbGet(`prendas?id=eq.${prendaSel}&select=stock`);
+      const stockActual = rows[0]?.stock||0;
+      await dbPatch(`prendas?id=eq.${prendaSel}`,{stock:stockActual+cantidad});
     }
 
     toast('✓ Stock guardado');
     closeModal('modal-stock');
     await loadCatalogo();
+    await loadCatalogoLive();
     await loadStock();
   } catch(e){ toast('Error: '+e.message); }
 }
@@ -2267,14 +2280,16 @@ function openModalPrenda(id){
     document.getElementById('pr-costo').value=p.costo||'';
     document.getElementById('pr-cat').value=p.categoria||'Vestido';
     document.getElementById('pr-colores').value=p.colores||'';
+    document.getElementById('pr-stock-wrap').style.display='none';
     updateTallasModal();
     setTimeout(()=>{
       document.querySelectorAll('.talla-chk').forEach(chk=>{chk.checked=(p.tallas||[]).includes(chk.value);});
     },50);
   } else {
     document.getElementById('modal-prenda-title').textContent='Nueva prenda';
-    ['pr-nombre','pr-codigo','pr-precio','pr-costo','pr-colores'].forEach(fid=>document.getElementById(fid).value='');
+    ['pr-nombre','pr-codigo','pr-precio','pr-costo','pr-colores','pr-stock'].forEach(fid=>document.getElementById(fid).value='');
     document.getElementById('pr-cat').value='Vestido';
+    document.getElementById('pr-stock-wrap').style.display='block';
     updateTallasModal();
   }
   document.getElementById('modal-prenda').classList.add('open');
