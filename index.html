@@ -1810,8 +1810,13 @@ async function removeCarritoItem(itemId, precio, pedidoId, pagado, prendaId){
     const ped = await dbGet(`pedidos?id=eq.${pedidoId}&select=id,carrito_id,costo_envio`);
     if(ped.length){
       const allItems = await dbGet(`carrito_items?carrito_id=eq.${ped[0].carrito_id}&estado_bolsa=neq.eliminado&select=precio_unitario`);
-      const nuevoSubtotal = allItems.reduce((a,it)=>a+(it.precio_unitario||0),0);
-      await dbPatch(`pedidos?id=eq.${pedidoId}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(ped[0].costo_envio||0)});
+      if(allItems.length === 0){
+        // No quedan prendas — cancelar pedido
+        await dbPatch(`pedidos?id=eq.${pedidoId}`,{estado:'cancelado', subtotal:0, total:0});
+      } else {
+        const nuevoSubtotal = allItems.reduce((a,it)=>a+(it.precio_unitario||0),0);
+        await dbPatch(`pedidos?id=eq.${pedidoId}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(ped[0].costo_envio||0)});
+      }
     }
     // Devolver 1 unidad de stock del modelo (best-effort)
     if(prendaId){
