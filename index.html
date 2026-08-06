@@ -997,9 +997,29 @@ textarea{resize:vertical;min-height:72px}
       <label class="form-label">Stock inicial <span class="text-hint">(unidades totales, todas las tallas/colores juntos)</span></label>
       <input type="number" id="pr-stock" placeholder="10" min="0">
     </div>
+    <!-- Stock por talla/color (solo al editar) -->
+    <div id="pr-stock-detalle" style="display:none;margin-top:4px">
+      <div class="card-title" style="margin-bottom:8px">STOCK POR TALLA Y COLOR</div>
+      <div id="pr-stock-tabla" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-row" style="margin:0;flex:0 0 80px">
+          <label class="form-label">Talla</label>
+          <input type="text" id="st-talla-nueva" placeholder="M" style="width:100%">
+        </div>
+        <div class="form-row" style="margin:0;flex:0 0 100px">
+          <label class="form-label">Color</label>
+          <input type="text" id="st-color-nueva" placeholder="Azul" style="width:100%">
+        </div>
+        <div class="form-row" style="margin:0;flex:0 0 70px">
+          <label class="form-label">Cantidad</label>
+          <input type="number" id="st-cant-nueva" placeholder="0" min="0" style="width:100%">
+        </div>
+        <button class="btn btn-sm btn-success" style="flex-shrink:0;margin-bottom:1px" onclick="agregarFilaStock()">+ Agregar</button>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-sm" onclick="closeModal('modal-prenda')">Cancelar</button>
-      <button class="btn btn-primary btn-sm" onclick="guardarPrenda()">Guardar</button>
+      <button class="btn btn-primary btn-sm" onclick="guardarPrenda()">Guardar prenda</button>
     </div>
   </div>
 </div>
@@ -1678,6 +1698,15 @@ async function addToCart(){
       estado_pago:'pendiente',
       monto_pagado:0
     });
+    // Verificar stock antes de agregar
+    try {
+      const stockRows = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${color||''}`);
+      if(stockRows.length && stockRows[0].cantidad <= 0){
+        toast('⚠️ Stock 0 para '+prenda.nombre+' T-'+talla+(color?' · '+color:'')+' — se agrega igual');
+      } else if(stockRows.length && stockRows[0].cantidad > 0){
+        await dbPatch(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${color||''}`,{cantidad:stockRows[0].cantidad-1});
+      }
+    } catch(e){ /* stock check opcional */ }
     const item = Array.isArray(itemRows)?itemRows[0]:itemRows;
     if(!item || !item.id){ toast('Error guardando prenda — intenta de nuevo'); return; }
     liveCart.push({id:item.id, prenda_id:prendaId, nombre:prenda.nombre, talla, color:color||'', precio:prenda.precio, estado_pago:'pendiente', estado_bolsa:'sin_agregar'});
@@ -2326,18 +2355,96 @@ function openModalPrenda(id){
     document.getElementById('pr-cat').value=p.categoria||'Vestido';
     document.getElementById('pr-colores').value=p.colores||'';
     document.getElementById('pr-stock-wrap').style.display='none';
+    document.getElementById('pr-stock-detalle').style.display='block';
     updateTallasModal();
     setTimeout(()=>{
       document.querySelectorAll('.talla-chk').forEach(chk=>{chk.checked=(p.tallas||[]).includes(chk.value);});
     },50);
+    cargarTablaStock(id);
   } else {
     document.getElementById('modal-prenda-title').textContent='Nueva prenda';
     ['pr-nombre','pr-codigo','pr-precio','pr-costo','pr-colores','pr-stock'].forEach(fid=>document.getElementById(fid).value='');
     document.getElementById('pr-cat').value='Vestido';
     document.getElementById('pr-stock-wrap').style.display='block';
+    document.getElementById('pr-stock-detalle').style.display='none';
     updateTallasModal();
   }
   document.getElementById('modal-prenda').classList.add('open');
+}
+
+// ═══════════════════════════ STOCK POR TALLA/COLOR ═══════════════════════════
+let editingPrendaStockId = null;
+
+async function cargarTablaStock(prendaId){
+  editingPrendaStockId = prendaId;
+  try {
+    const rows = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&order=talla,color`);
+    renderTablaStock(rows);
+  } catch(e){ document.getElementById('pr-stock-tabla').innerHTML='<div style="font-size:12px;color:var(--text3)">Sin stock cargado aún</div>'; }
+}
+
+function renderTablaStock(rows){
+  if(!rows.length){
+    document.getElementById('pr-stock-tabla').innerHTML='<div style="font-size:12px;color:var(--text3);margin-bottom:6px">Sin stock cargado aún — agrega combinaciones abajo</div>';
+    return;
+  }
+  document.getElementById('pr-stock-tabla').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:4px">
+      <thead><tr style="border-bottom:1px solid var(--border)">
+        <th style="text-align:left;padding:4px 6px;font-weight:600;color:var(--text3);font-size:11px">TALLA</th>
+        <th style="text-align:left;padding:4px 6px;font-weight:600;color:var(--text3);font-size:11px">COLOR</th>
+        <th style="text-align:center;padding:4px 6px;font-weight:600;color:var(--text3);font-size:11px">STOCK</th>
+        <th style="padding:4px 6px"></th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r=>`<tr style="border-bottom:0.5px solid var(--border)">
+          <td style="padding:5px 6px">${r.talla}</td>
+          <td style="padding:5px 6px">${r.color}</td>
+          <td style="padding:5px 6px;text-align:center">
+            <input type="number" value="${r.cantidad}" min="0" style="width:56px;text-align:center;border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:12px" onchange="actualizarCantidadStock('${r.id}',this.value)">
+          </td>
+          <td style="padding:5px 6px;text-align:right">
+            <span style="cursor:pointer;color:var(--red);font-size:13px" onclick="eliminarFilaStock('${r.id}',this)">✕</span>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function agregarFilaStock(){
+  const talla = document.getElementById('st-talla-nueva').value.trim().toUpperCase();
+  const color = document.getElementById('st-color-nueva').value.trim();
+  const cantidad = parseInt(document.getElementById('st-cant-nueva').value)||0;
+  if(!talla||!color){ toast('Ingresa talla y color'); return; }
+  if(!editingPrendaStockId){ toast('Error: no hay prenda seleccionada'); return; }
+  try {
+    await dbPost('prenda_stock',{prenda_id:editingPrendaStockId, talla, color, cantidad});
+    document.getElementById('st-talla-nueva').value='';
+    document.getElementById('st-color-nueva').value='';
+    document.getElementById('st-cant-nueva').value='';
+    await cargarTablaStock(editingPrendaStockId);
+    toast('✓ Stock agregado');
+  } catch(e){
+    if(e.message.includes('duplicate')||e.message.includes('unique')){
+      toast('Ya existe esa combinación — edita la cantidad directamente');
+    } else { toast('Error: '+e.message); }
+  }
+}
+
+async function actualizarCantidadStock(stockId, valor){
+  try {
+    await dbPatch(`prenda_stock?id=eq.${stockId}`,{cantidad:parseInt(valor)||0});
+    toast('✓ Guardado');
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+async function eliminarFilaStock(stockId, el){
+  if(!confirm('¿Eliminar esta fila de stock?')) return;
+  try {
+    await dbPatch(`prenda_stock?id=eq.${stockId}`,{cantidad:0});
+    el.closest('tr').remove();
+    toast('✓ Eliminado');
+  } catch(e){ toast('Error: '+e.message); }
 }
 
 // ═══════════════════════════ TRACKING ═══════════════════════════
