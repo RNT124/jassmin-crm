@@ -868,16 +868,14 @@ textarea{resize:vertical;min-height:72px}
       <div id="pg-stock" class="page">
         <div class="sec-header">
           <div class="sec-title">Stock</div>
-          <button class="btn btn-primary btn-sm" onclick="openModalStock()">+ Agregar / reponer stock</button>
         </div>
-        <div class="text-hint text-sm mb-8">El stock es por modelo (todas las tallas y colores juntos). Al vender, la talla y el color se anotan en el carrito pero no descuentan por separado.</div>
         <div id="stock-alerta" style="display:none;background:var(--red-light);color:var(--red);border-radius:var(--radius-sm);padding:10px 14px;font-size:12.5px;font-weight:500;margin-bottom:12px"></div>
-        <div style="padding:0 0 12px 0">
-          <input id="pedidos-search" type="text" placeholder="🔍 Buscar por teléfono o nombre..." style="width:100%;max-width:320px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarPedidosBuscador(this.value)">
+        <div style="margin-bottom:12px">
+          <input id="stock-search" type="text" placeholder="🔍 Buscar prenda, talla o color..." style="width:100%;max-width:340px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarStock(this.value)">
         </div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>Prenda</th><th>Categoría</th><th>Stock</th><th></th></tr></thead>
+            <thead><tr><th>Prenda</th><th>Talla</th><th>Color</th><th>Stock</th><th>Ajuste rápido</th></tr></thead>
             <tbody id="stock-tbody"></tbody>
           </table>
         </div>
@@ -2252,51 +2250,71 @@ async function togglePrenda(id, activo){
 // ═══════════════════════════ STOCK ═══════════════════════════
 const STOCK_BAJO_LIMITE = 2;
 
+// Datos de stock en memoria para buscador
+let DB_STOCK = [];
+
 async function loadStock(){
-  document.getElementById('stock-tbody').innerHTML='<tr><td colspan="4" class="loading">Cargando stock...</td></tr>';
+  document.getElementById('stock-tbody').innerHTML='<tr><td colspan="5" class="loading">Cargando stock...</td></tr>';
   try {
-    const prendas = await dbGet('prendas?select=id,nombre,categoria,stock,activo&activo=eq.true&order=stock.asc');
-    renderStockTabla(prendas);
-    const bajos = prendas.filter(p=>p.stock<=STOCK_BAJO_LIMITE);
+    // Cargar prenda_stock con nombre de prenda
+    const rows = await dbGet('prenda_stock?select=*,prendas(nombre,categoria)&order=prendas(nombre),talla,color');
+    DB_STOCK = rows;
+    renderStockTabla(rows);
+    // Badge de stock bajo
+    const bajos = rows.filter(r=>r.cantidad<=2);
     const badge = document.getElementById('badge-stock-bajo');
     if(bajos.length>0){ badge.textContent=bajos.length; badge.style.display='inline-block'; }
     else { badge.style.display='none'; }
     const alerta = document.getElementById('stock-alerta');
     if(bajos.length>0){
       alerta.style.display='block';
-      alerta.textContent = '⚠️ '+bajos.length+' prenda'+(bajos.length!==1?'s':'')+' con stock bajo (2 o menos unidades): '+bajos.map(p=>p.nombre).join(', ');
+      alerta.textContent='⚠️ '+bajos.length+' combinación'+(bajos.length!==1?'es':'')+' con stock bajo (2 o menos): '+bajos.map(r=>(r.prendas?.nombre||'?')+' '+r.talla+' '+r.color).join(', ');
     } else { alerta.style.display='none'; }
   } catch(e){
-    document.getElementById('stock-tbody').innerHTML='<tr><td colspan="4" style="color:var(--red);font-size:12px">Error cargando stock: '+e.message+' — recuerda ejecutar el SQL que agrega la columna stock a prendas en Supabase</td></tr>';
+    document.getElementById('stock-tbody').innerHTML='<tr><td colspan="5" style="color:var(--red);font-size:12px;padding:12px">Error: '+e.message+'</td></tr>';
   }
 }
 
-function renderStockTabla(prendas){
-  document.getElementById('stock-tbody').innerHTML = prendas.length ? prendas.map(p=>{
-    const bajo = p.stock<=STOCK_BAJO_LIMITE;
-    return `<tr>
-      <td class="font-500">${p.nombre}</td>
-      <td class="text-muted">${p.categoria||'—'}</td>
-      <td><span class="badge ${bajo?'badge-warn':'badge-ok'}">${p.stock} ${bajo?'⚠️':''}</span></td>
-      <td style="display:flex;gap:4px;align-items:center">
-        <input type="number" min="1" value="1" id="qty-${p.id}" style="width:52px;padding:3px 6px;font-size:12px">
-        <button class="btn btn-xs" onclick="reponerRapido('${p.id}')">+ Reponer</button>
-      </td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="4" class="loading">Sin prendas con stock registrado — usa "+ Agregar / reponer stock"</td></tr>';
+function renderStockTabla(rows){
+  if(!rows.length){
+    document.getElementById('stock-tbody').innerHTML='<tr><td colspan="5" class="loading">Sin stock cargado — ve al Catálogo, edita una prenda y agrega stock por talla/color</td></tr>';
+    return;
+  }
+  document.getElementById('stock-tbody').innerHTML = rows.map(r=>{
+    const bajo = r.cantidad<=2;
+    const nombre = r.prendas?.nombre||'—';
+    return '<tr data-txt="'+nombre.toLowerCase()+' '+r.talla.toLowerCase()+' '+r.color.toLowerCase()+'">'
+      + '<td class="font-500">'+nombre+'</td>'
+      + '<td><span class="badge badge-gray" style="font-size:11px">'+r.talla+'</span></td>'
+      + '<td style="font-size:13px">'+r.color+'</td>'
+      + '<td><span class="badge '+(bajo?'badge-warn':'badge-ok')+'" style="font-size:12px">'+r.cantidad+(bajo?' ⚠️':'')+'</span></td>'
+      + '<td style="display:flex;gap:4px;align-items:center">'
+        + '<button class="btn btn-xs" style="padding:3px 8px;font-size:13px;font-weight:700" onclick="ajusteRapidoStock(''+r.id+'',''+r.prenda_id+'',''+r.talla+'',''+r.color+'','+r.cantidad+',-1)">−</button>'
+        + '<span id="stk-'+r.id+'" style="min-width:28px;text-align:center;font-weight:600">'+r.cantidad+'</span>'
+        + '<button class="btn btn-xs btn-success" style="padding:3px 8px;font-size:13px;font-weight:700" onclick="ajusteRapidoStock(''+r.id+'',''+r.prenda_id+'',''+r.talla+'',''+r.color+'','+r.cantidad+',+1)">+</button>'
+      + '</td>'
+    + '</tr>';
+  }).join('');
 }
 
-async function reponerRapido(prendaId){
-  const input = document.getElementById('qty-'+prendaId);
-  const cantidad = parseInt(input.value||1);
-  if(!cantidad||cantidad<1){ toast('Ingresa una cantidad válida'); return; }
+async function ajusteRapidoStock(stockId, prendaId, talla, color, actual, delta){
+  const nueva = Math.max(0, actual+delta);
   try {
-    const rows = await dbGet(`prendas?id=eq.${prendaId}&select=stock`);
-    const stockActual = rows[0]?.stock||0;
-    await dbPatch(`prendas?id=eq.${prendaId}`,{stock:stockActual+cantidad});
-    toast('✓ Stock actualizado');
-    loadStock();
+    await dbPatch('prenda_stock?id=eq.'+stockId,{cantidad:nueva});
+    const el = document.getElementById('stk-'+stockId);
+    if(el){ el.textContent=nueva; }
+    // Actualizar en memoria
+    const idx = DB_STOCK.findIndex(r=>r.id===stockId);
+    if(idx>=0) DB_STOCK[idx].cantidad=nueva;
+    if(nueva<=2) toast('⚠️ Stock bajo: '+talla+' '+color+' — quedan '+nueva);
   } catch(e){ toast('Error: '+e.message); }
+}
+
+function filtrarStock(q){
+  q = q.toLowerCase().trim();
+  document.querySelectorAll('#stock-tbody tr[data-txt]').forEach(row=>{
+    row.style.display = (!q||row.dataset.txt.includes(q)) ? '' : 'none';
+  });
 }
 
 function openModalStock(){
