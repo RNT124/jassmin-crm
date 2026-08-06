@@ -198,6 +198,7 @@ textarea{resize:vertical;min-height:72px}
 .divider{border:none;border-top:0.5px solid var(--border);margin:12px 0}
 .pill-row{display:flex;flex-wrap:wrap;gap:5px}
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -868,6 +869,12 @@ textarea{resize:vertical;min-height:72px}
       <div id="pg-stock" class="page">
         <div class="sec-header">
           <div class="sec-title">Stock</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label class="btn btn-sm" style="cursor:pointer;background:var(--green-light);color:var(--green);border-color:var(--green)" title="Importar inventario desde Excel">
+              📥 Importar Excel
+              <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importarInventarioExcel(this)">
+            </label>
+          </div>
         </div>
         <div id="stock-alerta" style="display:none;background:var(--red-light);color:var(--red);border-radius:var(--radius-sm);padding:10px 14px;font-size:12.5px;font-weight:500;margin-bottom:12px"></div>
         <div style="margin-bottom:12px">
@@ -2388,6 +2395,135 @@ function openModalPrenda(id){
     updateTallasModal();
   }
   document.getElementById('modal-prenda').classList.add('open');
+}
+
+// ═══════════════════════════ IMPORTAR EXCEL ═══════════════════════════
+async function importarInventarioExcel(input){
+  const file = input.files[0];
+  if(!file) return;
+  input.value = '';
+
+  toast('📥 Leyendo Excel...');
+
+  try {
+    // Leer archivo con FileReader
+    const data = await new Promise((res,rej)=>{
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result);
+      reader.onerror = rej;
+      reader.readAsArrayBuffer(file);
+    });
+
+    // Parsear con SheetJS
+    const XLSX = window.XLSX;
+    if(!XLSX){ toast('Error: librería Excel no disponible'); return; }
+    const wb = XLSX.read(data, {type:'arraybuffer'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+    // Encontrar fila de headers (la que tenga "nombre")
+    let headerRow = -1;
+    for(let i=0;i<filas.length;i++){
+      const r = filas[i].map(c=>String(c).toLowerCase().trim());
+      if(r.includes('nombre') && r.includes('talla') && r.includes('color') && r.includes('stock')){
+        headerRow = i; break;
+      }
+    }
+    if(headerRow===-1){ toast('⚠️ No encontré los headers. Asegúrate de usar la plantilla de Jassmin'); return; }
+
+    const headers = filas[headerRow].map(c=>String(c).toLowerCase().trim());
+    const idx = h => headers.indexOf(h);
+
+    // Leer filas de datos
+    const datos = [];
+    for(let i=headerRow+1;i<filas.length;i++){
+      const r = filas[i];
+      const nombre = String(r[idx('nombre')]||'').trim();
+      const talla  = String(r[idx('talla')]||'').trim().toUpperCase();
+      const color  = String(r[idx('color')]||'').trim();
+      const stock  = parseInt(r[idx('stock')])||0;
+      if(!nombre||!talla||!color) continue; // saltar filas vacías
+      datos.push({
+        nombre,
+        codigo:   String(r[idx('codigo')]||'').trim(),
+        categoria:String(r[idx('categoria')]||'Otro').trim(),
+        precio:   parseFloat(r[idx('precio')])||0,
+        costo:    parseFloat(r[idx('costo')])||0,
+        talla, color, stock
+      });
+    }
+
+    if(!datos.length){ toast('⚠️ No encontré filas con datos válidos'); return; }
+
+    // Agrupar por prenda (nombre+codigo)
+    const prendaMap = {};
+    datos.forEach(d=>{
+      const key = d.nombre+'||'+d.codigo;
+      if(!prendaMap[key]) prendaMap[key] = {
+        nombre:d.nombre, codigo:d.codigo, categoria:d.categoria,
+        precio:d.precio, costo:d.costo, tallas:[], colores:[], items:[]
+      };
+      if(!prendaMap[key].tallas.includes(d.talla)) prendaMap[key].tallas.push(d.talla);
+      if(!prendaMap[key].colores.includes(d.color)) prendaMap[key].colores.push(d.color);
+      prendaMap[key].items.push({talla:d.talla, color:d.color, stock:d.stock});
+    });
+
+    const prendas = Object.values(prendaMap);
+    const total = datos.length;
+
+    if(!confirm(`¿Importar ${prendas.length} prenda(s) con ${total} combinaciones talla/color?
+
+${prendas.map(p=>p.nombre).join('
+')}`)) return;
+
+    toast('⏳ Importando...');
+    let ok=0, errores=[];
+
+    for(const p of prendas){
+      try {
+        // Verificar si ya existe por nombre
+        const exist = await dbGet(`prendas?nombre=eq.${encodeURIComponent(p.nombre)}&select=id`);
+        let prendaId;
+        if(exist.length){
+          prendaId = exist[0].id;
+          // Actualizar precio/costo si cambió
+          await dbPatch(`prendas?id=eq.${prendaId}`,{
+            precio:p.precio, costo:p.costo, categoria:p.categoria,
+            tallas:p.tallas, colores:p.colores.join(', '), activo:true
+          });
+        } else {
+          const res = await dbPost('prendas',{
+            nombre:p.nombre, codigo:p.codigo, categoria:p.categoria,
+            precio:p.precio, costo:p.costo, tallas:p.tallas,
+            colores:p.colores.join(', '), activo:true, stock:0
+          });
+          prendaId = (Array.isArray(res)?res[0]:res).id;
+        }
+        // Insertar/actualizar stock por talla+color
+        for(const it of p.items){
+          const existStock = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${it.talla}&color=eq.${encodeURIComponent(it.color)}&select=id`);
+          if(existStock.length){
+            await dbPatch(`prenda_stock?id=eq.${existStock[0].id}`,{cantidad:it.stock});
+          } else {
+            await dbPost('prenda_stock',{prenda_id:prendaId, talla:it.talla, color:it.color, cantidad:it.stock});
+          }
+        }
+        ok++;
+      } catch(e){ errores.push(p.nombre+': '+e.message); }
+    }
+
+    await loadStock();
+    await loadCatalogo();
+    await loadCatalogoLive();
+
+    if(errores.length){
+      toast('✓ '+ok+' importadas, '+errores.length+' con error');
+      console.error('Errores importación:', errores);
+    } else {
+      toast('✓ '+ok+' prenda'+(ok!==1?'s':'')+' importadas con '+total+' combinaciones');
+    }
+
+  } catch(e){ toast('Error leyendo Excel: '+e.message); console.error(e); }
 }
 
 // ═══════════════════════════ STOCK POR TALLA/COLOR ═══════════════════════════
