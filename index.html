@@ -2332,9 +2332,9 @@ function renderStockTabla(rows){
       + '<td style="font-size:13px">'+r.color+'</td>'
       + '<td><span class="badge '+(bajo?'badge-warn':'badge-ok')+'" style="font-size:12px">'+r.cantidad+(bajo?' ⚠️':'')+'</span></td>'
       + '<td style="display:flex;gap:4px;align-items:center">'
-        + '<button class="btn btn-xs" style="padding:3px 8px;font-size:13px;font-weight:700" onclick="ajusteRapidoStock(''+r.id+'',''+r.prenda_id+'',''+r.talla+'',''+r.color+'','+r.cantidad+',-1)">−</button>'
+        + '<button class="btn btn-xs" style="padding:3px 8px;font-size:13px;font-weight:700" onclick="ajusteRapidoStock(&quot;'+r.id+'&quot;,&quot;'+r.prenda_id+'&quot;,&quot;'+r.talla+'&quot;,&quot;'+r.color+'&quot;,'+r.cantidad+',-1)">−</button>'
         + '<span id="stk-'+r.id+'" style="min-width:28px;text-align:center;font-weight:600">'+r.cantidad+'</span>'
-        + '<button class="btn btn-xs btn-success" style="padding:3px 8px;font-size:13px;font-weight:700" onclick="ajusteRapidoStock(''+r.id+'',''+r.prenda_id+'',''+r.talla+'',''+r.color+'','+r.cantidad+',+1)">+</button>'
+        + '<button class="btn btn-xs btn-success" style="padding:3px 8px;font-size:13px;font-weight:700" onclick="ajusteRapidoStock(&quot;'+r.id+'&quot;,&quot;'+r.prenda_id+'&quot;,&quot;'+r.talla+'&quot;,&quot;'+r.color+'&quot;,'+r.cantidad+',+1)">+</button>'
       + '</td>'
     + '</tr>';
   }).join('');
@@ -2490,10 +2490,10 @@ function renderDespachoCard(p, tipo){
     + (c.direccion||c.distrito?'<div style="margin-top:8px;font-size:12px;color:var(--text2);background:var(--gray-light);padding:6px 10px;border-radius:6px">📍 '+(c.direccion?c.direccion+(c.distrito?' — '+c.distrito:''):c.distrito)+'</div>':'')
     + (p.courier_codigo?'<div style="margin-top:6px;font-size:11px;color:var(--text3)">Código: <span style="font-family:monospace;font-weight:600">'+p.courier_codigo+'</span></div>':'')
     + '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'
-      + '<button class="btn btn-sm" onclick="copiarWA(''+p.id+'',''+c.telefono+'',''+p.numero+'')">💬 Copiar msg WA</button>'
+      + '<button class="btn btn-sm" onclick="copiarWA(&quot;'+p.id+'&quot;,&quot;'+c.telefono+'&quot;,&quot;'+p.numero+'&quot;)">💬 Copiar msg WA</button>'
       + (tipo==='empaquetar'
-        ? '<button class="btn btn-sm btn-success" onclick="avanzarEstadoDirecto(''+p.id+'','pago_completo');setTimeout(loadDespacho,800)">✓ Marcar empaquetado</button>'
-        : '<button class="btn btn-sm btn-primary" onclick="avanzarEstadoDirecto(''+p.id+'','empaquetado');setTimeout(loadDespacho,800)">🚚 Registrar despacho</button>')
+        ? '<button class="btn btn-sm btn-success" onclick="avanzarEstadoDirecto(&quot;'+p.id+'&quot;,&quot;pago_completo&quot;);setTimeout(loadDespacho,800)">✓ Marcar empaquetado</button>'
+        : '<button class="btn btn-sm btn-primary" onclick="avanzarEstadoDirecto(&quot;'+p.id+'&quot;,&quot;empaquetado&quot;);setTimeout(loadDespacho,800)">🚚 Registrar despacho</button>')
     + '</div>'
   + '</div>';
 }
@@ -2580,8 +2580,7 @@ async function importarInventarioExcel(input){
 
     if(!confirm(`¿Importar ${prendas.length} prenda(s) con ${total} combinaciones talla/color?
 
-${prendas.map(p=>p.nombre).join('
-')}`)) return;
+${prendas.map(p=>p.nombre).join('\n')}`)) return;
 
     toast('⏳ Importando...');
     let ok=0, errores=[];
