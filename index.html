@@ -1239,8 +1239,8 @@ let DB = {
 const ESTADOS_ORDEN = ['pago_pendiente','pago_parcial','pago_completo','empaquetado','en_camino','entregado'];
 const ESTADOS_LABEL = { acumulando:'Acumulando', listo_envio:'Listo para envío', pago_pendiente:'Pendiente pago', pago_parcial:'Pago parcial', pago_completo:'Pago completo', empaquetado:'Empaquetado', en_camino:'En camino', entregado:'Entregado' };
 const ESTADOS_BADGE = { acumulando:'badge-gray', listo_envio:'badge-warn', pago_pendiente:'badge-danger', pago_parcial:'badge-warn', pago_completo:'badge-ok', empaquetado:'badge-info', en_camino:'badge-pink', entregado:'badge-gray' };
-const ESTADOS_ACTION = { acumulando:'', listo_envio:'Marcar empaquetado', pago_pendiente:'', pago_parcial:'', pago_completo:'Marcar empaquetado', empaquetado:'Registrar despacho', en_camino:'Confirmar entrega', entregado:null };
-const ESTADOS_NEXT = { acumulando:'', listo_envio:'empaquetado', pago_pendiente:'', pago_parcial:'', pago_completo:'empaquetado', empaquetado:'en_camino', en_camino:'entregado' };
+const ESTADOS_ACTION = { acumulando:'', listo_envio:'', pago_pendiente:'', pago_parcial:'', pago_completo:'Marcar empaquetado', empaquetado:'Registrar despacho', en_camino:'Confirmar entrega', entregado:null };
+const ESTADOS_NEXT = { acumulando:'', listo_envio:'', pago_pendiente:'', pago_parcial:'', pago_completo:'empaquetado', empaquetado:'en_camino', en_camino:'entregado' };
 
 // ═══════════════════════════ AUTH ═══════════════════════════
 async function doLogin(){
@@ -2040,7 +2040,7 @@ async function openPedidoModal(id){
     const btn=document.getElementById('mp-action-btn');
 
     // Botón de acción principal — solo para estados que no son pago
-    if(actionLabel && !['pago_pendiente','pago_parcial'].includes(p.estado)){
+    if(actionLabel && !['pago_pendiente','pago_parcial','listo_envio'].includes(p.estado)){
       btn.style.display='inline-flex';
       btn.textContent=actionLabel;
       btn.onclick=()=>avanzarEstadoDirecto(p.id,p.estado);
@@ -2064,7 +2064,7 @@ async function openPedidoModal(id){
           <span>${it.prendas?.nombre||'Prenda'} ${it.talla?'T-'+it.talla:''} ${it.color?'· '+it.color:''}</span>
           <span class="font-500">S/ ${it.precio_unitario}</span>
         </div>`).join(''):'<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin items</div>'}</div>
-      ${['pago_pendiente','pago_parcial'].includes(p.estado)?`
+      ${['pago_pendiente','pago_parcial','listo_envio'].includes(p.estado)?`
         <div style="background:var(--amber-light);border-radius:var(--radius-sm);padding:12px 14px;margin-top:4px;display:flex;align-items:center;justify-content:space-between;gap:10px">
           <div>
             <div style="font-size:12px;font-weight:600;color:var(--amber-dark)">${p.estado==='pago_parcial'?'Pago parcial — falta S/'+falta:'Pendiente de pago — S/'+falta}</div>
@@ -3262,12 +3262,12 @@ async function confirmarPagoCorte(){
         const ped = pedidos[0];
         const totalConEnvio = ped.total||totalCarrito;
         const estadoActual = ped.estado;
-        // Calcular nuevo estado — respetar estados de despacho/entrega
+        // Calcular nuevo estado — solo avanzar automáticamente si aún no se despachó/empaquetó.
+        // Una vez en empaquetado/en_camino/entregado, el pago solo actualiza el monto — nunca retrocede el estado.
         let estadoPedido = estadoActual;
-        if(!['despachado','entregado'].includes(estadoActual)){
+        if(['acumulando','listo_envio','pago_pendiente','pago_parcial'].includes(estadoActual)){
           estadoPedido = totalPagadoCarrito >= totalConEnvio ? 'pago_completo' :
                          totalPagadoCarrito > 0 ? (estadoActual==='listo_envio'?'listo_envio':'acumulando') : estadoActual;
-          // Si tenía listo_envio y ahora pagó completo → pago_completo
           if(estadoActual==='listo_envio' && totalPagadoCarrito>=totalConEnvio) estadoPedido='pago_completo';
         }
         await dbPatch(`pedidos?id=eq.${ped.id}`,{
