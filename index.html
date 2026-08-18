@@ -335,10 +335,21 @@ textarea{resize:vertical;min-height:72px}
 
         <!-- campos shalom -->
         <div id="f5-campos-shalom" style="display:none">
+          <label class="f5-label">Departamento *</label>
+          <select class="f5-select" id="f5-depto" onchange="f5PoblarAgencias()">
+            <option value="">— seleccionar departamento —</option>
+          </select>
           <label class="f5-label">Agencia Shalom de recojo *</label>
-          <input class="f5-input" id="f5-agencia" placeholder="ej. Shalom San Juan de Lurigancho">
-          <label class="f5-label">Ciudad / Provincia *</label>
-          <input class="f5-input" id="f5-ciudad" placeholder="ej. Lima, Cusco, Arequipa...">
+          <select class="f5-select" id="f5-agencia">
+            <option value="">— primero elige tu departamento —</option>
+          </select>
+          <div id="f5-agencia-manual" style="display:none">
+            <label class="f5-label">Escribe tu ciudad *</label>
+            <input class="f5-input" id="f5-ciudad-manual" placeholder="ej. Yurimaguas">
+            <label class="f5-label">Escribe la agencia Shalom más cercana *</label>
+            <input class="f5-input" id="f5-agencia-manual-input" placeholder="ej. Shalom Yurimaguas">
+            <div style="font-size:11px;color:#9C9A92;margin-top:-8px;margin-bottom:12px">Tu departamento aún no está en la lista — escríbelo y lo verificamos antes de despachar.</div>
+          </div>
         </div>
 
         <!-- campos motorizado -->
@@ -2903,6 +2914,81 @@ let f5PedidoData = null;
 
 const F5_PASOS = ['Envío','Datos','Resumen','Términos','Pago'];
 
+// Agencias Shalom — compiladas de directorios públicos (no oficiales de Shalom), Lima y Callao.
+// Formato: [distrito, nombre de agencia]. Faltan las 23 regiones restantes del país — se pueden ir agregando.
+const SHALOM_AGENCIAS = {
+  "Lima": [
+    ["San Juan de Lurigancho","Av Circunvalacion Sjl"],["San Juan de Lurigancho","Av Malecon Checa Cdra. 1"],["San Juan de Lurigancho","Av Santa Rosa Urb los Alamos"],["San Juan de Lurigancho","Av. 13 de Enero"],["San Juan de Lurigancho","Av. Central"],["San Juan de Lurigancho","Av. Santa Rosa Cruce Av. el Sol"],["San Juan de Lurigancho","Av. del Mercado"],["San Juan de Lurigancho","Bayovar"],["San Juan de Lurigancho","Campoy"],["San Juan de Lurigancho","Canto Grande"],["San Juan de Lurigancho","Cruz de Motupe"],["San Juan de Lurigancho","Jr Chinchaysuyo Cdra 4"],["San Juan de Lurigancho","Los Pinos"],["San Juan de Lurigancho","Sjl- las Flores"],["San Juan de Lurigancho","Sjl-av.proceres"],
+    ["San Martín de Porres","Av Bertello Smp"],["San Martín de Porres","Av Jose Granda Cdra 38"],["San Martín de Porres","Av Jose Granda Cdra. 25"],["San Martín de Porres","Av. Canta Callao Con Alisos"],["San Martín de Porres","Av. Canta Callao Con Izaguirre"],["San Martín de Porres","Av. Carlos Izaguirre Cuadra 23"],["San Martín de Porres","Av. Dominicos Cdra 14"],["San Martín de Porres","Av. Gerardo Unger Cdra 64"],["San Martín de Porres","Av. Lima Cdra 38"],["San Martín de Porres","Av. Peru 15"],["San Martín de Porres","Av. Universitaria Cdra. 16"],["San Martín de Porres","Fiori"],["San Martín de Porres","Germán Aguirre"],["San Martín de Porres","Smp-av. Proceres"],
+    ["Ate Vitarte","Av Esperanza"],["Ate Vitarte","Av Marco Puente"],["Ate Vitarte","Av el Sol"],["Ate Vitarte","Huaycan Av Horacio Zevallos"],["Ate Vitarte","Huaycan Av Jose C Mariategui"],["Ate Vitarte","Huaycan Entrada"],["Ate Vitarte","Huaycan el Descanso"],["Ate Vitarte","Los Sauces"],["Ate Vitarte","Puente Santa Anita"],["Ate Vitarte","Santa Clara"],["Ate Vitarte","Urb Santa Elvira"],
+    ["Los Olivos","Av Huandoy Con Av Central"],["Los Olivos","Av Huandoy Con Marañon"],["Los Olivos","Av. Angelica Gamarra"],["Los Olivos","Av. Carlos Izaguirre Cdra. 14"],["Los Olivos","Av. Dos de Octubre"],["Los Olivos","Av. las Palmeras"],["Los Olivos","Av. los Platinos"],["Los Olivos","Pro"],
+    ["Carabayllo","Av Jose Saco Rojas"],["Carabayllo","Av Tupac Amaru Km. 19"],["Carabayllo","Av. Tupac Amaru Km. 23.5"],["Carabayllo","Carabayllo Establo"],["Carabayllo","El Progreso Km 22"],["Carabayllo","Santo Domingo"],["Carabayllo","Tungasuca"],
+    ["Comas","Av Tupac Amaru Cdra. 57"],["Comas","Av Univ. Retablo"],["Comas","Av. Trapiche"],["Comas","Av. Univ. Parque Sinchi Roca"],["Comas","Año Nuevo"],
+    ["La Molina","Av Flora Tristan"],["La Molina","Av la Fontana"],["La Molina","Av. la Molina Cdra. 35"],["La Molina","Los Fresnos"],["La Molina","Parque la Molina"],
+    ["Puente Piedra","Av Buenos Aires"],["Puente Piedra","Av. San Lorenzo"],["Puente Piedra","Ovalo Puente Piedra"],["Puente Piedra","Puente Arica"],["Puente Piedra","Zapallal"],
+    ["San Juan de Miraflores","Atocongo"],["San Juan de Miraflores","Av Miguel Grau Pamplona Alta"],["San Juan de Miraflores","Av San Juan Pamplona Alta"],["San Juan de Miraflores","Av. Canevaro"],["San Juan de Miraflores","Maria Auxiliadora"],
+    ["Villa María del Triunfo","Av. Lima - Vmt"],["Villa María del Triunfo","Av. Villa Maria"],["Villa María del Triunfo","Las Conchitas"],["Villa María del Triunfo","Nueva Esperanza Vmt"],["Villa María del Triunfo","Pesquero"],
+    ["Cercado de Lima","Av Nicolas Dueñas Cdra. 5"],["Cercado de Lima","Lima Av Tingo María"],["Cercado de Lima","Malvinas - Jr. Garcia Villón"],["Cercado de Lima","Malvinas - Jr. Ricardo Treneman"],
+    ["Chorrillos","Chorrillos Co"],["Chorrillos","Chorrillos los Faisanes"],["Chorrillos","Las Delicias de Villa"],["Chorrillos","Megaplaza Chorrillos"],
+    ["Independencia","Calle a Con Av Industrial"],["Independencia","La Cincuenta"],["Independencia","Megaplaza Independencia"],["Independencia","Plaza Norte Entregas"],
+    ["Villa El Salvador","01 de Mayo"],["Villa El Salvador","Av. Cesar Vallejo"],["Villa El Salvador","Av. Pastor Sevilla"],["Villa El Salvador","Óvalo Mariátegui"],
+    ["La Victoria","Av Mexico Co"],["La Victoria","Av. Canada"],["La Victoria","Jr. Raymondi"],
+    ["Lurigancho-Chosica","Chosica"],["Lurigancho-Chosica","Huachipa Co"],["Lurigancho-Chosica","Santa María de Huachipa"],
+    ["Pachacamac","Av Manuel Valle"],["Pachacamac","La Curva de Manchay"],["Pachacamac","Manchay Tres Marias"],
+    ["Santiago de Surco","Av Tomas Marsano - la Bolichera"],["Santiago de Surco","Higuereta"],["Santiago de Surco","Surco Mateo Pumacahua"],
+    ["Breña","Av Venezuela"],["Breña","Jr. Huaraz - Breña"],
+    ["El Agustino","Jiron Ancash"],["El Agustino","Puente Nuevo"],
+    ["Jesús María","Jesus Maria"],["Jesús María","Real Plaza Salaverry"],
+    ["Lince","Av Jose Leal Cdra 6"],["Lince","Jr Casanova Con Petit Thouars"],
+    ["Lurín","Nuevo Lurin"],["Lurín","Puente Lurin"],
+    ["Pueblo Libre","Av Bolivar"],["Pueblo Libre","Av. la Marina"],
+    ["Rímac","Rimac Av. Amancaes"],["Rímac","Rimac Guardia Republicana Cdra. 9"],
+    ["San Borja","Av. Angamos"],["San Borja","Aviacion 2819"],
+    ["Santa Anita","Av Santa Rosa - Sta Anita"],["Santa Anita","Av. Huarochirí"],
+    ["Surquillo","Av. Principal"],["Surquillo","Rep. de Panama"],
+    ["Huacho","Huacho Av Indacochea"],["Huacho","Salaverry Huacho Co"],
+    ["Cieneguilla","Cieneguilla Km. 14.5"],["Magdalena del Mar","Magdalena del Mar"],["Miraflores","Larcomar"],["Punta Hermosa","Punta Hermosa"],["Santa Rosa","Santa Rosa"],["Barranca","Barranca"],["Paramonga","Paramonga"],["Supe","Supe"],["San Vicente de Cañete","Cañete San Vicente"],["Chilca","Ant Panam Sur Cdra 11"],["Imperial","Cañete Imperial"],["Mala","Mala"],["Nuevo Imperial","Nuevo Imperial Co"],["Huaral","Huaral"],["Chancay","Chancay"],["San Antonio","Jicamarca"],["Huaura","Huaura"],["Sayán","Sayan"]
+  ],
+  "Callao": [
+    ["Bellavista","Av. Elmer Faucett 1641"],
+    ["Callao","Av. Bertello Bollati (Bahía Blanca)"],["Callao","Av. Elmer Faucett 492"],["Callao","Av. Saenz Peña 414-416"],["Callao","Urb. Aeropuerto (Av. Quilca)"],
+    ["La Perla","Av. la Marina 530"],
+    ["Mi Perú","Confraternidad"],
+    ["Ventanilla","Coop. de la Marina (Calle 19)"],["Ventanilla","Pachacutec"]
+  ]
+};
+
+function f5PoblarDepartamentos(){
+  const sel = document.getElementById('f5-depto');
+  if(!sel || sel.options.length>1) return;
+  Object.keys(SHALOM_AGENCIAS).forEach(dep=>{
+    sel.innerHTML += `<option value="${dep}">${dep} (${SHALOM_AGENCIAS[dep].length} agencias)</option>`;
+  });
+  sel.innerHTML += `<option value="__otro__">Mi departamento no está en la lista</option>`;
+}
+
+function f5PoblarAgencias(){
+  const dep = document.getElementById('f5-depto').value;
+  const selAg = document.getElementById('f5-agencia');
+  const manual = document.getElementById('f5-agencia-manual');
+  if(dep==='__otro__'){
+    selAg.innerHTML = '<option value="">— escribe abajo —</option>';
+    selAg.disabled = true;
+    manual.style.display = 'block';
+    return;
+  }
+  manual.style.display = 'none';
+  selAg.disabled = false;
+  if(!dep || !SHALOM_AGENCIAS[dep]){
+    selAg.innerHTML = '<option value="">— primero elige tu departamento —</option>';
+    return;
+  }
+  selAg.innerHTML = '<option value="">— seleccionar agencia —</option>'
+    + SHALOM_AGENCIAS[dep].map(([distrito,nombre])=>`<option value="${distrito} — ${nombre}">${distrito} — ${nombre}</option>`).join('');
+}
+f5PoblarDepartamentos();
+
+
 function f5InitProgress(){
   document.getElementById('f5-progress-bar').innerHTML = F5_PASOS.map((label,i)=>{
     const n = i+1;
@@ -2953,6 +3039,19 @@ function f5HandleFile(input){
   reader.readAsDataURL(file);
 }
 
+// Devuelve {agencia, ciudad} tanto si vino del select (departamento con lista) como del fallback manual
+function f5GetAgenciaShalom(){
+  const dep = document.getElementById('f5-depto')?.value||'';
+  if(dep==='__otro__'){
+    return {
+      ciudad: document.getElementById('f5-ciudad-manual')?.value.trim()||'',
+      agencia: document.getElementById('f5-agencia-manual-input')?.value.trim()||''
+    };
+  }
+  return { ciudad: dep, agencia: document.getElementById('f5-agencia')?.value||'' };
+}
+
+
 function f5Next(){
   if(f5Paso === 1){
     if(!f5Courier){ alert('Selecciona un tipo de envío'); return; }
@@ -2970,9 +3069,9 @@ function f5Next(){
     if(tel.length < 9){ errEl.textContent='Ingresa tu número de WhatsApp (9 dígitos).'; errEl.style.display='block'; return; }
     if(!dni || dni.length < 8){ errEl.textContent='Ingresa tu DNI (8 dígitos).'; errEl.style.display='block'; return; }
     if(f5Courier==='shalom'){
-      const agencia = document.getElementById('f5-agencia').value.trim();
-      const ciudad = document.getElementById('f5-ciudad').value.trim();
-      if(!agencia){ errEl.textContent='Ingresa la agencia Shalom de recojo.'; errEl.style.display='block'; return; }
+      const {agencia, ciudad} = f5GetAgenciaShalom();
+      if(!document.getElementById('f5-depto').value){ errEl.textContent='Selecciona tu departamento.'; errEl.style.display='block'; return; }
+      if(!agencia){ errEl.textContent='Selecciona (o escribe) la agencia Shalom de recojo.'; errEl.style.display='block'; return; }
       if(!ciudad){ errEl.textContent='Ingresa tu ciudad o provincia.'; errEl.style.display='block'; return; }
     }
     if(f5Courier==='motorizado'){
@@ -3029,8 +3128,8 @@ function f5BuildResumen(){
   const tel = document.getElementById('f5-tel').value;
   const distrito = f5Courier==='motorizado' ? document.getElementById('f5-distrito').value : '';
   const dir = f5Courier==='motorizado' ? document.getElementById('f5-direccion').value : '';
-  const agencia = f5Courier==='shalom' ? document.getElementById('f5-agencia').value : '';
-  const ciudad = f5Courier==='shalom' ? document.getElementById('f5-ciudad').value : '';
+  const agencia = f5Courier==='shalom' ? f5GetAgenciaShalom().agencia : '';
+  const ciudad = f5Courier==='shalom' ? f5GetAgenciaShalom().ciudad : '';
 
   document.getElementById('f5-resumen-envio').innerHTML = `
     <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9C9A92;margin-bottom:8px">Datos de entrega</div>
@@ -3053,8 +3152,8 @@ async function f5Confirmar(){
   const tel = document.getElementById('f5-tel').value.replace(/\s/g,'');
   const dni = document.getElementById('f5-dni').value.trim();
   const costoEnvio = f5Courier==='motorizado' ? 14 : 0;
-  const distrito = f5Courier==='motorizado' ? document.getElementById('f5-distrito').value : document.getElementById('f5-ciudad')?.value||'';
-  const dir = f5Courier==='motorizado' ? document.getElementById('f5-direccion').value : document.getElementById('f5-agencia')?.value||'';
+  const distrito = f5Courier==='motorizado' ? document.getElementById('f5-distrito').value : f5GetAgenciaShalom().ciudad;
+  const dir = f5Courier==='motorizado' ? document.getElementById('f5-direccion').value : f5GetAgenciaShalom().agencia;
   const ref = f5Courier==='motorizado' ? (document.getElementById('f5-referencia')?.value||'') : '';
 
   try {
