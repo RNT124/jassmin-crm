@@ -898,7 +898,11 @@ textarea{resize:vertical;min-height:72px}
       <div id="pg-despacho" class="page">
         <div class="sec-header">
           <div class="sec-title">Despacho del día</div>
-          <button class="btn btn-sm" onclick="loadDespacho()">↻ Actualizar</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" onclick="exportarCSVMotorizado()">📊 Exportar CSV Motorizado</button>
+            <button class="btn btn-sm" onclick="imprimirEtiquetasShalom()">🏷️ Imprimir etiquetas Shalom</button>
+            <button class="btn btn-sm" onclick="loadDespacho()">↻ Actualizar</button>
+          </div>
         </div>
 
         <!-- Sección: Listos para empaquetar -->
@@ -2475,14 +2479,17 @@ function openModalPrenda(id){
 }
 
 // ═══════════════════════════ DESPACHO DEL DÍA ═══════════════════════════
+let despachoActual=[];
 async function loadDespacho(){
   document.getElementById('despacho-empaquetar').innerHTML='<div class="loading">Cargando...</div>';
   document.getElementById('despacho-courier').innerHTML='<div class="loading">Cargando...</div>';
   try {
     // Listos para empaquetar: pago_completo
-    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,clientes(nombre,telefono,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
+    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
     // Empaquetados listos para courier
-    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,clientes(nombre,telefono,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
+    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
+
+    despachoActual = [...empaquetar,...courier];
 
     // Badge sidebar
     const total = empaquetar.length + courier.length;
@@ -2504,6 +2511,55 @@ async function loadDespacho(){
       : '<div style="color:var(--text3);font-size:13px;padding:12px 0">No hay pedidos empaquetados pendientes de despacho</div>';
 
   } catch(e){ console.error('loadDespacho error:',e); }
+}
+
+function esTipoEnvio(p, tipo){
+  const t = (p.clientes?.tipo_envio_preferido||p.tipo_envio||'').toLowerCase();
+  return t===tipo;
+}
+
+function exportarCSVMotorizado(){
+  const lista = despachoActual.filter(p=>esTipoEnvio(p,'motorizado'));
+  if(!lista.length){ toast('No hay pedidos de Motorizado para exportar'); return; }
+  const filas = [['Pedido','Cliente','Telefono','Distrito','Direccion','Total','Falta por cobrar']];
+  lista.forEach(p=>{
+    const c=p.clientes||{};
+    const falta=(p.total||0)-(p.monto_pagado||0);
+    filas.push([p.numero, c.nombre||'', c.telefono||'', c.distrito||'', c.direccion||'', p.total||0, falta>0?falta:0]);
+  });
+  const csv = filas.map(f=>f.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='despacho-motorizado-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('✓ CSV descargado — '+lista.length+' pedido(s)');
+}
+
+function imprimirEtiquetasShalom(){
+  const lista = despachoActual.filter(p=>esTipoEnvio(p,'shalom'));
+  if(!lista.length){ toast('No hay pedidos de Shalom para imprimir'); return; }
+  const win = window.open('', '_blank');
+  const etiquetas = lista.map(p=>{
+    const c=p.clientes||{};
+    return `<div style="width:340px;border:2px solid #000;border-radius:8px;padding:16px;margin:0 0 16px;page-break-inside:avoid;font-family:Arial,sans-serif">
+      <div style="font-size:11px;letter-spacing:.1em;color:#666;margin-bottom:6px">JASSMIN — ENVÍO SHALOM</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:10px">${p.numero}</div>
+      <div style="font-size:13px;line-height:1.9">
+        <div><strong>Nombre:</strong> ${c.nombre||'—'}</div>
+        <div><strong>DNI:</strong> ${c.dni||'—'}</div>
+        <div><strong>Teléfono:</strong> ${c.telefono||'—'}</div>
+        <div><strong>Agencia destino:</strong> ${c.direccion||'—'}</div>
+        <div><strong>Ciudad/Distrito:</strong> ${c.distrito||'—'}</div>
+      </div>
+    </div>`;
+  }).join('');
+  win.document.write(`<html><head><title>Etiquetas Shalom</title></head>
+    <body style="margin:20px">${etiquetas}
+    <script>window.onload=()=>window.print()<\/script>
+    </body></html>`);
+  win.document.close();
 }
 
 function renderDespachoCard(p, tipo){
