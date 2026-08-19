@@ -339,9 +339,13 @@ textarea{resize:vertical;min-height:72px}
           <select class="f5-select" id="f5-depto" onchange="f5PoblarAgencias()">
             <option value="">— seleccionar departamento —</option>
           </select>
+          <label class="f5-label">Distrito / Provincia *</label>
+          <select class="f5-select" id="f5-shalom-distrito" onchange="poblarAgenciaDesdeDistritoGenerico('f5-depto','f5-shalom-distrito','f5-agencia')">
+            <option value="">— primero elige tu departamento —</option>
+          </select>
           <label class="f5-label">Agencia Shalom de recojo *</label>
           <select class="f5-select" id="f5-agencia">
-            <option value="">— primero elige tu departamento —</option>
+            <option value="">— primero elige tu distrito/provincia —</option>
           </select>
           <div id="f5-agencia-manual" style="display:none">
             <label class="f5-label">Escribe tu ciudad *</label>
@@ -583,12 +587,16 @@ textarea{resize:vertical;min-height:72px}
 
           <div id="rg-campos-shalom" style="display:none">
             <label class="f5-label">Departamento *</label>
-            <select class="f5-select" id="rg-depto" onchange="poblarAgenciasGenerico('rg-depto','rg-agencia','rg-agencia-manual')">
+            <select class="f5-select" id="rg-depto" onchange="poblarDistritoShalomGenerico('rg-depto','rg-shalom-distrito','rg-agencia','rg-agencia-manual')">
               <option value="">— seleccionar departamento —</option>
+            </select>
+            <label class="f5-label">Distrito / Provincia *</label>
+            <select class="f5-select" id="rg-shalom-distrito" onchange="poblarAgenciaDesdeDistritoGenerico('rg-depto','rg-shalom-distrito','rg-agencia')">
+              <option value="">— primero elige tu departamento —</option>
             </select>
             <label class="f5-label">Agencia Shalom de recojo *</label>
             <select class="f5-select" id="rg-agencia">
-              <option value="">— primero elige tu departamento —</option>
+              <option value="">— primero elige tu distrito/provincia —</option>
             </select>
             <div id="rg-agencia-manual" style="display:none">
               <label class="f5-label">Escribe tu ciudad *</label>
@@ -3081,46 +3089,170 @@ function poblarDistritosGenerico(selectId){
 poblarDistritosGenerico('f5-distrito');
 
 const SHALOM_AGENCIAS = {
-  "Lima": [
-    ["San Juan de Lurigancho","Av Circunvalacion Sjl"],["San Juan de Lurigancho","Av Malecon Checa Cdra. 1"],["San Juan de Lurigancho","Av Santa Rosa Urb los Alamos"],["San Juan de Lurigancho","Av. 13 de Enero"],["San Juan de Lurigancho","Av. Central"],["San Juan de Lurigancho","Av. Santa Rosa Cruce Av. el Sol"],["San Juan de Lurigancho","Av. del Mercado"],["San Juan de Lurigancho","Bayovar"],["San Juan de Lurigancho","Campoy"],["San Juan de Lurigancho","Canto Grande"],["San Juan de Lurigancho","Cruz de Motupe"],["San Juan de Lurigancho","Jr Chinchaysuyo Cdra 4"],["San Juan de Lurigancho","Los Pinos"],["San Juan de Lurigancho","Sjl- las Flores"],["San Juan de Lurigancho","Sjl-av.proceres"],
-    ["San Martín de Porres","Av Bertello Smp"],["San Martín de Porres","Av Jose Granda Cdra 38"],["San Martín de Porres","Av Jose Granda Cdra. 25"],["San Martín de Porres","Av. Canta Callao Con Alisos"],["San Martín de Porres","Av. Canta Callao Con Izaguirre"],["San Martín de Porres","Av. Carlos Izaguirre Cuadra 23"],["San Martín de Porres","Av. Dominicos Cdra 14"],["San Martín de Porres","Av. Gerardo Unger Cdra 64"],["San Martín de Porres","Av. Lima Cdra 38"],["San Martín de Porres","Av. Peru 15"],["San Martín de Porres","Av. Universitaria Cdra. 16"],["San Martín de Porres","Fiori"],["San Martín de Porres","Germán Aguirre"],["San Martín de Porres","Smp-av. Proceres"],
-    ["Ate Vitarte","Av Esperanza"],["Ate Vitarte","Av Marco Puente"],["Ate Vitarte","Av el Sol"],["Ate Vitarte","Huaycan Av Horacio Zevallos"],["Ate Vitarte","Huaycan Av Jose C Mariategui"],["Ate Vitarte","Huaycan Entrada"],["Ate Vitarte","Huaycan el Descanso"],["Ate Vitarte","Los Sauces"],["Ate Vitarte","Puente Santa Anita"],["Ate Vitarte","Santa Clara"],["Ate Vitarte","Urb Santa Elvira"],
-    ["Los Olivos","Av Huandoy Con Av Central"],["Los Olivos","Av Huandoy Con Marañon"],["Los Olivos","Av. Angelica Gamarra"],["Los Olivos","Av. Carlos Izaguirre Cdra. 14"],["Los Olivos","Av. Dos de Octubre"],["Los Olivos","Av. las Palmeras"],["Los Olivos","Av. los Platinos"],["Los Olivos","Pro"],
-    ["Carabayllo","Av Jose Saco Rojas"],["Carabayllo","Av Tupac Amaru Km. 19"],["Carabayllo","Av. Tupac Amaru Km. 23.5"],["Carabayllo","Carabayllo Establo"],["Carabayllo","El Progreso Km 22"],["Carabayllo","Santo Domingo"],["Carabayllo","Tungasuca"],
-    ["Comas","Av Tupac Amaru Cdra. 57"],["Comas","Av Univ. Retablo"],["Comas","Av. Trapiche"],["Comas","Av. Univ. Parque Sinchi Roca"],["Comas","Año Nuevo"],
-    ["La Molina","Av Flora Tristan"],["La Molina","Av la Fontana"],["La Molina","Av. la Molina Cdra. 35"],["La Molina","Los Fresnos"],["La Molina","Parque la Molina"],
-    ["Puente Piedra","Av Buenos Aires"],["Puente Piedra","Av. San Lorenzo"],["Puente Piedra","Ovalo Puente Piedra"],["Puente Piedra","Puente Arica"],["Puente Piedra","Zapallal"],
-    ["San Juan de Miraflores","Atocongo"],["San Juan de Miraflores","Av Miguel Grau Pamplona Alta"],["San Juan de Miraflores","Av San Juan Pamplona Alta"],["San Juan de Miraflores","Av. Canevaro"],["San Juan de Miraflores","Maria Auxiliadora"],
-    ["Villa María del Triunfo","Av. Lima - Vmt"],["Villa María del Triunfo","Av. Villa Maria"],["Villa María del Triunfo","Las Conchitas"],["Villa María del Triunfo","Nueva Esperanza Vmt"],["Villa María del Triunfo","Pesquero"],
-    ["Cercado de Lima","Av Nicolas Dueñas Cdra. 5"],["Cercado de Lima","Lima Av Tingo María"],["Cercado de Lima","Malvinas - Jr. Garcia Villón"],["Cercado de Lima","Malvinas - Jr. Ricardo Treneman"],
-    ["Chorrillos","Chorrillos Co"],["Chorrillos","Chorrillos los Faisanes"],["Chorrillos","Las Delicias de Villa"],["Chorrillos","Megaplaza Chorrillos"],
-    ["Independencia","Calle a Con Av Industrial"],["Independencia","La Cincuenta"],["Independencia","Megaplaza Independencia"],["Independencia","Plaza Norte Entregas"],
-    ["Villa El Salvador","01 de Mayo"],["Villa El Salvador","Av. Cesar Vallejo"],["Villa El Salvador","Av. Pastor Sevilla"],["Villa El Salvador","Óvalo Mariátegui"],
-    ["La Victoria","Av Mexico Co"],["La Victoria","Av. Canada"],["La Victoria","Jr. Raymondi"],
-    ["Lurigancho-Chosica","Chosica"],["Lurigancho-Chosica","Huachipa Co"],["Lurigancho-Chosica","Santa María de Huachipa"],
-    ["Pachacamac","Av Manuel Valle"],["Pachacamac","La Curva de Manchay"],["Pachacamac","Manchay Tres Marias"],
-    ["Santiago de Surco","Av Tomas Marsano - la Bolichera"],["Santiago de Surco","Higuereta"],["Santiago de Surco","Surco Mateo Pumacahua"],
-    ["Breña","Av Venezuela"],["Breña","Jr. Huaraz - Breña"],
-    ["El Agustino","Jiron Ancash"],["El Agustino","Puente Nuevo"],
-    ["Jesús María","Jesus Maria"],["Jesús María","Real Plaza Salaverry"],
-    ["Lince","Av Jose Leal Cdra 6"],["Lince","Jr Casanova Con Petit Thouars"],
-    ["Lurín","Nuevo Lurin"],["Lurín","Puente Lurin"],
-    ["Pueblo Libre","Av Bolivar"],["Pueblo Libre","Av. la Marina"],
-    ["Rímac","Rimac Av. Amancaes"],["Rímac","Rimac Guardia Republicana Cdra. 9"],
-    ["San Borja","Av. Angamos"],["San Borja","Aviacion 2819"],
-    ["Santa Anita","Av Santa Rosa - Sta Anita"],["Santa Anita","Av. Huarochirí"],
-    ["Surquillo","Av. Principal"],["Surquillo","Rep. de Panama"],
-    ["Huacho","Huacho Av Indacochea"],["Huacho","Salaverry Huacho Co"],
-    ["Cieneguilla","Cieneguilla Km. 14.5"],["Magdalena del Mar","Magdalena del Mar"],["Miraflores","Larcomar"],["Punta Hermosa","Punta Hermosa"],["Santa Rosa","Santa Rosa"],["Barranca","Barranca"],["Paramonga","Paramonga"],["Supe","Supe"],["San Vicente de Cañete","Cañete San Vicente"],["Chilca","Ant Panam Sur Cdra 11"],["Imperial","Cañete Imperial"],["Mala","Mala"],["Nuevo Imperial","Nuevo Imperial Co"],["Huaral","Huaral"],["Chancay","Chancay"],["San Antonio","Jicamarca"],["Huaura","Huaura"],["Sayán","Sayan"]
-  ],
-  "Callao": [
-    ["Bellavista","Av. Elmer Faucett 1641"],
-    ["Callao","Av. Bertello Bollati (Bahía Blanca)"],["Callao","Av. Elmer Faucett 492"],["Callao","Av. Saenz Peña 414-416"],["Callao","Urb. Aeropuerto (Av. Quilca)"],
-    ["La Perla","Av. la Marina 530"],
-    ["Mi Perú","Confraternidad"],
-    ["Ventanilla","Coop. de la Marina (Calle 19)"],["Ventanilla","Pachacutec"]
-  ]
+  'Lima': {
+    'San Juan de Lurigancho': ['Av Circunvalacion Sjl','Av Malecon Checa Cdra. 1','Av Santa Rosa Urb los Alamos','Av. 13 de Enero','Av. Central','Av. Santa Rosa Cruce Av. el Sol','Av. del Mercado','Bayovar','Campoy','Canto Grande','Cruz de Motupe','Jr Chinchaysuyo Cdra 4','Los Pinos','Sjl- las Flores','Sjl-av.proceres'],
+    'San Martín de Porres': ['Av Bertello Smp','Av Jose Granda Cdra 38','Av Jose Granda Cdra. 25','Av. Canta Callao Con Alisos','Av. Canta Callao Con Izaguirre','Av. Carlos Izaguirre Cuadra 23','Av. Dominicos Cdra 14','Av. Gerardo Unger Cdra 64','Av. Lima Cdra 38','Av. Peru 15','Av. Universitaria Cdra. 16','Fiori','Germán Aguirre','Smp-av. Proceres'],
+    'Ate Vitarte': ['Av Esperanza','Av Marco Puente','Av el Sol','Huaycan Av Horacio Zevallos','Huaycan Av Jose C Mariategui','Huaycan Entrada','Huaycan el Descanso','Los Sauces','Puente Santa Anita','Santa Clara','Urb Santa Elvira'],
+    'Los Olivos': ['Av Huandoy Con Av Central','Av Huandoy Con Marañon','Av. Angelica Gamarra','Av. Carlos Izaguirre Cdra. 14','Av. Dos de Octubre','Av. las Palmeras','Av. los Platinos','Pro'],
+    'Carabayllo': ['Av Jose Saco Rojas','Av Tupac Amaru Km. 19','Av. Tupac Amaru Km. 23.5','Carabayllo Establo','El Progreso Km 22','Santo Domingo','Tungasuca'],
+    'Comas': ['Av Tupac Amaru Cdra. 57','Av Univ. Retablo','Av. Trapiche','Av. Univ. Parque Sinchi Roca','Año Nuevo'],
+    'La Molina': ['Av Flora Tristan','Av la Fontana','Av. la Molina Cdra. 35','Los Fresnos','Parque la Molina'],
+    'Puente Piedra': ['Av Buenos Aires','Av. San Lorenzo','Ovalo Puente Piedra','Puente Arica','Zapallal'],
+    'San Juan de Miraflores': ['Atocongo','Av Miguel Grau Pamplona Alta','Av San Juan Pamplona Alta','Av. Canevaro','Maria Auxiliadora'],
+    'Villa María del Triunfo': ['Av. Lima - Vmt','Av. Villa Maria','Las Conchitas','Nueva Esperanza Vmt','Pesquero'],
+    'Cercado de Lima': ['Av Nicolas Dueñas Cdra. 5','Lima Av Tingo María','Malvinas - Jr. Garcia Villón','Malvinas - Jr. Ricardo Treneman'],
+    'Chorrillos': ['Chorrillos Co','Chorrillos los Faisanes','Las Delicias de Villa','Megaplaza Chorrillos'],
+    'Independencia': ['Calle a Con Av Industrial','La Cincuenta','Megaplaza Independencia','Plaza Norte Entregas'],
+    'Villa El Salvador': ['01 de Mayo','Av. Cesar Vallejo','Av. Pastor Sevilla','Óvalo Mariátegui'],
+    'La Victoria': ['Av Mexico Co','Av. Canada','Jr. Raymondi'],
+    'Lurigancho-Chosica': ['Chosica','Huachipa Co','Santa María de Huachipa'],
+    'Pachacamac': ['Av Manuel Valle','La Curva de Manchay','Manchay Tres Marias'],
+    'Santiago de Surco': ['Av Tomas Marsano - la Bolichera','Higuereta','Surco Mateo Pumacahua'],
+    'Breña': ['Av Venezuela','Jr. Huaraz - Breña'],
+    'El Agustino': ['Jiron Ancash','Puente Nuevo'],
+    'Jesús María': ['Jesus Maria','Real Plaza Salaverry'],
+    'Lince': ['Av Jose Leal Cdra 6','Jr Casanova Con Petit Thouars'],
+    'Lurín': ['Nuevo Lurin','Puente Lurin'],
+    'Pueblo Libre': ['Av Bolivar','Av. la Marina'],
+    'Rímac': ['Rimac Av. Amancaes','Rimac Guardia Republicana Cdra. 9'],
+    'San Borja': ['Av. Angamos','Aviacion 2819'],
+    'Santa Anita': ['Av Santa Rosa - Sta Anita','Av. Huarochirí'],
+    'Surquillo': ['Av. Principal','Rep. de Panama'],
+    'Huacho': ['Huacho Av Indacochea','Salaverry Huacho Co'],
+    'Cieneguilla': ['Cieneguilla Km. 14.5'],
+    'Magdalena del Mar': ['Magdalena del Mar'],
+    'Miraflores': ['Larcomar'],
+    'Punta Hermosa': ['Punta Hermosa'],
+    'Santa Rosa': ['Santa Rosa'],
+    'Barranca': ['Barranca'],
+    'Paramonga': ['Paramonga'],
+    'Supe': ['Supe'],
+    'San Vicente de Cañete': ['Cañete San Vicente'],
+    'Chilca': ['Ant Panam Sur Cdra 11'],
+    'Imperial': ['Cañete Imperial'],
+    'Mala': ['Mala'],
+    'Nuevo Imperial': ['Nuevo Imperial Co'],
+    'Huaral': ['Huaral'],
+    'Chancay': ['Chancay'],
+    'San Antonio': ['Jicamarca'],
+    'Huaura': ['Huaura'],
+    'Sayán': ['Sayan']
+  },
+  'Callao': {
+    'Bellavista': ['Av. Elmer Faucett 1641'],
+    'Callao': ['Av. Bertello Bollati (Bahía Blanca)','Av. Elmer Faucett 492','Av. Saenz Peña 414-416','Urb. Aeropuerto (Av. Quilca)'],
+    'La Perla': ['Av. la Marina 530'],
+    'Mi Perú': ['Confraternidad'],
+    'Ventanilla': ['Coop. de la Marina (Calle 19)','Pachacutec']
+  },
+  'Arequipa': {
+    'Alto Selva Alegre': ['Augusto Salazar Bondy Mz J Lt4','Av. Lima 406'],
+    'Arequipa (Cercado)': ['Av. Parra 379'],
+    'Cayma': ['Av. Charcani 401','Av. Ramón Castilla 1000'],
+    'Cerro Colorado': ['Asoc. Las Flores Zn.2 Mz J','Autopista La Joya Zona I','Av. Los Incas 604 Pachacutec','Calle Yavarí 507B Zamacola','Las Canteras Mz A','Nuevo Horizonte Mz H','Urb. San Felipe Av. Pumacahua'],
+    'Jacobo Hunter': ['Calle Argentina 405-A'],
+    'La Joya': ['Lateral 12C Lt.32'],
+    'Mariano Melgar': ['Calle Ancash 202'],
+    'Miraflores': ['Av. Goyoneche 1422'],
+    'Paucarpata': ['Av. Jesús 1100','Calle Belén 100-A'],
+    'Socabaya': ['AA.HH Horacio Zeballos','Av. Socabaya 301'],
+    'Uchumayo': ['Urb. El Carmen Mz E Congata'],
+    'Yura': ['Mz O Lt.4 Zona 2 Ciudad de Dios'],
+    'Islay - Cocachacra': ['C.P. Cocachacra Mz N5'],
+    'Islay': ['AA.HH Puerto Nuevo Mz I'],
+    'Mollendo': ['Calle Dean Valdivia 388','Mariscal Castilla 472-A'],
+    'Majes (Caylloma)': ['Lote Colonizadores 4','Calle Yarabamba Mz Y'],
+    'Camaná': ['Calle Agustín Gamarra 451'],
+    'Chala (Caravelí)': ['Av. Emancipación S/N'],
+    'Aplao (Castilla)': ['Mz X1 Lote 07']
+  },
+  'La Libertad': {
+    'El Porvenir': ['Av. Hermanos Angulo 628','Av. Las Magnolias Mz25','Prolong. 12 de Noviembre Mz Q','Jr. Cahuide 342'],
+    'Huanchaco': ['Av. Industrial Mz23 El Milagro','Vía Evitamiento 576.2'],
+    'La Esperanza': ['Av. Tahuantinsuyo 739','Mz1 Lt23 AA.HH Wichanzao'],
+    'Moche': ['Av. La Marina Lote 25-B'],
+    'Trujillo (Cercado)': ['Av. Hermanos Uceda Meza 269','Av. La Perla Mz E','Calle Atahualpa 481','Calle Liverpool 329','Calle Santa Cruz 389 Chicago','Urb. Vista Hermosa Mz F'],
+    'Víctor Larco Herrera': ['Av. Larco 865'],
+    'Guadalupe (Pacasmayo)': ['Av. Nilla Cerruty 299','Mz A Lt.01 Ciudad de Dios'],
+    'Pacasmayo': ['Av. Gonzalo Ugaz Salcedo','Ctra. Panamericana Mz P'],
+    'San Pedro de Lloc': ['Av. Vía de Evitamiento 407'],
+    'Chao (Virú)': ['Av. Víctor Raúl Haya de la Torre 575'],
+    'Virú': ['Calle Puno 125','Panamericana Norte 933'],
+    'Casa Grande (Ascope)': ['Calle Luis Sánchez 152'],
+    'Paiján (Ascope)': ['Av. Panamericana Norte 1320'],
+    'Chepén': ['Prolong. Ezequiel Gonzales 193'],
+    'Pacanga': ['Carretera Panamericana 835'],
+    'Otuzco': ['Av. Alfredo Gutiérrez 120'],
+    'Huamachuco (Sánchez Carrión)': ['Jr. Simón Bolívar 763']
+  },
+  'Piura': {
+    '26 de Octubre': ['AAHH Consuelo de Velasco','Calle Tres 102','Urb. Parque Industrial Mz G','Urb. Santa Rosa Mz D'],
+    'Castilla': ['Av. Tacna 509','Carr. Panamericana A-2'],
+    'Catacaos': ['Av. Francisco Bolognesi Mz60'],
+    'La Unión': ['Av. Lima 590'],
+    'Las Lomas': ['Jr. Miguel Grau Mz H'],
+    'Piura (Cercado)': ['Av. Grau Mz N','Av. Málaga Mz A','Av. Raúl Mata La Cruz Lt.11'],
+    'Tambo Grande': ['Av. Arámbulo Santín 100'],
+    'El Alto (Talara)': ['Av. Bolognesi O-37'],
+    'Los Órganos (Talara)': ['Av. Panamericana Norte P-29'],
+    'Máncora (Talara)': ['Av. Grau 432'],
+    'Pariñas (Talara)': ['Asoc. California C-03','Mz N-10 AA.HH 9 de Octubre','Parque 22-03 Lateral'],
+    'Bellavista (Sullana)': ['Calle Moquegua 381'],
+    'Ignacio Escudero (Sullana)': ['Av. Panamericana Calle 26'],
+    'Sullana': ['Carretera Panamericana Norte 790','Ctra. Sullana Zona Industrial'],
+    'Ayabaca': ['Calle Bolognesi 136'],
+    'Paimas (Ayabaca)': ['Av. Sullana S/N'],
+    'Chulucanas (Morropón)': ['Jr. Huancavelica 548'],
+    'Morropón': ['Jr. Adrianzén 099'],
+    'Huancabamba': ['Av. Ramón Castilla 0351'],
+    'Paita': ['Mz H Lt.14 Urb. Sol y Mar'],
+    'Sechura': ['Av. Bayovar 311']
+  },
+  'Cusco': {
+    'Cusco (Cercado)': ['Arco Ticatica Pustipata'],
+    'San Jerónimo': ['Calle Ciro Alegría 226'],
+    'San Sebastián': ['Av. Evitamiento Chacahuayco','Urb. Cachimayo A-37','Urb. Túpac Amaru B-1-2'],
+    'Santiago': ['Av. Industrial Bancopata J-20','Prolong. Antonio Lorena 140','Urb. Villa Unión Huancaro'],
+    'Wanchaq': ['Av. Las Américas Mz E','Av. Pachacutec 429','Velasco Astete D3'],
+    'Combapata (Canchis)': ['Av. Señor de Huanca S/N'],
+    'Sicuani (Canchis)': ['Jr. Inambari 208','Prolong. Av. Arequipa 1010'],
+    'Ocongate (Quispicanchi)': ['Sect. Mayo Ucjo S/N'],
+    'Oropesa (Quispicanchi)': ['Sec. Chimpapampa'],
+    'Urcos (Quispicanchi)': ['Mayupata S/N Paucarbamba'],
+    'Calca': ['Av. Vilcanota Mz A'],
+    'Pisac (Calca)': ['Av. Vilcanota S/N'],
+    'Chinchero (Urubamba)': ['Av. Mateo Pumacahua S/N'],
+    'Urubamba': ['Lt. E-3 Sector Patahuasi'],
+    'Anta': ['Parque del Carmen Lt.1'],
+    'Santo Tomás (Chumbivilcas)': ['Calle Bolognesi Mz02'],
+    'Yauri (Espinar)': ['Av. Tintaya 215'],
+    'Santa Ana (La Convención)': ['Jr. Puno Lt.10-11']
+  },
+  'Cajamarca': {
+    'Cajamarca (Cercado)': ['Av. Independencia 787','Jr. Los Gladiolos 336','Jr. Chanchamayo 1162','Jr. Emilio Barrantes Mz X','Mz A Huambocancha Baja'],
+    'Jesús': ['Mz A CP Huaraclla'],
+    'Baños del Inca': ['Jr. Cahuide 242'],
+    'Cajabamba': ['Jr. Cáceres 211'],
+    'Celendín': ['Jr. Pedro Ortiz Montoya 148'],
+    'Chota': ['Av. Fray José Arana 805'],
+    'Yonan (Contumazá)': ['Jr. Bolognesi S/N Tembladera'],
+    'Cutervo': ['Av. Salomón Vílchez Murga'],
+    'Bambamarca (Hualgayoc)': ['Av. Túpac Amaru 1105'],
+    'Jaén': ['Av. Pakammuros Cdra.6'],
+    'San Ignacio': ['Pasaje Tres 113'],
+    'Pedro Gálvez (San Marcos)': ['Jr. Adolfo Amorín Bueno 140'],
+    'San Miguel': ['Jr. Bolognesi 717'],
+    'San Pablo': ['Jr. Tnt. Lorenzo Iglesia 910']
+  },
+  'Huánuco': {
+    'José Crespo y Castillo (Leoncio Prado)': ['Jr. Chiclayo 247'],
+    'Rupa Rupa (Leoncio Prado)': ['Av. Tito Jaime 914','Calle Rosario Central'],
+    'Amarilis': ['Jr. Los Pinos Lote 3-D2'],
+    'Huánuco (Cercado)': ['Jr. Aguilar 872'],
+    'Ambo': ['Av. Las Américas 501']
+  }
 };
+
 
 function f5PoblarDepartamentos(){
   poblarDepartamentosGenerico('f5-depto');
@@ -3130,33 +3262,52 @@ function poblarDepartamentosGenerico(deptoId){
   const sel = document.getElementById(deptoId);
   if(!sel || sel.options.length>1) return;
   Object.keys(SHALOM_AGENCIAS).forEach(dep=>{
-    sel.innerHTML += `<option value="${dep}">${dep} (${SHALOM_AGENCIAS[dep].length} agencias)</option>`;
+    const total = Object.values(SHALOM_AGENCIAS[dep]).reduce((a,arr)=>a+arr.length,0);
+    sel.innerHTML += `<option value="${dep}">${dep} (${total} agencias)</option>`;
   });
   sel.innerHTML += `<option value="__otro__">Mi departamento no está en la lista</option>`;
 }
 
+// Paso 1: al elegir Departamento, poblar el select de Distrito/Provincia
 function f5PoblarAgencias(){
-  poblarAgenciasGenerico('f5-depto','f5-agencia','f5-agencia-manual');
+  poblarDistritoShalomGenerico('f5-depto','f5-shalom-distrito','f5-agencia','f5-agencia-manual');
 }
 
-function poblarAgenciasGenerico(deptoId, agenciaId, manualId){
+function poblarDistritoShalomGenerico(deptoId, distritoId, agenciaId, manualId){
   const dep = document.getElementById(deptoId).value;
+  const selDist = document.getElementById(distritoId);
   const selAg = document.getElementById(agenciaId);
   const manual = document.getElementById(manualId);
+  selAg.innerHTML = '<option value="">— primero elige tu distrito/provincia —</option>';
   if(dep==='__otro__'){
-    selAg.innerHTML = '<option value="">— escribe abajo —</option>';
-    selAg.disabled = true;
+    selDist.style.display='none'; selDist.innerHTML='';
+    selAg.style.display='none';
     manual.style.display = 'block';
     return;
   }
   manual.style.display = 'none';
-  selAg.disabled = false;
+  selDist.style.display='block';
+  selAg.style.display='block';
   if(!dep || !SHALOM_AGENCIAS[dep]){
-    selAg.innerHTML = '<option value="">— primero elige tu departamento —</option>';
+    selDist.innerHTML = '<option value="">— primero elige tu departamento —</option>';
+    return;
+  }
+  const distritos = Object.keys(SHALOM_AGENCIAS[dep]);
+  selDist.innerHTML = '<option value="">— seleccionar distrito/provincia —</option>'
+    + distritos.map(d=>`<option value="${d}">${d} (${SHALOM_AGENCIAS[dep][d].length})</option>`).join('');
+}
+
+// Paso 2: al elegir Distrito/Provincia, poblar el select de Agencia exacta
+function poblarAgenciaDesdeDistritoGenerico(deptoId, distritoId, agenciaId){
+  const dep = document.getElementById(deptoId).value;
+  const dist = document.getElementById(distritoId).value;
+  const selAg = document.getElementById(agenciaId);
+  if(!dep || !dist || !SHALOM_AGENCIAS[dep] || !SHALOM_AGENCIAS[dep][dist]){
+    selAg.innerHTML = '<option value="">— primero elige tu distrito/provincia —</option>';
     return;
   }
   selAg.innerHTML = '<option value="">— seleccionar agencia —</option>'
-    + SHALOM_AGENCIAS[dep].map(([distrito,nombre])=>`<option value="${distrito} — ${nombre}">${distrito} — ${nombre}</option>`).join('');
+    + SHALOM_AGENCIAS[dep][dist].map(nombre=>`<option value="${dist} — ${nombre}">${nombre}</option>`).join('');
 }
 f5PoblarDepartamentos();
 
@@ -3472,7 +3623,7 @@ function rgMostrarFormNuevo(tel){
   document.getElementById('rg-referencia').value='';
   document.getElementById('rg-distrito').value='';
   document.getElementById('rg-depto').value='';
-  poblarAgenciasGenerico('rg-depto','rg-agencia','rg-agencia-manual');
+  poblarDistritoShalomGenerico('rg-depto','rg-shalom-distrito','rg-agencia','rg-agencia-manual');
   rgCourier = null;
   document.getElementById('rg-opt-motorizado').classList.remove('selected');
   document.getElementById('rg-opt-shalom').classList.remove('selected');
@@ -3568,8 +3719,12 @@ function rgEditar(){
     rgSelCourier(esShalom?'shalom':'motorizado');
     if(esShalom){
       document.getElementById('rg-depto').value = rgClienteActual.distrito||'';
-      poblarAgenciasGenerico('rg-depto','rg-agencia','rg-agencia-manual');
-      document.getElementById('rg-agencia').value = rgClienteActual.direccion||'';
+      const agenciaGuardada = rgClienteActual.direccion||'';
+      const distritoGuardado = agenciaGuardada.includes(' — ') ? agenciaGuardada.split(' — ')[0] : '';
+      poblarDistritoShalomGenerico('rg-depto','rg-shalom-distrito','rg-agencia','rg-agencia-manual');
+      document.getElementById('rg-shalom-distrito').value = distritoGuardado;
+      poblarAgenciaDesdeDistritoGenerico('rg-depto','rg-shalom-distrito','rg-agencia');
+      document.getElementById('rg-agencia').value = agenciaGuardada;
     } else {
       document.getElementById('rg-distrito').value = rgClienteActual.distrito||'';
       document.getElementById('rg-direccion').value = rgClienteActual.direccion||'';
