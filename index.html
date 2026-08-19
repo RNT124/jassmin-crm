@@ -547,33 +547,94 @@ textarea{resize:vertical;min-height:72px}
       <div class="f5-subtitle">Registra tus datos</div>
     </div>
     <div class="f5-card">
-      <div id="rg-form-wrap">
+
+      <!-- PASO 0: buscar por teléfono -->
+      <div id="rg-buscar-wrap">
+        <div class="f5-body">
+          <div class="f5-title">Tus datos de envío 🌸</div>
+          <div class="f5-desc">Ingresa tu número para ver si ya estás registrada, o crear tus datos por primera vez.</div>
+          <label class="f5-label">Tu número WhatsApp *</label>
+          <input class="f5-input" id="rg-buscar-tel" placeholder="987 654 321" type="tel" maxlength="12">
+          <div class="f5-error" id="rg-buscar-error"></div>
+          <button class="f5-btn-full" onclick="rgBuscar()">Continuar →</button>
+        </div>
+      </div>
+
+      <!-- PASO EXISTENTE: clienta ya registrada -->
+      <div id="rg-existente-wrap" style="display:none">
+        <div class="f5-body">
+          <div class="f5-title">¡Hola de nuevo, <span id="rg-ex-nombre"></span>! 👋</div>
+          <div style="background:#F1EFE8;border-radius:10px;padding:14px;text-align:left;margin-bottom:16px">
+            <div style="font-size:11px;color:#9C9A92;margin-bottom:6px">TUS DATOS ACTUALES</div>
+            <div id="rg-ex-detalle" style="font-size:12.5px;color:#1A1A18;line-height:1.8"></div>
+          </div>
+          <div id="rg-ex-urgente-wrap" style="display:none;margin-bottom:12px">
+            <button class="f5-btn-full" style="background:#B3184A" onclick="rgSolicitarUrgente()">🚀 Solicitar envío lo antes posible</button>
+            <div style="font-size:11px;color:#9C9A92;margin-top:6px;text-align:center">Le avisamos a nuestro equipo para que programe tu envío cuanto antes</div>
+          </div>
+          <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A" onclick="rgEditar()">Actualizar mis datos</button>
+        </div>
+      </div>
+
+      <!-- PASO FORM: registro / edición completa -->
+      <div id="rg-form-wrap" style="display:none">
         <div class="f5-body">
           <div class="f5-title">Registra tus datos de envío 🌸</div>
           <div class="f5-desc">Llénalo una sola vez y úsalo en todos tus pedidos. Así programar tu envío será mucho más rápido.</div>
           <label class="f5-label">Nombre completo *</label>
           <input class="f5-input" id="rg-nombre" placeholder="Nombre y apellido">
           <label class="f5-label">Tu número WhatsApp *</label>
-          <input class="f5-input" id="rg-tel" placeholder="987 654 321" type="tel" maxlength="12">
+          <input class="f5-input" id="rg-tel" placeholder="987 654 321" type="tel" maxlength="12" readonly style="background:#F1EFE8">
           <div style="font-size:11px;color:#9C9A92;margin-top:-8px;margin-bottom:12px">Con este número te identificamos en cada pedido</div>
-          <label class="f5-label">Distrito (si eres de Lima)</label>
-          <select class="f5-select" id="rg-distrito">
-            <option value="">— seleccionar —</option>
-            <optgroup label="Lima Centro"><option>Miraflores</option><option>San Isidro</option><option>Barranco</option><option>Surquillo</option><option>Lince</option><option>Jesús María</option><option>Pueblo Libre</option><option>San Miguel</option><option>Magdalena del Mar</option></optgroup>
-            <optgroup label="Lima Sur"><option>Santiago de Surco</option><option>Chorrillos</option><option>San Juan de Miraflores</option><option>Villa María del Triunfo</option><option>Villa El Salvador</option></optgroup>
-            <optgroup label="Lima Este"><option>Ate</option><option>San Juan de Lurigancho</option><option>La Molina</option><option>Santa Anita</option></optgroup>
-            <optgroup label="Lima Norte"><option>Los Olivos</option><option>Independencia</option><option>Comas</option><option>San Martín de Porres</option><option>Puente Piedra</option></optgroup>
-            <optgroup label="Callao"><option>Callao</option><option>Ventanilla</option></optgroup>
-            <option value="Provincias">Soy de provincias</option>
-          </select>
-          <label class="f5-label">Dirección</label>
-          <input class="f5-input" id="rg-direccion" placeholder="Calle, número, dpto.">
-          <label class="f5-label">Referencia <span style="color:#9C9A92;font-weight:400">(opcional)</span></label>
-          <input class="f5-input" id="rg-referencia" placeholder="ej. frente al parque...">
+          <label class="f5-label">DNI *</label>
+          <input class="f5-input" id="rg-dni" placeholder="12345678" maxlength="8">
+
+          <label class="f5-label">Tipo de envío *</label>
+          <div class="f5-courier-opts" style="display:flex;gap:10px;margin-bottom:14px">
+            <div class="f5-courier-card" id="rg-opt-motorizado" onclick="rgSelCourier('motorizado')" style="flex:1;border:1.5px solid #E5E3DC;border-radius:10px;padding:12px;text-align:center;cursor:pointer">🏍️<br><span style="font-size:12.5px;font-weight:600">Motorizado</span></div>
+            <div class="f5-courier-card" id="rg-opt-shalom" onclick="rgSelCourier('shalom')" style="flex:1;border:1.5px solid #E5E3DC;border-radius:10px;padding:12px;text-align:center;cursor:pointer">📦<br><span style="font-size:12.5px;font-weight:600">Shalom</span></div>
+          </div>
+
+          <div id="rg-campos-motor" style="display:none">
+            <label class="f5-label">Distrito *</label>
+            <select class="f5-select" id="rg-distrito">
+              <option value="">— seleccionar —</option>
+              <optgroup label="Lima Centro"><option>Miraflores</option><option>San Isidro</option><option>Barranco</option><option>Surquillo</option><option>Lince</option><option>Jesús María</option><option>Pueblo Libre</option><option>San Miguel</option><option>Magdalena del Mar</option></optgroup>
+              <optgroup label="Lima Sur"><option>Santiago de Surco</option><option>Chorrillos</option><option>San Juan de Miraflores</option><option>Villa María del Triunfo</option><option>Villa El Salvador</option></optgroup>
+              <optgroup label="Lima Este"><option>Ate</option><option>San Juan de Lurigancho</option><option>La Molina</option><option>Santa Anita</option></optgroup>
+              <optgroup label="Lima Norte"><option>Los Olivos</option><option>Independencia</option><option>Comas</option><option>San Martín de Porres</option><option>Puente Piedra</option></optgroup>
+              <optgroup label="Callao"><option>Callao</option><option>Ventanilla</option></optgroup>
+              <option value="Provincias">Soy de provincias</option>
+            </select>
+            <label class="f5-label">Dirección *</label>
+            <input class="f5-input" id="rg-direccion" placeholder="Calle, número, dpto.">
+            <label class="f5-label">Referencia <span style="color:#9C9A92;font-weight:400">(opcional)</span></label>
+            <input class="f5-input" id="rg-referencia" placeholder="ej. frente al parque...">
+          </div>
+
+          <div id="rg-campos-shalom" style="display:none">
+            <label class="f5-label">Departamento *</label>
+            <select class="f5-select" id="rg-depto" onchange="poblarAgenciasGenerico('rg-depto','rg-agencia','rg-agencia-manual')">
+              <option value="">— seleccionar departamento —</option>
+            </select>
+            <label class="f5-label">Agencia Shalom de recojo *</label>
+            <select class="f5-select" id="rg-agencia">
+              <option value="">— primero elige tu departamento —</option>
+            </select>
+            <div id="rg-agencia-manual" style="display:none">
+              <label class="f5-label">Escribe tu ciudad *</label>
+              <input class="f5-input" id="rg-ciudad-manual" placeholder="ej. Yurimaguas">
+              <label class="f5-label">Escribe la agencia Shalom más cercana *</label>
+              <input class="f5-input" id="rg-agencia-manual-input" placeholder="ej. Shalom Yurimaguas">
+              <div style="font-size:11px;color:#9C9A92;margin-top:-8px;margin-bottom:12px">Tu departamento aún no está en la lista — escríbelo y lo verificamos antes de despachar.</div>
+            </div>
+          </div>
+
           <div class="f5-error" id="rg-error"></div>
           <button class="f5-btn-full" onclick="rgGuardar()">Guardar mis datos →</button>
         </div>
       </div>
+
       <div id="rg-confirm-wrap" style="display:none">
         <div class="f5-success">
           <div class="f5-success-icon">✅</div>
@@ -583,7 +644,7 @@ textarea{resize:vertical;min-height:72px}
             <div style="font-size:11px;color:#9C9A92;margin-bottom:6px">TUS DATOS</div>
             <div id="rg-confirm-detalle" style="font-size:12.5px;color:#1A1A18;line-height:1.8"></div>
           </div>
-          <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A" onclick="document.getElementById('rg-confirm-wrap').style.display='none';document.getElementById('rg-form-wrap').style.display='block'">Actualizar mis datos</button>
+          <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A" onclick="rgEditar()">Actualizar mis datos</button>
           <div style="font-size:12px;color:#9C9A92;margin-top:8px">¿Dudas? Escríbenos al <strong style="color:#1A1A18">921 328 731</strong></div>
         </div>
       </div>
@@ -611,6 +672,11 @@ textarea{resize:vertical;min-height:72px}
     </div>
 
     <div class="sb-section">Operación</div>
+    <div class="sb-item" id="sb-urgentes" onclick="nav('urgentes',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      Solicitudes urgentes
+      <span id="badge-urgentes" style="margin-left:auto;background:var(--pink);color:#fff;font-size:10px;padding:1px 7px;border-radius:20px;display:none">0</span>
+    </div>
     <div class="sb-item" onclick="nav('carritos',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       Carritos abiertos
@@ -787,6 +853,15 @@ textarea{resize:vertical;min-height:72px}
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- ── SOLICITUDES URGENTES ── -->
+      <div id="pg-urgentes" class="page">
+        <div class="sec-header">
+          <div class="sec-title">Solicitudes urgentes</div>
+          <div style="font-size:12px;color:var(--text2)">Clientas que pidieron su envío lo antes posible, desde su link de datos</div>
+        </div>
+        <div id="urgentes-lista"><div class="loading">Cargando...</div></div>
       </div>
 
       <!-- ── CARRITOS ABIERTOS ── -->
@@ -1316,7 +1391,7 @@ function nav(page, el){
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   document.getElementById('pg-'+page).classList.add('active');
   if(el) el.classList.add('active');
-  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock'};
+  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes'};
   document.getElementById('tb-title').textContent=titles[page]||page;
   if(page==='carritos') loadCarritos();
   if(page==='cortes') loadCortes('mes');
@@ -1325,6 +1400,7 @@ function nav(page, el){
   if(page==='catalogo') loadCatalogo();
   if(page==='stock') loadStock();
   if(page==='despacho') loadDespacho();
+  if(page==='urgentes') loadUrgentes();
 }
 
 // ═══════════════════════════ INIT ═══════════════════════════
@@ -1488,6 +1564,47 @@ function setDashboardPeriodo(p){
 }
 
 // ═══════════════════════════ CARRITOS ABIERTOS ═══════════════════════════
+async function loadUrgentes(){
+  document.getElementById('urgentes-lista').innerHTML='<div class="loading">Cargando...</div>';
+  try {
+    const clientes = await dbGet('clientes?envio_urgente_en=not.is.null&select=id,nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en&order=envio_urgente_en.asc');
+
+    const badge = document.getElementById('badge-urgentes');
+    if(clientes.length>0){ badge.textContent=clientes.length; badge.style.display='inline-block'; }
+    else { badge.style.display='none'; }
+
+    if(!clientes.length){
+      document.getElementById('urgentes-lista').innerHTML=`
+        <div class="card" style="text-align:center;padding:32px">
+          <div style="font-size:32px;margin-bottom:8px">✅</div>
+          <div style="font-size:14px;font-weight:500;color:var(--text)">Sin solicitudes urgentes</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px">Cuando una clienta pida su envío lo antes posible, aparecerá aquí</div>
+        </div>`;
+      return;
+    }
+
+    const rows = await Promise.all(clientes.map(async cl=>{
+      const peds = await dbGet(`pedidos?cliente_id=eq.${cl.id}&estado=eq.acumulando&select=id,carrito_id,subtotal&order=creado_en.desc&limit=1`);
+      return {cl, ped: peds && peds.length ? peds[0] : null};
+    }));
+
+    document.getElementById('urgentes-lista').innerHTML = rows.filter(r=>r.ped).map(({cl,ped})=>{
+      const mins = Math.floor((Date.now()-new Date(cl.envio_urgente_en).getTime())/60000);
+      const tiempo = mins<60 ? `hace ${mins} min` : `hace ${Math.floor(mins/60)}h`;
+      const esShalom = (cl.tipo_envio_preferido||'').startsWith('shalom');
+      return `<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
+        <div>
+          <div style="font-weight:600;font-size:13.5px">${cl.nombre} <span style="font-weight:400;color:var(--text3);font-size:11.5px">· ${tiempo}</span></div>
+          <div style="font-size:12px;color:var(--text2)">${cl.telefono} · ${esShalom?'📦 Shalom — '+(cl.direccion||''):'🏍️ Motorizado — '+(cl.distrito||'')}</div>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="generarPedidoDesdeCarrito('${ped.id}','${cl.id}',${ped.subtotal||0})">Generar pedido →</button>
+      </div>`;
+    }).join('') || `<div class="card" style="text-align:center;padding:32px">
+          <div style="font-size:13px;color:var(--text2)">Hay solicitudes, pero sin carrito abierto — revisa manualmente en Clientas</div>
+        </div>`;
+  } catch(e){ console.error('loadUrgentes error:',e); }
+}
+
 async function loadCarritos(){
   document.getElementById('carritos-lista').innerHTML='<div class="loading">Cargando carritos...</div>';
   try {
@@ -1977,11 +2094,16 @@ async function confirmarPedido(){
       await dbPatch(`clientes?id=eq.${currentLiveClient.id}`,{pedidos_count:(currentLiveClient.pedidos_count||0)+1});
     }
   } catch(e){ alert('Error: '+e.message); return; }
+  // Limpiar solicitud de envío urgente si la tenía
+  try {
+    if(currentLiveClient?.id) await dbPatch(`clientes?id=eq.${currentLiveClient.id}`,{envio_urgente_en:null});
+  } catch(e){}
   closeModal('modal-envio');
   liveCart=[]; currentCarritoId=null; currentPedidoActivo=null; renderLiveCart();
   currentLiveClient=null; hideClientCard();
   document.getElementById('live-search').value='';
   document.getElementById('live-search-results').innerHTML='';
+  if(document.getElementById('pg-urgentes')?.classList.contains('active')) loadUrgentes();
   const base=location.origin+location.pathname;
   const linkPedido=`${base}?tracking=${numPedido}`;
   const linkReg=`${base}?registro`;
@@ -2959,7 +3081,11 @@ const SHALOM_AGENCIAS = {
 };
 
 function f5PoblarDepartamentos(){
-  const sel = document.getElementById('f5-depto');
+  poblarDepartamentosGenerico('f5-depto');
+}
+
+function poblarDepartamentosGenerico(deptoId){
+  const sel = document.getElementById(deptoId);
   if(!sel || sel.options.length>1) return;
   Object.keys(SHALOM_AGENCIAS).forEach(dep=>{
     sel.innerHTML += `<option value="${dep}">${dep} (${SHALOM_AGENCIAS[dep].length} agencias)</option>`;
@@ -2968,9 +3094,13 @@ function f5PoblarDepartamentos(){
 }
 
 function f5PoblarAgencias(){
-  const dep = document.getElementById('f5-depto').value;
-  const selAg = document.getElementById('f5-agencia');
-  const manual = document.getElementById('f5-agencia-manual');
+  poblarAgenciasGenerico('f5-depto','f5-agencia','f5-agencia-manual');
+}
+
+function poblarAgenciasGenerico(deptoId, agenciaId, manualId){
+  const dep = document.getElementById(deptoId).value;
+  const selAg = document.getElementById(agenciaId);
+  const manual = document.getElementById(manualId);
   if(dep==='__otro__'){
     selAg.innerHTML = '<option value="">— escribe abajo —</option>';
     selAg.disabled = true;
@@ -3223,50 +3353,175 @@ function feUpdateCosto(){}
 async function feConfirmar(){ await f5Confirmar(); }
 
 // ═══════════════════════════ REGISTRO PÚBLICO ═══════════════════════════
+let rgClienteActual = null;
+let rgCourier = null;
+
 function showRegistro(){
   hideAllRootPages();
   document.getElementById('registro-page').style.display='block';
-  document.getElementById('rg-form-wrap').style.display='block';
+  document.getElementById('rg-buscar-wrap').style.display='block';
+  document.getElementById('rg-existente-wrap').style.display='none';
+  document.getElementById('rg-form-wrap').style.display='none';
   document.getElementById('rg-confirm-wrap').style.display='none';
+  document.getElementById('rg-buscar-error').style.display='none';
+  document.getElementById('rg-buscar-tel').value='';
+  poblarDepartamentosGenerico('rg-depto');
+  rgClienteActual = null;
+}
+
+async function rgBuscar(){
+  const tel = document.getElementById('rg-buscar-tel').value.replace(/\D/g,'');
+  const errEl = document.getElementById('rg-buscar-error');
+  if(tel.length < 9){ errEl.textContent='Ingresa tu número de WhatsApp (9 dígitos).'; errEl.style.display='block'; return; }
+  errEl.style.display='none';
+  try {
+    const rows = await dbGet(`clientes?telefono=eq.${tel}&select=*`);
+    if(rows && rows.length && rows[0].nombre && rows[0].nombre!=='Nueva clienta' && (rows[0].direccion||rows[0].distrito)){
+      rgClienteActual = rows[0];
+      await rgMostrarExistente(rows[0]);
+    } else {
+      rgClienteActual = rows && rows.length ? rows[0] : null;
+      rgMostrarFormNuevo(tel);
+    }
+  } catch(e){
+    errEl.textContent='Error buscando tus datos: '+e.message; errEl.style.display='block';
+  }
+}
+
+async function rgMostrarExistente(cl){
+  document.getElementById('rg-buscar-wrap').style.display='none';
+  document.getElementById('rg-existente-wrap').style.display='block';
+  document.getElementById('rg-ex-nombre').textContent = cl.nombre;
+  const esShalom = !!cl.tipo_envio_preferido && cl.tipo_envio_preferido.startsWith('shalom');
+  document.getElementById('rg-ex-detalle').innerHTML = esShalom
+    ? `<strong>Shalom</strong><br>${cl.direccion||''} — ${cl.distrito||''}<br><span style="color:var(--text3)">WA: ${cl.telefono}</span>`
+    : `<strong>Motorizado</strong><br>${cl.direccion||''}${cl.referencia?', '+cl.referencia:''}<br>${cl.distrito||''}<br><span style="color:var(--text3)">WA: ${cl.telefono}</span>`;
+
+  // ¿Tiene carrito abierto (pedido en acumulando)?
+  try {
+    const abiertos = await dbGet(`pedidos?cliente_id=eq.${cl.id}&estado=eq.acumulando&select=id&limit=1`);
+    document.getElementById('rg-ex-urgente-wrap').style.display = (abiertos && abiertos.length) ? 'block' : 'none';
+  } catch(e){
+    document.getElementById('rg-ex-urgente-wrap').style.display='none';
+  }
+}
+
+async function rgSolicitarUrgente(){
+  if(!rgClienteActual) return;
+  try {
+    await dbPatch(`clientes?id=eq.${rgClienteActual.id}`, {envio_urgente_en: new Date().toISOString()});
+    document.getElementById('rg-ex-urgente-wrap').innerHTML = `<div style="background:#EAF3DE;color:#27500A;border-radius:10px;padding:12px;text-align:center;font-size:13px;font-weight:600">✓ ¡Listo! Ya avisamos a nuestro equipo</div>`;
+  } catch(e){
+    toast('Error: '+e.message);
+  }
+}
+
+function rgMostrarFormNuevo(tel){
+  document.getElementById('rg-buscar-wrap').style.display='none';
+  document.getElementById('rg-existente-wrap').style.display='none';
+  document.getElementById('rg-confirm-wrap').style.display='none';
+  document.getElementById('rg-form-wrap').style.display='block';
+  document.getElementById('rg-tel').value = tel;
+  document.getElementById('rg-nombre').value='';
+  document.getElementById('rg-dni').value='';
+  document.getElementById('rg-direccion').value='';
+  document.getElementById('rg-referencia').value='';
+  document.getElementById('rg-distrito').value='';
+  document.getElementById('rg-depto').value='';
+  poblarAgenciasGenerico('rg-depto','rg-agencia','rg-agencia-manual');
+  rgCourier = null;
+  document.getElementById('rg-opt-motorizado').classList.remove('selected');
+  document.getElementById('rg-opt-shalom').classList.remove('selected');
+  document.getElementById('rg-campos-motor').style.display='none';
+  document.getElementById('rg-campos-shalom').style.display='none';
   document.getElementById('rg-error').style.display='none';
+}
+
+function rgSelCourier(tipo){
+  rgCourier = tipo;
+  document.getElementById('rg-opt-motorizado').style.borderColor = tipo==='motorizado' ? '#B3184A' : '#E5E3DC';
+  document.getElementById('rg-opt-shalom').style.borderColor = tipo==='shalom' ? '#B3184A' : '#E5E3DC';
+  document.getElementById('rg-campos-motor').style.display = tipo==='motorizado' ? 'block' : 'none';
+  document.getElementById('rg-campos-shalom').style.display = tipo==='shalom' ? 'block' : 'none';
+}
+
+function rgGetAgenciaShalom(){
+  const dep = document.getElementById('rg-depto').value;
+  if(dep==='__otro__'){
+    return {
+      ciudad: document.getElementById('rg-ciudad-manual')?.value.trim()||'',
+      agencia: document.getElementById('rg-agencia-manual-input')?.value.trim()||''
+    };
+  }
+  return { ciudad: dep, agencia: document.getElementById('rg-agencia')?.value||'' };
 }
 
 async function rgGuardar(){
   const nombre = document.getElementById('rg-nombre').value.trim();
-  const tel = document.getElementById('rg-tel').value.replace(/\s/g,'');
-  const disSel = document.getElementById('rg-distrito').value;
-  const dir = document.getElementById('rg-direccion').value.trim();
-  const ref = document.getElementById('rg-referencia').value.trim();
+  const tel = document.getElementById('rg-tel').value.replace(/\D/g,'');
+  const dni = document.getElementById('rg-dni').value.trim();
   const errEl = document.getElementById('rg-error');
   if(!nombre){ errEl.textContent='Ingresa tu nombre completo.'; errEl.style.display='block'; return; }
   if(tel.length < 9){ errEl.textContent='Ingresa tu número de WhatsApp (9 dígitos).'; errEl.style.display='block'; return; }
-  if(!disSel){ errEl.textContent='Selecciona tu distrito.'; errEl.style.display='block'; return; }
-  if(!dir){ errEl.textContent='Ingresa tu dirección de entrega.'; errEl.style.display='block'; return; }
+  if(!dni || dni.length < 8){ errEl.textContent='Ingresa tu DNI (8 dígitos).'; errEl.style.display='block'; return; }
+  if(!rgCourier){ errEl.textContent='Elige tipo de envío: Motorizado o Shalom.'; errEl.style.display='block'; return; }
+
+  let distrito, dir, ref='', costoEnv, tipoEnvio;
+  if(rgCourier==='motorizado'){
+    distrito = document.getElementById('rg-distrito').value;
+    dir = document.getElementById('rg-direccion').value.trim();
+    ref = document.getElementById('rg-referencia').value.trim();
+    costoEnv = 14;
+    tipoEnvio = 'motorizado';
+    if(!distrito){ errEl.textContent='Selecciona tu distrito.'; errEl.style.display='block'; return; }
+    if(!dir){ errEl.textContent='Ingresa tu dirección de entrega.'; errEl.style.display='block'; return; }
+  } else {
+    const {agencia, ciudad} = rgGetAgenciaShalom();
+    if(!document.getElementById('rg-depto').value){ errEl.textContent='Selecciona tu departamento.'; errEl.style.display='block'; return; }
+    if(!agencia){ errEl.textContent='Selecciona (o escribe) la agencia Shalom de recojo.'; errEl.style.display='block'; return; }
+    distrito = ciudad; dir = agencia; costoEnv = 0; tipoEnvio = 'shalom';
+  }
   errEl.style.display='none';
-  const distrito = disSel.split('|')[0];
-  const costoEnv = parseInt(disSel.split('|')[1])||13;
   try {
     const existe = await dbGet(`clientes?telefono=eq.${tel}`);
+    const patch = {nombre, distrito, direccion:dir, referencia:ref, dni, costo_envio:costoEnv, tipo_envio_preferido:tipoEnvio};
     if(existe && existe.length){
-      await dbPatch(`clientes?telefono=eq.${tel}`, {nombre, distrito, direccion:dir, referencia:ref, costo_envio:costoEnv});
+      await dbPatch(`clientes?telefono=eq.${tel}`, patch);
     } else {
-      await dbPost('clientes', {telefono:tel, nombre, distrito, direccion:dir, referencia:ref, costo_envio:costoEnv, pedidos_count:0, total_gastado:0});
+      await dbPost('clientes', {telefono:tel, ...patch, pedidos_count:0, total_gastado:0});
     }
   } catch(e) {
-    // fallback local
-    const existe = DB.clientes.find(c=>c.telefono===tel);
-    if(existe){ existe.nombre=nombre; existe.distrito=distrito; existe.direccion=dir; existe.referencia=ref; }
-    else { DB.clientes.push({ id:'c'+Date.now(), telefono:tel, nombre, talla:'', distrito, direccion:dir, referencia:ref, costo_envio:costoEnv, total:0, pedidos_count:0 }); }
+    errEl.textContent='Error guardando: '+e.message; errEl.style.display='block'; return;
   }
   document.getElementById('rg-form-wrap').style.display='none';
   document.getElementById('rg-confirm-wrap').style.display='block';
-  document.getElementById('rg-confirm-detalle').innerHTML=`<strong>${nombre}</strong><br>${dir}${ref?', '+ref:''}<br>${distrito} · Envío S/${costoEnv}<br><span style="color:var(--text3)">WA: ${tel}</span>`;
+  document.getElementById('rg-confirm-detalle').innerHTML = rgCourier==='shalom'
+    ? `<strong>${nombre}</strong><br>Shalom: ${dir}<br>${distrito}<br><span style="color:var(--text3)">WA: ${tel}</span>`
+    : `<strong>${nombre}</strong><br>${dir}${ref?', '+ref:''}<br>${distrito} · Envío S/${costoEnv}<br><span style="color:var(--text3)">WA: ${tel}</span>`;
 }
 
 function rgEditar(){
+  const tel = (rgClienteActual?.telefono) || document.getElementById('rg-tel')?.value || document.getElementById('rg-buscar-tel')?.value || '';
   document.getElementById('rg-confirm-wrap').style.display='none';
-  document.getElementById('rg-form-wrap').style.display='block';
+  document.getElementById('rg-existente-wrap').style.display='none';
+  rgMostrarFormNuevo(tel.replace(/\D/g,''));
+  if(rgClienteActual){
+    document.getElementById('rg-nombre').value = rgClienteActual.nombre||'';
+    document.getElementById('rg-dni').value = rgClienteActual.dni||'';
+    const esShalom = !!rgClienteActual.tipo_envio_preferido && rgClienteActual.tipo_envio_preferido.startsWith('shalom');
+    rgSelCourier(esShalom?'shalom':'motorizado');
+    if(esShalom){
+      document.getElementById('rg-depto').value = rgClienteActual.distrito||'';
+      poblarAgenciasGenerico('rg-depto','rg-agencia','rg-agencia-manual');
+      document.getElementById('rg-agencia').value = rgClienteActual.direccion||'';
+    } else {
+      document.getElementById('rg-distrito').value = rgClienteActual.distrito||'';
+      document.getElementById('rg-direccion').value = rgClienteActual.direccion||'';
+      document.getElementById('rg-referencia').value = rgClienteActual.referencia||'';
+    }
+  }
 }
+
 
 // ═══════════════════════════ UTILS ═══════════════════════════
 function copiarLink(num){
