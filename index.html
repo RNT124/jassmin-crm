@@ -644,6 +644,10 @@ textarea{resize:vertical;min-height:72px}
             <div style="font-size:11px;color:#9C9A92;margin-bottom:6px">TUS DATOS</div>
             <div id="rg-confirm-detalle" style="font-size:12.5px;color:#1A1A18;line-height:1.8"></div>
           </div>
+          <div id="rg-confirm-urgente-wrap" style="display:none;margin-bottom:12px">
+            <button class="f5-btn-full" style="background:#B3184A" onclick="rgSolicitarUrgente()">🚀 Solicitar envío lo antes posible</button>
+            <div style="font-size:11px;color:#9C9A92;margin-top:6px;text-align:center">Le avisamos a nuestro equipo para que programe tu envío cuanto antes</div>
+          </div>
           <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A" onclick="rgEditar()">Actualizar mis datos</button>
           <div style="font-size:12px;color:#9C9A92;margin-top:8px">¿Dudas? Escríbenos al <strong style="color:#1A1A18">921 328 731</strong></div>
         </div>
@@ -3460,7 +3464,8 @@ async function rgSolicitarUrgente(){
   if(!rgClienteActual) return;
   try {
     await dbPatch(`clientes?id=eq.${rgClienteActual.id}`, {envio_urgente_en: new Date().toISOString()});
-    document.getElementById('rg-ex-urgente-wrap').innerHTML = `<div style="background:#EAF3DE;color:#27500A;border-radius:10px;padding:12px;text-align:center;font-size:13px;font-weight:600">✓ ¡Listo! Ya avisamos a nuestro equipo</div>`;
+    const wrapId = document.getElementById('rg-existente-wrap').style.display==='block' ? 'rg-ex-urgente-wrap' : 'rg-confirm-urgente-wrap';
+    document.getElementById(wrapId).innerHTML = `<div style="background:#EAF3DE;color:#27500A;border-radius:10px;padding:12px;text-align:center;font-size:13px;font-weight:600">✓ ¡Listo! Ya avisamos a nuestro equipo</div>`;
   } catch(e){
     toast('Error: '+e.message);
   }
@@ -3537,8 +3542,10 @@ async function rgGuardar(){
     const patch = {nombre, distrito, direccion:dir, referencia:ref, dni, costo_envio:costoEnv, tipo_envio_preferido:tipoEnvio};
     if(existe && existe.length){
       await dbPatch(`clientes?telefono=eq.${tel}`, patch);
+      rgClienteActual = {...existe[0], ...patch};
     } else {
-      await dbPost('clientes', {telefono:tel, ...patch, pedidos_count:0, total_gastado:0});
+      const creado = await dbPost('clientes', {telefono:tel, ...patch, pedidos_count:0, total_gastado:0});
+      rgClienteActual = Array.isArray(creado) ? creado[0] : creado;
     }
   } catch(e) {
     errEl.textContent='Error guardando: '+e.message; errEl.style.display='block'; return;
@@ -3548,6 +3555,16 @@ async function rgGuardar(){
   document.getElementById('rg-confirm-detalle').innerHTML = rgCourier==='shalom'
     ? `<strong>${nombre}</strong><br>Shalom: ${dir}<br>${distrito}<br><span style="color:var(--text3)">WA: ${tel}</span>`
     : `<strong>${nombre}</strong><br>${dir}${ref?', '+ref:''}<br>${distrito} · Envío S/${costoEnv}<br><span style="color:var(--text3)">WA: ${tel}</span>`;
+
+  // ¿Ya tiene pedidos acumulados/activos? Si sí, ofrecer solicitar envío urgente
+  const urgenteWrap = document.getElementById('rg-confirm-urgente-wrap');
+  urgenteWrap.style.display = 'none';
+  if(rgClienteActual?.id){
+    try {
+      const activos = await dbGet(`pedidos?cliente_id=eq.${rgClienteActual.id}&estado=not.in.(entregado,cancelado)&select=id&limit=1`);
+      urgenteWrap.style.display = (activos && activos.length) ? 'block' : 'none';
+    } catch(e){}
+  }
 }
 
 function rgEditar(){
