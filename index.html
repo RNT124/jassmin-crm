@@ -357,31 +357,6 @@ textarea{resize:vertical;min-height:72px}
           <label class="f5-label">Distrito *</label>
           <select class="f5-select" id="f5-distrito">
             <option value="">— seleccionar distrito —</option>
-            <optgroup label="Lima Centro">
-              <option>Miraflores</option><option>San Isidro</option><option>Barranco</option>
-              <option>Surquillo</option><option>Lince</option><option>Jesús María</option>
-              <option>Pueblo Libre</option><option>San Miguel</option><option>Magdalena del Mar</option>
-              <option>Breña</option><option>La Victoria</option><option>Rímac</option>
-            </optgroup>
-            <optgroup label="Lima Sur">
-              <option>Santiago de Surco</option><option>Chorrillos</option><option>Barranco</option>
-              <option>San Juan de Miraflores</option><option>Villa María del Triunfo</option>
-              <option>Villa El Salvador</option><option>Lurín</option>
-            </optgroup>
-            <optgroup label="Lima Este">
-              <option>Ate</option><option>San Juan de Lurigancho</option><option>La Molina</option>
-              <option>El Agustino</option><option>Santa Anita</option><option>Chaclacayo</option>
-            </optgroup>
-            <optgroup label="Lima Norte">
-              <option>Los Olivos</option><option>Independencia</option><option>Comas</option>
-              <option>Carabayllo</option><option>Puente Piedra</option><option>San Martín de Porres</option>
-              <option>Ancón</option>
-            </optgroup>
-            <optgroup label="Callao">
-              <option>Callao</option><option>Bellavista</option><option>La Punta</option>
-              <option>La Perla</option><option>Mi Perú</option><option>Ventanilla</option>
-            </optgroup>
-            <option value="Otro">Otro distrito Lima</option>
           </select>
           <label class="f5-label">Dirección exacta *</label>
           <input class="f5-input" id="f5-direccion" placeholder="Calle, número, dpto...">
@@ -599,12 +574,6 @@ textarea{resize:vertical;min-height:72px}
             <label class="f5-label">Distrito *</label>
             <select class="f5-select" id="rg-distrito">
               <option value="">— seleccionar —</option>
-              <optgroup label="Lima Centro"><option>Miraflores</option><option>San Isidro</option><option>Barranco</option><option>Surquillo</option><option>Lince</option><option>Jesús María</option><option>Pueblo Libre</option><option>San Miguel</option><option>Magdalena del Mar</option></optgroup>
-              <optgroup label="Lima Sur"><option>Santiago de Surco</option><option>Chorrillos</option><option>San Juan de Miraflores</option><option>Villa María del Triunfo</option><option>Villa El Salvador</option></optgroup>
-              <optgroup label="Lima Este"><option>Ate</option><option>San Juan de Lurigancho</option><option>La Molina</option><option>Santa Anita</option></optgroup>
-              <optgroup label="Lima Norte"><option>Los Olivos</option><option>Independencia</option><option>Comas</option><option>San Martín de Porres</option><option>Puente Piedra</option></optgroup>
-              <optgroup label="Callao"><option>Callao</option><option>Ventanilla</option></optgroup>
-              <option value="Provincias">Soy de provincias</option>
             </select>
             <label class="f5-label">Dirección *</label>
             <input class="f5-input" id="rg-direccion" placeholder="Calle, número, dpto.">
@@ -3092,6 +3061,25 @@ const F5_PASOS = ['Envío','Datos','Resumen','Términos','Pago'];
 
 // Agencias Shalom — compiladas de directorios públicos (no oficiales de Shalom), Lima y Callao.
 // Formato: [distrito, nombre de agencia]. Faltan las 23 regiones restantes del país — se pueden ir agregando.
+// Distritos de Lima Metropolitana (43) y Callao (7) — para envío Motorizado
+const DISTRITOS_LIMA_CALLAO = {
+  "Lima Centro": ["Lima (Cercado)","Breña","La Victoria","Lince","Jesús María","Pueblo Libre","San Miguel","Magdalena del Mar","San Isidro","Miraflores","Barranco","Surquillo","Rímac","San Borja","San Luis"],
+  "Lima Sur": ["Santiago de Surco","Chorrillos","San Juan de Miraflores","Villa María del Triunfo","Villa El Salvador","Lurín","Pachacámac","Punta Hermosa","Punta Negra","San Bartolo","Santa María del Mar","Pucusana"],
+  "Lima Este": ["Ate","San Juan de Lurigancho","La Molina","El Agustino","Santa Anita","Chaclacayo","Lurigancho-Chosica","Cieneguilla"],
+  "Lima Norte": ["Los Olivos","Independencia","Comas","Carabayllo","Puente Piedra","San Martín de Porres","Ancón","Santa Rosa"],
+  "Callao": ["Callao (Cercado)","Bellavista","Carmen de la Legua Reynoso","La Perla","La Punta","Mi Perú","Ventanilla"]
+};
+
+function poblarDistritosGenerico(selectId){
+  const sel = document.getElementById(selectId);
+  if(!sel || sel.options.length>1) return;
+  Object.entries(DISTRITOS_LIMA_CALLAO).forEach(([zona,distritos])=>{
+    sel.innerHTML += `<optgroup label="${zona}">` + distritos.map(d=>`<option>${d}</option>`).join('') + `</optgroup>`;
+  });
+  sel.innerHTML += `<option value="Otro">Otro distrito / provincia</option>`;
+}
+poblarDistritosGenerico('f5-distrito');
+
 const SHALOM_AGENCIAS = {
   "Lima": [
     ["San Juan de Lurigancho","Av Circunvalacion Sjl"],["San Juan de Lurigancho","Av Malecon Checa Cdra. 1"],["San Juan de Lurigancho","Av Santa Rosa Urb los Alamos"],["San Juan de Lurigancho","Av. 13 de Enero"],["San Juan de Lurigancho","Av. Central"],["San Juan de Lurigancho","Av. Santa Rosa Cruce Av. el Sol"],["San Juan de Lurigancho","Av. del Mercado"],["San Juan de Lurigancho","Bayovar"],["San Juan de Lurigancho","Campoy"],["San Juan de Lurigancho","Canto Grande"],["San Juan de Lurigancho","Cruz de Motupe"],["San Juan de Lurigancho","Jr Chinchaysuyo Cdra 4"],["San Juan de Lurigancho","Los Pinos"],["San Juan de Lurigancho","Sjl- las Flores"],["San Juan de Lurigancho","Sjl-av.proceres"],
@@ -3476,6 +3464,7 @@ function rgMostrarFormNuevo(tel){
   document.getElementById('rg-existente-wrap').style.display='none';
   document.getElementById('rg-confirm-wrap').style.display='none';
   document.getElementById('rg-form-wrap').style.display='block';
+  poblarDistritosGenerico('rg-distrito');
   document.getElementById('rg-tel').value = tel;
   document.getElementById('rg-nombre').value='';
   document.getElementById('rg-dni').value='';
