@@ -859,7 +859,12 @@ textarea{resize:vertical;min-height:72px}
       <div id="pg-urgentes" class="page">
         <div class="sec-header">
           <div class="sec-title">Solicitudes urgentes</div>
-          <div style="font-size:12px;color:var(--text2)">Clientas que pidieron su envío lo antes posible, desde su link de datos</div>
+          <div style="font-size:12px;color:var(--text2)">Clientas que pidieron prioridad en el próximo reparto</div>
+        </div>
+        <div class="tabs" style="margin-bottom:12px">
+          <div class="tab active" onclick="filterUrgentes('todos',this)">Todos</div>
+          <div class="tab" onclick="filterUrgentes('shalom',this)">Shalom</div>
+          <div class="tab" onclick="filterUrgentes('motorizado',this)">Motorizado</div>
         </div>
         <div id="urgentes-lista"><div class="loading">Cargando...</div></div>
       </div>
@@ -1564,6 +1569,14 @@ function setDashboardPeriodo(p){
 }
 
 // ═══════════════════════════ CARRITOS ABIERTOS ═══════════════════════════
+let urgentesFiltro = 'todos';
+function filterUrgentes(f, el){
+  urgentesFiltro = f;
+  document.querySelectorAll('#pg-urgentes .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  loadUrgentes();
+}
+
 async function loadUrgentes(){
   document.getElementById('urgentes-lista').innerHTML='<div class="loading">Cargando...</div>';
   try {
@@ -1583,25 +1596,59 @@ async function loadUrgentes(){
       return;
     }
 
-    const rows = await Promise.all(clientes.map(async cl=>{
-      const peds = await dbGet(`pedidos?cliente_id=eq.${cl.id}&estado=eq.acumulando&select=id,carrito_id,subtotal&order=creado_en.desc&limit=1`);
+    // Para cada clienta, su pedido activo más reciente (cualquier estado salvo entregado/cancelado)
+    let rows = await Promise.all(clientes.map(async cl=>{
+      const peds = await dbGet(`pedidos?cliente_id=eq.${cl.id}&estado=not.in.(entregado,cancelado)&select=*&order=creado_en.desc&limit=1`);
       return {cl, ped: peds && peds.length ? peds[0] : null};
     }));
+    rows = rows.filter(r=>r.ped);
 
-    document.getElementById('urgentes-lista').innerHTML = rows.filter(r=>r.ped).map(({cl,ped})=>{
+    if(urgentesFiltro!=='todos'){
+      rows = rows.filter(({cl})=> (cl.tipo_envio_preferido||'').startsWith(urgentesFiltro==='shalom'?'shalom':'motorizado'));
+    }
+
+    if(!rows.length){
+      document.getElementById('urgentes-lista').innerHTML = `<div class="card" style="text-align:center;padding:32px">
+          <div style="font-size:13px;color:var(--text2)">No hay solicitudes con pedido activo en este filtro</div>
+        </div>`;
+      return;
+    }
+
+    document.getElementById('urgentes-lista').innerHTML = rows.map(({cl,ped})=>{
       const mins = Math.floor((Date.now()-new Date(cl.envio_urgente_en).getTime())/60000);
-      const tiempo = mins<60 ? `hace ${mins} min` : `hace ${Math.floor(mins/60)}h`;
+      const tiempo = mins<60 ? `hace ${mins} min` : mins<1440 ? `hace ${Math.floor(mins/60)}h` : `hace ${Math.floor(mins/1440)}d`;
       const esShalom = (cl.tipo_envio_preferido||'').startsWith('shalom');
+      const etiqueta = esShalom?'📦 Shalom — '+(cl.direccion||''):'🏍️ Motorizado — '+(cl.distrito||'');
+
+      let accion, estadoLbl;
+      if(ped.estado==='acumulando'){
+        estadoLbl = 'Acumulando';
+        accion = `<button class="btn btn-sm btn-primary" onclick="generarPedidoDesdeCarrito('${ped.id}','${cl.id}',${ped.subtotal||0})">Generar pedido →</button>`;
+      } else if(['pago_pendiente','pago_parcial','listo_envio'].includes(ped.estado)){
+        estadoLbl = ped.estado==='pago_parcial'?'Pago parcial':'Pendiente de pago';
+        accion = `<button class="btn btn-sm" style="background:var(--amber-dark);color:#fff" onclick="nav('cortes',document.getElementById('sb-cortes')||null)">→ Cortes de pago</button>`;
+      } else if(ped.estado==='pago_completo'){
+        estadoLbl = 'Pago completo';
+        accion = `<button class="btn btn-sm btn-primary" onclick="avanzarEstadoDirecto('${ped.id}','pago_completo').then(loadUrgentes)">Marcar empaquetado</button>`;
+      } else if(ped.estado==='empaquetado'){
+        estadoLbl = 'Empaquetado';
+        accion = `<button class="btn btn-sm btn-success" onclick="avanzarEstadoDirecto('${ped.id}','empaquetado').then(loadUrgentes)">🚚 Registrar despacho</button>`;
+      } else if(ped.estado==='en_camino'){
+        estadoLbl = 'En camino';
+        accion = `<span style="font-size:11.5px;color:var(--text3)">Ya despachado</span>`;
+      } else {
+        estadoLbl = ped.estado; accion='';
+      }
+
       return `<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
         <div>
-          <div style="font-weight:600;font-size:13.5px">${cl.nombre} <span style="font-weight:400;color:var(--text3);font-size:11.5px">· ${tiempo}</span></div>
-          <div style="font-size:12px;color:var(--text2)">${cl.telefono} · ${esShalom?'📦 Shalom — '+(cl.direccion||''):'🏍️ Motorizado — '+(cl.distrito||'')}</div>
+          <div style="font-weight:600;font-size:13.5px">${cl.nombre} <span style="font-weight:400;color:var(--text3);font-size:11.5px">· solicitado ${tiempo}</span></div>
+          <div style="font-size:12px;color:var(--text2)">${cl.telefono} · ${etiqueta}</div>
+          <div style="font-size:11.5px;color:var(--text3);margin-top:2px">Pedido ${ped.numero||'(sin generar)'} · <strong>${estadoLbl}</strong></div>
         </div>
-        <button class="btn btn-sm btn-primary" onclick="generarPedidoDesdeCarrito('${ped.id}','${cl.id}',${ped.subtotal||0})">Generar pedido →</button>
+        ${accion}
       </div>`;
-    }).join('') || `<div class="card" style="text-align:center;padding:32px">
-          <div style="font-size:13px;color:var(--text2)">Hay solicitudes, pero sin carrito abierto — revisa manualmente en Clientas</div>
-        </div>`;
+    }).join('');
   } catch(e){ console.error('loadUrgentes error:',e); }
 }
 
@@ -2094,10 +2141,6 @@ async function confirmarPedido(){
       await dbPatch(`clientes?id=eq.${currentLiveClient.id}`,{pedidos_count:(currentLiveClient.pedidos_count||0)+1});
     }
   } catch(e){ alert('Error: '+e.message); return; }
-  // Limpiar solicitud de envío urgente si la tenía
-  try {
-    if(currentLiveClient?.id) await dbPatch(`clientes?id=eq.${currentLiveClient.id}`,{envio_urgente_en:null});
-  } catch(e){}
   closeModal('modal-envio');
   liveCart=[]; currentCarritoId=null; currentPedidoActivo=null; renderLiveCart();
   currentLiveClient=null; hideClientCard();
@@ -2306,9 +2349,16 @@ async function avanzarEstadoDirecto(id, estadoActual){
       msg='✓ Marcado como empaquetado';
     }
     await dbPatch(`pedidos?id=eq.${id}`,patch);
+    // Si se acaba de despachar de verdad, ya no es urgente — se cumplió el reparto
+    if(estadoActual==='empaquetado' && next==='en_camino'){
+      try {
+        const pedRow = await dbGet(`pedidos?id=eq.${id}&select=cliente_id`);
+        if(pedRow[0]?.cliente_id) await dbPatch(`clientes?id=eq.${pedRow[0].cliente_id}`,{envio_urgente_en:null});
+      } catch(e){}
+    }
     closeModal('modal-pedido');
     toast(msg);
-    setTimeout(async()=>{ await loadPedidos(pedidoFiltro); loadDashboard(); }, 150);
+    setTimeout(async()=>{ await loadPedidos(pedidoFiltro); loadDashboard(); if(document.getElementById('pg-urgentes')?.classList.contains('active')) loadUrgentes(); }, 150);
   } catch(e){ toast('Error actualizando estado: '+e.message); }
 }
 
@@ -3397,10 +3447,10 @@ async function rgMostrarExistente(cl){
     ? `<strong>Shalom</strong><br>${cl.direccion||''} — ${cl.distrito||''}<br><span style="color:var(--text3)">WA: ${cl.telefono}</span>`
     : `<strong>Motorizado</strong><br>${cl.direccion||''}${cl.referencia?', '+cl.referencia:''}<br>${cl.distrito||''}<br><span style="color:var(--text3)">WA: ${cl.telefono}</span>`;
 
-  // ¿Tiene carrito abierto (pedido en acumulando)?
+  // ¿Tiene algún pedido activo (no entregado ni cancelado) al que priorizar?
   try {
-    const abiertos = await dbGet(`pedidos?cliente_id=eq.${cl.id}&estado=eq.acumulando&select=id&limit=1`);
-    document.getElementById('rg-ex-urgente-wrap').style.display = (abiertos && abiertos.length) ? 'block' : 'none';
+    const activos = await dbGet(`pedidos?cliente_id=eq.${cl.id}&estado=not.in.(entregado,cancelado)&select=id&limit=1`);
+    document.getElementById('rg-ex-urgente-wrap').style.display = (activos && activos.length) ? 'block' : 'none';
   } catch(e){
     document.getElementById('rg-ex-urgente-wrap').style.display='none';
   }
