@@ -714,48 +714,85 @@ textarea{resize:vertical;min-height:72px}
 
       <!-- ── DASHBOARD ── -->
       <div id="pg-dashboard" class="page active">
-        <div class="sec-header" style="margin-bottom:12px">
-          <div class="sec-title" style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Resumen</div>
-          <div id="db-periodo-toggle" style="display:flex;gap:4px">
-            <button class="btn btn-xs" data-p="dia" onclick="setDashboardPeriodo('dia')" style="background:var(--pink);color:#fff;border-color:var(--pink)">Hoy</button>
-            <button class="btn btn-xs" data-p="semana" onclick="setDashboardPeriodo('semana')">Semana</button>
-            <button class="btn btn-xs" data-p="mes" onclick="setDashboardPeriodo('mes')">Mes</button>
-          </div>
+        <div class="tabs" style="margin-bottom:14px">
+          <div class="tab active" id="db-tab-btn-operacion" onclick="setDashboardTab('operacion')">📋 Pedidos / Operación</div>
+          <div class="tab" id="db-tab-btn-finanzas" onclick="setDashboardTab('finanzas')">💰 Inventario / Finanzas</div>
         </div>
-        <div class="metrics-grid" id="db-metrics"></div>
 
-        <div class="grid-2 mb-16">
-          <div>
-            <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Alertas</div>
-            <div id="db-alertas"><div class="loading">Cargando...</div></div>
-          </div>
-
-          <div>
-            <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Pedidos en curso</div>
-            <div class="kanban-grid" id="db-kanban" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px"></div>
-
-            <div class="card card-sm mt-8">
-              <div class="card-title" id="db-ventas-titulo">Ventas de hoy</div>
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-                <span class="text-muted text-sm">Total</span>
-                <span class="font-600" style="font-size:15px" id="db-semana-total">S/ 0</span>
-              </div>
-              <div class="bars" id="db-bars"></div>
+        <!-- ═══ TAB 1: OPERACIÓN ═══ -->
+        <div id="db-tab-operacion">
+          <div class="sec-header" style="margin-bottom:12px">
+            <div class="sec-title" style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Resumen</div>
+            <div id="db-periodo-toggle" style="display:flex;gap:4px">
+              <button class="btn btn-xs" data-p="dia" onclick="setDashboardPeriodo('dia')" style="background:var(--pink);color:#fff;border-color:var(--pink)">Hoy</button>
+              <button class="btn btn-xs" data-p="semana" onclick="setDashboardPeriodo('semana')">Semana</button>
+              <button class="btn btn-xs" data-p="mes" onclick="setDashboardPeriodo('mes')">Mes</button>
             </div>
           </div>
+          <div class="metrics-grid" id="db-metrics"></div>
+
+          <div class="grid-2 mb-16">
+            <div>
+              <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Alertas</div>
+              <div id="db-alertas"><div class="loading">Cargando...</div></div>
+            </div>
+
+            <div>
+              <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Pedidos en curso</div>
+              <div class="kanban-grid" id="db-kanban" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px"></div>
+
+              <div class="card card-sm mt-8">
+                <div class="card-title" id="db-ventas-titulo">Ventas de hoy</div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+                  <span class="text-muted text-sm">Total</span>
+                  <span class="font-600" style="font-size:15px" id="db-semana-total">S/ 0</span>
+                </div>
+                <div class="bars" id="db-bars"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sec-header">
+            <div class="sec-title" style="font-size:13px" id="db-top-prendas-titulo">Prendas más vendidas — hoy</div>
+          </div>
+          <div style="padding:0 0 12px 0">
+            <input id="pedidos-search" type="text" placeholder="🔍 Buscar por teléfono o nombre..." style="width:100%;max-width:320px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarPedidosBuscador(this.value)">
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>#</th><th>Prenda</th><th>Unidades</th><th>Ingresos</th></tr></thead>
+              <tbody id="db-top-prendas"><tr><td colspan="4" class="loading">Cargando...</td></tr></tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="sec-header">
-          <div class="sec-title" style="font-size:13px" id="db-top-prendas-titulo">Prendas más vendidas — hoy</div>
-        </div>
-        <div style="padding:0 0 12px 0">
-          <input id="pedidos-search" type="text" placeholder="🔍 Buscar por teléfono o nombre..." style="width:100%;max-width:320px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarPedidosBuscador(this.value)">
-        </div>
-        <div class="tbl-wrap">
-          <table class="tbl">
-            <thead><tr><th>#</th><th>Prenda</th><th>Unidades</th><th>Ingresos</th></tr></thead>
-            <tbody id="db-top-prendas"><tr><td colspan="4" class="loading">Cargando...</td></tr></tbody>
-          </table>
+        <!-- ═══ TAB 2: INVENTARIO / FINANZAS ═══ -->
+        <div id="db-tab-finanzas" style="display:none">
+          <div class="metrics-grid" id="fin-metrics"><div class="loading">Cargando...</div></div>
+
+          <div class="grid-2 mb-16">
+            <div>
+              <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">🏆 Top ganancia de la semana</div>
+              <div id="fin-top-ganancia" class="card card-sm"><div class="loading">Cargando...</div></div>
+            </div>
+            <div>
+              <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">📊 Top margen % por unidad</div>
+              <div id="fin-top-margen" class="card card-sm"><div class="loading">Cargando...</div></div>
+            </div>
+          </div>
+
+          <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--red)">⚠️ Rotación lenta — candidatos a promocionar o liquidar</div>
+          <div id="fin-rotacion-lenta" class="mb-16"><div class="loading">Cargando...</div></div>
+
+          <div class="sec-header">
+            <div class="sec-title" style="font-size:13px">Ranking de rotación — de más rápida a más lenta</div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>#</th><th>Prenda</th><th>Stock</th><th>Vendido (7d)</th><th>Rotación</th></tr></thead>
+              <tbody id="fin-rotacion-tabla"><tr><td colspan="5" class="loading">Cargando...</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -1406,10 +1443,11 @@ async function loadDashboard(){
     const inicioSemana = new Date(hoy); inicioSemana.setDate(inicioSemana.getDate()-6); inicioSemana.setHours(0,0,0,0);
     const periodo = window.dashboardPeriodo || 'dia';
 
-    const [pedidos, clientes, variantes] = await Promise.all([
+    const [pedidos, clientes, variantes, urgentes] = await Promise.all([
       dbGet('pedidos?select=*&order=creado_en.desc'),
       dbGet('clientes?select=id,creado_en'),
-      dbGet('prendas?select=id,nombre,stock&activo=eq.true').catch(()=>[])
+      dbGet('prendas?select=id,nombre,stock&activo=eq.true').catch(()=>[]),
+      dbGet('clientes?envio_urgente_en=not.is.null&select=id').catch(()=>[])
     ]);
 
     const noCancel = pedidos.filter(p=>p.estado!=='cancelado');
@@ -1453,7 +1491,8 @@ async function loadDashboard(){
       <div class="metric"><div class="metric-val">${activos.length}</div><div class="metric-lbl">Pedidos activos</div><div class="metric-delta text-hint">${nuevosPeriodo} nuevo${nuevosPeriodo!==1?'s':''} ${rangoLabel}</div></div>
       <div class="metric"><div class="metric-val">S/ ${ticketProm}</div><div class="metric-lbl">Ticket promedio</div></div>
       <div class="metric"><div class="metric-val">${clientes.length}</div><div class="metric-lbl">Clientas totales</div><div class="metric-delta ${clientesNuevasPeriodo>0?'delta-up':'text-hint'}">${clientesNuevasPeriodo>0?'↑ ':''}${clientesNuevasPeriodo} nueva${clientesNuevasPeriodo!==1?'s':''} ${rangoLabel}</div></div>
-      <div class="metric" ${stockBajo>0?'style="cursor:pointer" onclick="nav(\'stock\',document.getElementById(\'sb-stock\'))"':''}><div class="metric-val" style="${stockBajo>0?'color:var(--red)':''}">${stockBajo}</div><div class="metric-lbl">Prendas con stock bajo</div></div>`;
+      <div class="metric" ${stockBajo>0?'style="cursor:pointer" onclick="nav(\'stock\',document.getElementById(\'sb-stock\'))"':''}><div class="metric-val" style="${stockBajo>0?'color:var(--red)':''}">${stockBajo}</div><div class="metric-lbl">Prendas con stock bajo</div></div>
+      <div class="metric" ${urgentes.length>0?'style="cursor:pointer" onclick="nav(\'urgentes\',document.getElementById(\'sb-urgentes\'))"':''}><div class="metric-val" style="${urgentes.length>0?'color:var(--pink)':''}">${urgentes.length}</div><div class="metric-lbl">🚀 Envío urgente</div><div class="metric-delta text-hint">${urgentes.length>0?'clientas esperando':'sin pendientes'}</div></div>`;
 
     // ── Alertas reales (siempre snapshot actual, no dependen del período) ──
     const empaquetar = activos.filter(p=>p.estado==='pago_completo');
@@ -1537,6 +1576,92 @@ async function loadDashboard(){
       document.getElementById('db-top-prendas').innerHTML = `<tr><td colspan="4" class="loading">Sin ventas ${rangoLabel}</td></tr>`;
     }
   } catch(e){ console.error('Dashboard error:',e); }
+}
+
+function setDashboardTab(tab){
+  document.getElementById('db-tab-operacion').style.display = tab==='operacion'?'block':'none';
+  document.getElementById('db-tab-finanzas').style.display = tab==='finanzas'?'block':'none';
+  document.getElementById('db-tab-btn-operacion').classList.toggle('active', tab==='operacion');
+  document.getElementById('db-tab-btn-finanzas').classList.toggle('active', tab==='finanzas');
+  if(tab==='finanzas' && !window._finanzasLoaded){ loadDashboardFinanzas(); window._finanzasLoaded = true; }
+}
+
+async function loadDashboardFinanzas(){
+  try {
+    const hoy = new Date();
+    const hace7dias = new Date(hoy); hace7dias.setDate(hace7dias.getDate()-7);
+
+    const [prendas, itemsSemana] = await Promise.all([
+      dbGet('prendas?select=id,nombre,stock,costo,precio&activo=eq.true'),
+      dbGet(`carrito_items?agregado_en=gte.${hace7dias.toISOString()}&estado_bolsa=neq.eliminado&select=prenda_id,precio_unitario`)
+    ]);
+
+    // ── Ventas por prenda esta semana ──
+    const ventasPorPrenda = {};
+    itemsSemana.forEach(it=>{
+      const key = it.prenda_id;
+      if(!key) return;
+      if(!ventasPorPrenda[key]) ventasPorPrenda[key] = {unidades:0, ingresos:0};
+      ventasPorPrenda[key].unidades += 1;
+      ventasPorPrenda[key].ingresos += (it.precio_unitario||0);
+    });
+
+    // ── Métricas de inventario ──
+    let stockTotal=0, inversionTotal=0, valorVenta=0;
+    prendas.forEach(p=>{
+      const stock = p.stock||0;
+      stockTotal += stock;
+      inversionTotal += stock*(p.costo||0);
+      valorVenta += stock*(p.precio||0);
+    });
+    const margenPotencial = valorVenta - inversionTotal;
+    const margenPct = valorVenta>0 ? Math.round(margenPotencial/valorVenta*100) : 0;
+
+    document.getElementById('fin-metrics').innerHTML = `
+      <div class="metric"><div class="metric-val">${stockTotal}</div><div class="metric-lbl">Unidades en stock</div><div class="metric-delta text-hint">${prendas.length} modelos</div></div>
+      <div class="metric"><div class="metric-val">S/ ${inversionTotal.toFixed(0)}</div><div class="metric-lbl">Inversión en inventario</div><div class="metric-delta text-hint">Σ stock × costo</div></div>
+      <div class="metric"><div class="metric-val">S/ ${valorVenta.toFixed(0)}</div><div class="metric-lbl">Valor estimado de venta</div><div class="metric-delta text-hint">Σ stock × precio</div></div>
+      <div class="metric"><div class="metric-val" style="color:var(--green)">S/ ${margenPotencial.toFixed(0)}</div><div class="metric-lbl">Margen potencial</div><div class="metric-delta delta-up">${margenPct}% del valor de venta</div></div>`;
+
+    // ── Rankings de ganancia (esta semana) ──
+    const conVentas = prendas.map(p=>{
+      const v = ventasPorPrenda[p.id] || {unidades:0, ingresos:0};
+      const margenUnitario = (p.precio||0)-(p.costo||0);
+      const margenPctUnit = p.precio>0 ? Math.round(margenUnitario/p.precio*100) : 0;
+      const gananciaTotal = v.ingresos - (v.unidades*(p.costo||0));
+      return {...p, unidades:v.unidades, ingresos:v.ingresos, margenUnitario, margenPctUnit, gananciaTotal};
+    });
+
+    const topGanancia = [...conVentas].filter(p=>p.unidades>0).sort((a,b)=>b.gananciaTotal-a.gananciaTotal).slice(0,5);
+    document.getElementById('fin-top-ganancia').innerHTML = topGanancia.length ? topGanancia.map((p,i)=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;${i<topGanancia.length-1?'border-bottom:1px solid var(--border)':''}">
+        <div><span class="text-hint" style="margin-right:6px">${i+1}</span>${p.nombre}<div style="font-size:11px;color:var(--text3)">${p.unidades} vendida${p.unidades!==1?'s':''}</div></div>
+        <div style="color:var(--green);font-weight:600">S/ ${p.gananciaTotal.toFixed(0)}</div>
+      </div>`).join('') : '<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin ventas esta semana</div>';
+
+    const topMargen = [...conVentas].filter(p=>p.precio>0).sort((a,b)=>b.margenPctUnit-a.margenPctUnit).slice(0,5);
+    document.getElementById('fin-top-margen').innerHTML = topMargen.length ? topMargen.map((p,i)=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;${i<topMargen.length-1?'border-bottom:1px solid var(--border)':''}">
+        <div><span class="text-hint" style="margin-right:6px">${i+1}</span>${p.nombre}<div style="font-size:11px;color:var(--text3)">S/${p.costo||0} → S/${p.precio||0}</div></div>
+        <div style="color:var(--pink);font-weight:600">${p.margenPctUnit}%</div>
+      </div>`).join('') : '<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin datos</div>';
+
+    // ── Rotación lenta: stock alto + pocas/ninguna venta en 7 días ──
+    const STOCK_ALTO = 3;
+    const lenta = conVentas.filter(p=>(p.stock||0)>=STOCK_ALTO && p.unidades<=1).sort((a,b)=>(b.stock*(b.costo||0))-(a.stock*(a.costo||0))).slice(0,8);
+    document.getElementById('fin-rotacion-lenta').innerHTML = lenta.length ? `
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Prenda</th><th>Stock</th><th>Vendido (7d)</th><th>Plata parada</th></tr></thead><tbody>
+      ${lenta.map(p=>`<tr><td>${p.nombre}</td><td style="color:var(--red);font-weight:600">${p.stock}</td><td>${p.unidades}</td><td>S/ ${(p.stock*(p.costo||0)).toFixed(0)}</td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="card card-sm" style="font-size:12px;color:var(--text3)">Sin candidatos de rotación lenta por ahora ✓</div>';
+
+    // ── Ranking de rotación completo ──
+    const rotacion = conVentas.map(p=>({...p, ratio: p.unidades/Math.max(p.stock,1)})).sort((a,b)=>b.ratio-a.ratio);
+    document.getElementById('fin-rotacion-tabla').innerHTML = rotacion.length ? rotacion.map((p,i)=>`
+      <tr><td class="text-hint">${i+1}</td><td>${p.nombre}</td><td>${p.stock}</td><td>${p.unidades}</td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;max-width:80px;height:6px;background:var(--gray-light);border-radius:3px;overflow:hidden"><div style="width:${Math.min(p.ratio*100,100)}%;height:100%;background:${p.ratio>0.5?'var(--green)':p.ratio>0.15?'var(--amber)':'var(--red)'}"></div></div><span style="font-size:11px;color:var(--text3)">${(p.ratio).toFixed(2)}</span></div></td></tr>`
+    ).join('') : `<tr><td colspan="5" class="loading">Sin datos</td></tr>`;
+
+  } catch(e){ console.error('Dashboard finanzas error:',e); }
 }
 
 function setDashboardPeriodo(p){
