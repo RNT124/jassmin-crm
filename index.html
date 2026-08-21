@@ -1590,7 +1590,7 @@ function setDashboardTab(tab){
   document.getElementById('db-tab-finanzas').style.display = tab==='finanzas'?'block':'none';
   document.getElementById('db-tab-btn-operacion').classList.toggle('active', tab==='operacion');
   document.getElementById('db-tab-btn-finanzas').classList.toggle('active', tab==='finanzas');
-  if(tab==='finanzas' && !window._finanzasLoaded){ loadDashboardFinanzas(); window._finanzasLoaded = true; }
+  if(tab==='finanzas') loadDashboardFinanzas();
 }
 
 async function loadDashboardFinanzas(){
@@ -2934,6 +2934,7 @@ async function recalcularStockTotal(){
     await loadStock();
     await loadCatalogo();
     await loadCatalogoLive();
+    if(document.getElementById('db-tab-finanzas')?.style.display==='block') loadDashboardFinanzas();
   } catch(e){ toast('Error recalculando stock: '+e.message); }
 }
 
@@ -3057,6 +3058,7 @@ ${prendas.map(p=>p.nombre).join('\n')}`)) return;
     await loadStock();
     await loadCatalogo();
     await loadCatalogoLive();
+    if(document.getElementById('db-tab-finanzas')?.style.display==='block') loadDashboardFinanzas();
 
     if(errores.length){
       toast('✓ '+ok+' importadas, '+errores.length+' con error');
