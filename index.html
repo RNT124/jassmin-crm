@@ -1193,6 +1193,7 @@ textarea{resize:vertical;min-height:72px}
   <div class="modal">
     <div class="modal-title" id="mpc-title">Registrar pago</div>
     <div id="mpc-info" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;font-size:12px"></div>
+    <div class="form-row"><label class="form-label">Total de esta prenda (S/) <span class="text-hint">— edítalo si hubo descuento en el live</span></label><input type="number" id="mpc-total" placeholder="0.00" step="0.01" oninput="mpcRecalcularFalta()"></div>
     <div class="form-row"><label class="form-label">Monto recibido (S/)</label><input type="number" id="mpc-monto" placeholder="0.00" step="0.01"></div>
     <div class="form-row"><label class="form-label">Método</label>
       <select id="mpc-metodo"><option>Yape</option><option>Plin</option><option>Transferencia</option></select>
@@ -3886,29 +3887,45 @@ function openPagoCorte(itemId,nombre,monto,estadoActual,pagadoActual){
   currentCorteItem={itemId,monto,estadoActual,pagadoActual};
   const falta=monto-(pagadoActual||0);
   document.getElementById('mpc-title').textContent=`Validar pago — ${nombre}`;
-  document.getElementById('mpc-info').innerHTML=`
-    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Total prenda</span><span class="font-500">S/ ${monto}</span></div>
-    ${pagadoActual>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Ya abonado</span><span style="color:var(--green)">S/ ${pagadoActual}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between"><span>Falta cobrar</span><span style="color:var(--red)" class="font-500">S/ ${falta}</span></div>`;
+  mpcUpdateInfo(monto,pagadoActual);
+  document.getElementById('mpc-total').value=monto;
   document.getElementById('mpc-monto').value=falta;
   document.getElementById('mpc-nota').value='';
   document.getElementById('modal-pago-corte').classList.add('open');
 }
 
+function mpcUpdateInfo(totalActual,pagadoActual){
+  const falta=totalActual-(pagadoActual||0);
+  document.getElementById('mpc-info').innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Total prenda</span><span class="font-500">S/ ${totalActual}</span></div>
+    ${pagadoActual>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Ya abonado</span><span style="color:var(--green)">S/ ${pagadoActual}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between"><span>Falta cobrar</span><span style="color:${falta>0?'var(--red)':'var(--green)'}" class="font-500">S/ ${falta}</span></div>`;
+}
+
+function mpcRecalcularFalta(){
+  if(!currentCorteItem) return;
+  const nuevoTotal=parseFloat(document.getElementById('mpc-total').value||currentCorteItem.monto);
+  mpcUpdateInfo(nuevoTotal, currentCorteItem.pagadoActual);
+  // Sugerir el monto recibido = lo que falta con el nuevo total (el usuario lo puede seguir editando)
+  document.getElementById('mpc-monto').value = Math.max(0, nuevoTotal-(currentCorteItem.pagadoActual||0));
+}
+
 async function confirmarPagoCorte(){
   const monto=parseFloat(document.getElementById('mpc-monto').value||0);
+  const totalEditado=parseFloat(document.getElementById('mpc-total').value||0);
   const metodo=document.getElementById('mpc-metodo').value;
   const nota=document.getElementById('mpc-nota').value;
   if(!monto||monto<=0){ toast('Ingresa el monto recibido'); return; }
-  const {itemId,monto:total,pagadoActual}=currentCorteItem;
+  if(!totalEditado||totalEditado<=0){ toast('El total de la prenda no puede ser 0'); return; }
+  const {itemId,monto:totalOriginal,pagadoActual}=currentCorteItem;
+  const descuento = totalOriginal - totalEditado; // >0 si hubo descuento, <0 si se subió el precio (raro, pero lo soportamos)
   const nuevoPagado=(pagadoActual||0)+monto;
-  const nuevoEstado=nuevoPagado>=total?'confirmado':'parcial';
+  const nuevoEstado=nuevoPagado>=totalEditado?'confirmado':'parcial';
   try {
-    // 1. Actualizar el item del carrito
-    await dbPatch(`carrito_items?id=eq.${itemId}`,{
-      estado_pago:nuevoEstado,
-      monto_pagado:nuevoPagado
-    });
+    // 1. Actualizar el item del carrito — incluyendo el precio si hubo descuento
+    const patchItem={ estado_pago:nuevoEstado, monto_pagado:nuevoPagado };
+    if(descuento!==0) patchItem.precio_unitario = totalEditado;
+    await dbPatch(`carrito_items?id=eq.${itemId}`,patchItem);
 
     // 2. Buscar el carrito al que pertenece este item
     const itemData = await dbGet(`carrito_items?id=eq.${itemId}&select=carrito_id`);
@@ -3924,7 +3941,16 @@ async function confirmarPagoCorte(){
       const pedidos = await dbGet(`pedidos?carrito_id=eq.${carritoId}&order=creado_en.desc&limit=1&select=*`);
       if(pedidos.length){
         const ped = pedidos[0];
-        const totalRequerido = montoRequeridoPedido(ped)||totalCarrito;
+        // Si hubo descuento, reflejarlo también en el total congelado del pedido (subtotal/total),
+        // para que despacho y validaciones futuras usen el precio real cobrado, no el de catálogo.
+        let pedPatchExtra = {};
+        if(descuento!==0){
+          const nuevoSubtotal = (ped.subtotal!=null ? ped.subtotal : (ped.total-(ped.costo_envio||0))) - descuento;
+          pedPatchExtra.subtotal = Math.max(0, nuevoSubtotal);
+          pedPatchExtra.total = Math.max(0, (ped.total||0) - descuento);
+        }
+        const pedParaCalculo = {...ped, ...pedPatchExtra};
+        const totalRequerido = montoRequeridoPedido(pedParaCalculo)||totalCarrito;
         const estadoActual = ped.estado;
         // Calcular nuevo estado — solo avanzar automáticamente si aún no se despachó/empaquetó.
         // Una vez en empaquetado/en_camino/entregado, el pago solo actualiza el monto — nunca retrocede el estado.
@@ -3936,7 +3962,8 @@ async function confirmarPagoCorte(){
         }
         await dbPatch(`pedidos?id=eq.${ped.id}`,{
           monto_pagado: totalPagadoCarrito,
-          estado: estadoPedido
+          estado: estadoPedido,
+          ...pedPatchExtra
         });
         // 5. Registrar en tabla pagos
         await dbPost('pagos',{
@@ -3953,7 +3980,7 @@ async function confirmarPagoCorte(){
     }
 
     closeModal('modal-pago-corte');
-    toast(`✓ ${nuevoEstado==='confirmado'?'Pago completo confirmado':'Abono registrado — queda S/'+(total-nuevoPagado)+' pendiente'}`);
+    toast(`✓ ${nuevoEstado==='confirmado'?'Pago completo confirmado':'Abono registrado — queda S/'+(totalEditado-nuevoPagado)+' pendiente'}`);
 
     // 6. Recargar vistas afectadas
     loadCortes(corteFiltro);
