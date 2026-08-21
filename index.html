@@ -989,6 +989,7 @@ textarea{resize:vertical;min-height:72px}
               📥 Importar Excel
               <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importarInventarioExcel(this)">
             </label>
+            <button class="btn btn-sm" onclick="recalcularStockTotal()" title="Arregla el contador de stock si quedó desincronizado (ej. después de un import viejo)">🔄 Recalcular stock</button>
           </div>
         </div>
         <div id="stock-alerta" style="display:none;background:var(--red-light);color:var(--red);border-radius:var(--radius-sm);padding:10px 14px;font-size:12.5px;font-weight:500;margin-bottom:12px"></div>
@@ -2892,6 +2893,25 @@ function copiarWA(pedidoId, telefono, numero){
 }
 
 // ═══════════════════════════ IMPORTAR EXCEL ═══════════════════════════
+async function recalcularStockTotal(){
+  if(!confirm('Esto va a recalcular el stock total de cada prenda sumando sus tallas/colores. Puede tardar un poco si tienes muchas prendas. ¿Continuar?')) return;
+  toast('⏳ Recalculando stock...');
+  try {
+    const prendas = await dbGet('prendas?select=id,nombre&activo=eq.true');
+    let corregidas = 0;
+    for(const p of prendas){
+      const variantes = await dbGet(`prenda_stock?prenda_id=eq.${p.id}&select=cantidad`);
+      const stockReal = variantes.reduce((a,v)=>a+(v.cantidad||0),0);
+      await dbPatch(`prendas?id=eq.${p.id}`,{stock:stockReal});
+      corregidas++;
+    }
+    toast(`✓ Stock recalculado en ${corregidas} prenda(s)`);
+    await loadStock();
+    await loadCatalogo();
+    await loadCatalogoLive();
+  } catch(e){ toast('Error recalculando stock: '+e.message); }
+}
+
 async function importarInventarioExcel(input){
   const file = input.files[0];
   if(!file) return;
@@ -3001,6 +3021,10 @@ ${prendas.map(p=>p.nombre).join('\n')}`)) return;
             await dbPost('prenda_stock',{prenda_id:prendaId, talla:it.talla, color:it.color, cantidad:it.stock});
           }
         }
+        // Recalcular el stock total de la prenda (suma de todas sus variantes) — nunca confiar en un contador aparte
+        const variantesActuales = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&select=cantidad`);
+        const stockTotalPrenda = variantesActuales.reduce((a,v)=>a+(v.cantidad||0),0);
+        await dbPatch(`prendas?id=eq.${prendaId}`,{stock:stockTotalPrenda});
         ok++;
       } catch(e){ errores.push(p.nombre+': '+e.message); }
     }
