@@ -684,6 +684,10 @@ textarea{resize:vertical;min-height:72px}
       Solicitudes urgentes
       <span id="badge-urgentes" style="margin-left:auto;background:var(--pink);color:#fff;font-size:10px;padding:1px 7px;border-radius:20px;display:none">0</span>
     </div>
+    <div class="sb-item" onclick="nav('compras',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      Compras y Gastos
+    </div>
     <div class="sb-item" onclick="nav('carritos',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       Carritos abiertos
@@ -911,6 +915,36 @@ textarea{resize:vertical;min-height:72px}
           <div class="tab" onclick="filterUrgentes('motorizado',this)">Motorizado</div>
         </div>
         <div id="urgentes-lista"><div class="loading">Cargando...</div></div>
+      </div>
+
+      <!-- ── COMPRAS Y GASTOS ── -->
+      <div id="pg-compras" class="page">
+        <div class="sec-header">
+          <div class="sec-title">Compras y Gastos</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-primary" onclick="abrirModalCompra()">📦 Registrar compra</button>
+            <button class="btn btn-sm" onclick="abrirModalGasto()">💸 Registrar gasto</button>
+          </div>
+        </div>
+
+        <div class="metrics-grid" id="compras-metrics" style="margin-bottom:16px"><div class="loading">Cargando...</div></div>
+
+        <div class="tabs" style="margin-bottom:12px">
+          <div class="tab active" onclick="filterCompras('semana',this)">Esta semana</div>
+          <div class="tab" onclick="filterCompras('mes',this)">Este mes</div>
+          <div class="tab" onclick="filterCompras('todos',this)">Todos</div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">📦 Compras de mercadería</div>
+            <div id="compras-lista"><div class="loading">Cargando...</div></div>
+          </div>
+          <div>
+            <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">💸 Gastos generales</div>
+            <div id="gastos-lista"><div class="loading">Cargando...</div></div>
+          </div>
+        </div>
       </div>
 
       <!-- ── CARRITOS ABIERTOS ── -->
@@ -1317,6 +1351,54 @@ textarea{resize:vertical;min-height:72px}
   </div>
 </div>
 
+<!-- Modal Registrar Compra -->
+<div class="modal-overlay" id="modal-compra">
+  <div class="modal">
+    <div class="modal-title">📦 Registrar compra de mercadería</div>
+    <div class="text-muted text-sm mb-12">Suma al stock y — si había pre-ventas de esta prenda — las resuelve automáticamente, empezando por las más antiguas.</div>
+    <div class="form-row"><label class="form-label">Prenda</label>
+      <select id="mc-prenda" onchange="mcActualizarTallasColores()"><option value="">— seleccionar —</option></select>
+    </div>
+    <div class="form-row"><label class="form-label">Talla</label>
+      <select id="mc-talla"><option value="">—</option></select>
+    </div>
+    <div class="form-row"><label class="form-label">Color</label>
+      <input type="text" id="mc-color" placeholder="ej. negro">
+    </div>
+    <div class="form-row"><label class="form-label">Cantidad comprada</label><input type="number" id="mc-cantidad" placeholder="0" min="1"></div>
+    <div class="form-row"><label class="form-label">Costo total pagado (S/)</label><input type="number" id="mc-costo" placeholder="0.00" step="0.01"></div>
+    <div class="form-row"><label class="form-label">Proveedor <span class="text-hint">(opcional)</span></label><input type="text" id="mc-proveedor" placeholder="ej. Gamarra - puesto 12"></div>
+    <div class="form-row"><label class="form-label">Fecha</label><input type="date" id="mc-fecha"></div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-compra')">Cancelar</button>
+      <button class="btn btn-sm btn-primary" onclick="guardarCompra()">Guardar compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Registrar Gasto -->
+<div class="modal-overlay" id="modal-gasto">
+  <div class="modal">
+    <div class="modal-title">💸 Registrar gasto</div>
+    <div class="form-row"><label class="form-label">Categoría</label>
+      <select id="mg-categoria">
+        <option>Envío / courier</option>
+        <option>Empaque</option>
+        <option>Publicidad</option>
+        <option>Comisión de plataforma</option>
+        <option>Otro</option>
+      </select>
+    </div>
+    <div class="form-row"><label class="form-label">Monto (S/)</label><input type="number" id="mg-monto" placeholder="0.00" step="0.01"></div>
+    <div class="form-row"><label class="form-label">Descripción <span class="text-hint">(opcional)</span></label><input type="text" id="mg-descripcion" placeholder="ej. Envío Shalom lote del 20/8"></div>
+    <div class="form-row"><label class="form-label">Fecha</label><input type="date" id="mg-fecha"></div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-gasto')">Cancelar</button>
+      <button class="btn btn-sm btn-primary" onclick="guardarGasto()">Guardar gasto</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Enlaces -->
 <div class="modal-overlay" id="modal-enlaces">
   <div class="modal">
@@ -1487,7 +1569,7 @@ function nav(page, el){
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   document.getElementById('pg-'+page).classList.add('active');
   if(el) el.classList.add('active');
-  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes'};
+  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos'};
   document.getElementById('tb-title').textContent=titles[page]||page;
   if(page==='carritos') loadCarritos();
   if(page==='cortes') loadCortes('mes');
@@ -1497,6 +1579,7 @@ function nav(page, el){
   if(page==='stock') loadStock();
   if(page==='despacho') loadDespacho();
   if(page==='urgentes') loadUrgentes();
+  if(page==='compras') loadCompras();
 }
 
 // ═══════════════════════════ INIT ═══════════════════════════
@@ -1754,6 +1837,155 @@ function filterUrgentes(f, el){
   document.querySelectorAll('#pg-urgentes .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
   loadUrgentes();
+}
+
+// ═══════════════════════════ COMPRAS Y GASTOS ═══════════════════════════
+let comprasFiltro = 'semana';
+
+function filterCompras(f, el){
+  comprasFiltro = f;
+  document.querySelectorAll('#pg-compras .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  loadCompras();
+}
+
+function rangoFechaCompras(f){
+  const hoy = new Date();
+  if(f==='semana'){ const d=new Date(hoy); d.setDate(d.getDate()-7); return d.toISOString().slice(0,10); }
+  if(f==='mes'){ return new Date(hoy.getFullYear(),hoy.getMonth(),1).toISOString().slice(0,10); }
+  return null; // todos
+}
+
+async function loadCompras(){
+  document.getElementById('compras-lista').innerHTML='<div class="loading">Cargando...</div>';
+  document.getElementById('gastos-lista').innerHTML='<div class="loading">Cargando...</div>';
+  document.getElementById('compras-metrics').innerHTML='<div class="loading">Cargando...</div>';
+  try {
+    const desde = rangoFechaCompras(comprasFiltro);
+    const filtroFecha = desde ? `fecha=gte.${desde}&` : '';
+
+    const [compras, gastos, itemsIngresos] = await Promise.all([
+      dbGet(`compras?${filtroFecha}select=*,prendas(nombre)&order=fecha.desc`),
+      dbGet(`gastos?${filtroFecha}select=*&order=fecha.desc`),
+      dbGet(`carrito_items?${desde?`agregado_en=gte.${desde}&`:''}estado_pago=eq.confirmado&estado_bolsa=neq.eliminado&select=monto_pagado`)
+    ]);
+
+    const totalCompras = compras.reduce((a,c)=>a+(c.costo_total||0),0);
+    const totalGastos = gastos.reduce((a,g)=>a+(g.monto||0),0);
+    const totalGastado = totalCompras + totalGastos;
+    const totalIngresos = itemsIngresos.reduce((a,it)=>a+(it.monto_pagado||0),0);
+    const gananciaReal = totalIngresos - totalGastado;
+
+    document.getElementById('compras-metrics').innerHTML = `
+      <div class="metric"><div class="metric-val">S/ ${totalIngresos.toFixed(0)}</div><div class="metric-lbl">Ingresado</div></div>
+      <div class="metric"><div class="metric-val" style="color:var(--red)">S/ ${totalGastado.toFixed(0)}</div><div class="metric-lbl">Gastado</div><div class="metric-delta text-hint">Compras S/${totalCompras.toFixed(0)} + Gastos S/${totalGastos.toFixed(0)}</div></div>
+      <div class="metric"><div class="metric-val" style="color:${gananciaReal>=0?'var(--green)':'var(--red)'}">S/ ${gananciaReal.toFixed(0)}</div><div class="metric-lbl">Ganancia real</div><div class="metric-delta text-hint">Ingresado − gastado</div></div>`;
+
+    document.getElementById('compras-lista').innerHTML = compras.length ? compras.map(c=>`
+      <div class="card card-sm mb-8">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <div class="font-500">${c.prendas?.nombre||'?'}</div>
+            <div style="font-size:11.5px;color:var(--text3)">T-${c.talla||'-'} · ${c.color||'-'} · ${c.cantidad} unid.${c.proveedor?' · '+c.proveedor:''}</div>
+            <div style="font-size:11px;color:var(--text3)">${c.fecha}</div>
+          </div>
+          <div class="font-600">S/ ${c.costo_total}</div>
+        </div>
+      </div>`).join('') : '<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin compras registradas en este período</div>';
+
+    document.getElementById('gastos-lista').innerHTML = gastos.length ? gastos.map(g=>`
+      <div class="card card-sm mb-8">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <div class="font-500">${g.categoria}</div>
+            ${g.descripcion?`<div style="font-size:11.5px;color:var(--text3)">${g.descripcion}</div>`:''}
+            <div style="font-size:11px;color:var(--text3)">${g.fecha}</div>
+          </div>
+          <div class="font-600" style="color:var(--red)">S/ ${g.monto}</div>
+        </div>
+      </div>`).join('') : '<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin gastos registrados en este período</div>';
+
+  } catch(e){ console.error('loadCompras error:',e); }
+}
+
+function abrirModalCompra(){
+  const sel = document.getElementById('mc-prenda');
+  sel.innerHTML = '<option value="">— seleccionar —</option>' + DB.prendas.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
+  document.getElementById('mc-talla').innerHTML = '<option value="">—</option>';
+  document.getElementById('mc-color').value='';
+  document.getElementById('mc-cantidad').value='';
+  document.getElementById('mc-costo').value='';
+  document.getElementById('mc-proveedor').value='';
+  document.getElementById('mc-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('modal-compra').classList.add('open');
+}
+
+function mcActualizarTallasColores(){
+  const prenda = DB.prendas.find(p=>p.id===document.getElementById('mc-prenda').value);
+  const tallas = prenda?.tallas ? String(prenda.tallas).split(',').map(t=>t.trim()).filter(Boolean) : [];
+  document.getElementById('mc-talla').innerHTML = '<option value="">—</option>' + tallas.map(t=>`<option>${t}</option>`).join('');
+}
+
+async function guardarCompra(){
+  const prendaId = document.getElementById('mc-prenda').value;
+  const talla = document.getElementById('mc-talla').value;
+  const color = document.getElementById('mc-color').value.trim();
+  const cantidad = parseInt(document.getElementById('mc-cantidad').value||0);
+  const costoTotal = parseFloat(document.getElementById('mc-costo').value||0);
+  const proveedor = document.getElementById('mc-proveedor').value.trim();
+  const fecha = document.getElementById('mc-fecha').value || new Date().toISOString().slice(0,10);
+  if(!prendaId){ toast('Selecciona la prenda'); return; }
+  if(!cantidad||cantidad<=0){ toast('Ingresa la cantidad comprada'); return; }
+  if(!costoTotal||costoTotal<=0){ toast('Ingresa el costo total pagado'); return; }
+  try {
+    await dbPost('compras', {prenda_id:prendaId, talla, color, cantidad, costo_total:costoTotal, proveedor, fecha});
+
+    // Sumar al stock por talla/color
+    const stockRows = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${encodeURIComponent(color)}`);
+    if(stockRows.length){
+      await dbPatch(`prenda_stock?id=eq.${stockRows[0].id}`,{cantidad:(stockRows[0].cantidad||0)+cantidad});
+    } else {
+      await dbPost('prenda_stock',{prenda_id:prendaId, talla, color, cantidad});
+    }
+    // Recalcular stock total de la prenda
+    const variantes = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&select=cantidad`);
+    const stockTotal = variantes.reduce((a,v)=>a+(v.cantidad||0),0);
+    await dbPatch(`prendas?id=eq.${prendaId}`,{stock:stockTotal});
+
+    // Resolver pre-ventas pendientes de esa misma prenda+talla+color, las más antiguas primero
+    const preventas = await dbGet(`carrito_items?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${encodeURIComponent(color)}&preventa=eq.true&estado_bolsa=neq.eliminado&select=id&order=agregado_en.asc&limit=${cantidad}`);
+    for(const it of preventas){
+      await dbPatch(`carrito_items?id=eq.${it.id}`,{preventa:false});
+    }
+
+    closeModal('modal-compra');
+    toast(`✓ Compra registrada${preventas.length?' — '+preventas.length+' pre-venta(s) resuelta(s)':''}`);
+    await loadCompras();
+    await loadStock();
+    await loadCatalogo();
+    await loadCatalogoLive();
+  } catch(e){ toast('Error registrando compra: '+e.message); }
+}
+
+function abrirModalGasto(){
+  document.getElementById('mg-monto').value='';
+  document.getElementById('mg-descripcion').value='';
+  document.getElementById('mg-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('modal-gasto').classList.add('open');
+}
+
+async function guardarGasto(){
+  const categoria = document.getElementById('mg-categoria').value;
+  const monto = parseFloat(document.getElementById('mg-monto').value||0);
+  const descripcion = document.getElementById('mg-descripcion').value.trim();
+  const fecha = document.getElementById('mg-fecha').value || new Date().toISOString().slice(0,10);
+  if(!monto||monto<=0){ toast('Ingresa el monto'); return; }
+  try {
+    await dbPost('gastos', {categoria, monto, descripcion, fecha});
+    closeModal('modal-gasto');
+    toast('✓ Gasto registrado');
+    await loadCompras();
+  } catch(e){ toast('Error registrando gasto: '+e.message); }
 }
 
 async function loadUrgentes(){
@@ -2085,6 +2317,26 @@ async function addToCart(){
   const prenda = DB.prendas.find(p=>p.id===prendaId);
   if(!prenda) return;
   try {
+    // Verificar stock ANTES de crear nada — para saber si es pre-venta
+    let esPreventa = false;
+    let stockActual = null;
+    try {
+      const stockRows = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${color||''}`);
+      stockActual = stockRows.length ? stockRows[0].cantidad : null;
+      esPreventa = stockActual !== null && stockActual <= 0;
+    } catch(e){ /* stock check opcional */ }
+
+    let preventaFechaEstimada = null;
+    if(esPreventa){
+      const dias = prompt('⚠️ "'+prenda.nombre+'" T-'+talla+(color?' · '+color:'')+' está sin stock.\n\n¿En cuántos días aprox. te llega? (déjalo vacío si no sabes aún)\n\nSe marcará como Pre-venta hasta que registres la compra.', '');
+      if(dias===null){ toast('Cancelado — no se agregó'); return; } // canceló el prompt
+      const diasNum = parseInt(dias);
+      if(!isNaN(diasNum) && diasNum>0){
+        const f = new Date(); f.setDate(f.getDate()+diasNum);
+        preventaFechaEstimada = f.toISOString().slice(0,10);
+      }
+    }
+
     // Si no hay pedido activo, crear carrito + pedido en estado "acumulando"
     let carritoId;
     if(!currentPedidoActivo){
@@ -2107,20 +2359,20 @@ async function addToCart(){
       precio_unitario:prenda.precio,
       estado_bolsa:'sin_agregar',
       estado_pago:'pendiente',
-      monto_pagado:0
+      monto_pagado:0,
+      preventa: esPreventa,
+      preventa_fecha_estimada: preventaFechaEstimada
     });
-    // Verificar stock antes de agregar
+    // Descontar stock (puede quedar negativo — eso es lo que luego resuelve una Compra)
     try {
-      const stockRows = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${color||''}`);
-      if(stockRows.length && stockRows[0].cantidad <= 0){
-        toast('⚠️ Stock 0 para '+prenda.nombre+' T-'+talla+(color?' · '+color:'')+' — se agrega igual');
-      } else if(stockRows.length && stockRows[0].cantidad > 0){
-        await dbPatch(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${color||''}`,{cantidad:stockRows[0].cantidad-1});
+      if(stockActual !== null){
+        await dbPatch(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${color||''}`,{cantidad:stockActual-1});
       }
+      if(esPreventa) toast('🕒 Agregado como Pre-venta — pendiente de reponer');
     } catch(e){ /* stock check opcional */ }
     const item = Array.isArray(itemRows)?itemRows[0]:itemRows;
     if(!item || !item.id){ toast('Error guardando prenda — intenta de nuevo'); return; }
-    liveCart.push({id:item.id, prenda_id:prendaId, nombre:prenda.nombre, talla, color:color||'', precio:prenda.precio, estado_pago:'pendiente', estado_bolsa:'sin_agregar'});
+    liveCart.push({id:item.id, prenda_id:prendaId, nombre:prenda.nombre, talla, color:color||'', precio:prenda.precio, estado_pago:'pendiente', estado_bolsa:'sin_agregar', preventa:esPreventa});
     // Descontar 1 unidad de stock del modelo (best-effort, no bloquea la venta)
     let avisoStock = '';
     try {
@@ -2163,6 +2415,7 @@ function renderLiveCart(){
         <span style="font-size:10px;color:var(--text3)">${it.hora||''}</span>
         <span class="badge ${it.estado_pago==='confirmado'?'badge-ok':'badge-warn'}" style="font-size:10px">${it.estado_pago==='confirmado'?'✓ Pagado':'Pago pendiente'}</span>
         <span class="badge ${it.estado_bolsa==='en_bolsa'?'badge-info':'badge-gray'}" style="font-size:10px;cursor:pointer" onclick="toggleBolsaItem(${i},this)">${it.estado_bolsa==='en_bolsa'?'📦 En bolsa':'Sin agregar'}</span>
+        ${it.preventa?`<span class="badge" style="font-size:10px;background:#FFE8CC;color:#B3541E">🕒 Pre-venta</span>`:''}
       </div>
     </div>`).join(''):`<div class="text-hint text-sm">Sin prendas aún</div>`;
   document.getElementById('live-cart-total').textContent='S/ '+total;
@@ -2515,13 +2768,22 @@ async function avanzarEstadoDirecto(id, estadoActual){
   try {
     // Bloquear despacho si pago incompleto
     if(estadoActual==='empaquetado'){
-      const pedData = await dbGet(`pedidos?id=eq.${id}&select=total,subtotal,costo_envio,monto_pagado,tipo_envio,envio_pagado`);
+      const pedData = await dbGet(`pedidos?id=eq.${id}&select=total,subtotal,costo_envio,monto_pagado,tipo_envio,envio_pagado,carrito_id`);
       const ped = pedData[0];
       const requerido = montoRequeridoPedido(ped);
       if(!ped||(ped.monto_pagado||0)<requerido){
         toast('⚠️ No se puede despachar — falta S/'+(requerido-(ped.monto_pagado||0))+' por cobrar');
         closeModal('modal-pedido');
         return;
+      }
+      // Bloquear si aún tiene prendas en pre-venta (no llegaron todavía)
+      if(ped.carrito_id){
+        const pendientes = await dbGet(`carrito_items?carrito_id=eq.${ped.carrito_id}&preventa=eq.true&estado_bolsa=neq.eliminado&select=id`);
+        if(pendientes.length){
+          toast('🕒 No se puede despachar — tiene '+pendientes.length+' prenda(s) en pre-venta sin reponer todavía');
+          closeModal('modal-pedido');
+          return;
+        }
       }
     }
     let patch={estado:next};
@@ -2877,11 +3139,20 @@ async function loadDespacho(){
   document.getElementById('despacho-courier').innerHTML='<div class="loading">Cargando...</div>';
   try {
     // Listos para empaquetar: pago_completo
-    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
+    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,carrito_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
     // Empaquetados listos para courier
-    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
+    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,carrito_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
 
     despachoActual = [...empaquetar,...courier];
+
+    // Pre-ventas pendientes por carrito (en un solo query, para no hacer N+1)
+    const carritoIds = despachoActual.map(p=>p.carrito_id).filter(Boolean);
+    let preventasPorCarrito = {};
+    if(carritoIds.length){
+      const preventaItems = await dbGet(`carrito_items?carrito_id=in.(${carritoIds.join(',')})&preventa=eq.true&estado_bolsa=neq.eliminado&select=carrito_id`);
+      preventaItems.forEach(it=>{ preventasPorCarrito[it.carrito_id] = (preventasPorCarrito[it.carrito_id]||0)+1; });
+    }
+    despachoActual.forEach(p=>{ p._preventaPendiente = preventasPorCarrito[p.carrito_id]||0; });
 
     // Badge sidebar
     const total = empaquetar.length + courier.length;
@@ -2962,8 +3233,9 @@ function renderDespachoCard(p, tipo){
   const colorEnvio = esShalom?'badge-info':esMoto?'badge-purple':'badge-gray';
   const labelEnvio = esShalom?'🚚 Shalom':esMoto?'🏍 Motorizado':'📦 '+envio;
   const falta = (p.total||0)-(p.monto_pagado||0);
+  const preventaBadge = p._preventaPendiente>0 ? '<span class="badge" style="font-size:11px;background:#FFE8CC;color:#B3541E">🕒 '+p._preventaPendiente+' en pre-venta</span>' : '';
 
-  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+(tipo==='empaquetar'?'var(--green)':'var(--blue)')+'">'
+  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+(p._preventaPendiente>0?'#E8A33D':(tipo==='empaquetar'?'var(--green)':'var(--blue)'))+'">'
     + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">'
       + '<div>'
         + '<div style="font-weight:700;font-size:14px">'+p.numero+'</div>'
@@ -2972,6 +3244,7 @@ function renderDespachoCard(p, tipo){
       + '</div>'
       + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'
         + '<span class="badge '+colorEnvio+'" style="font-size:11px">'+labelEnvio+'</span>'
+        + preventaBadge
         + '<span style="font-size:12px;font-weight:600">S/ '+(p.total||0)+'</span>'
         + (falta>0?'<span style="font-size:11px;color:var(--red)">Falta S/ '+falta+'</span>':'<span style="font-size:11px;color:var(--green)">✓ Pagado</span>')
       + '</div>'
