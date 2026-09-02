@@ -1352,11 +1352,33 @@ textarea{resize:vertical;min-height:72px}
     </div>
     <div class="grid-2">
       <div class="form-row"><label class="form-label">Talla habitual</label><select id="nc-talla"><option value="">—</option><option>S</option><option>M</option><option>L</option><option>XL</option></select></div>
-      <div class="form-row"><label class="form-label">Distrito</label><input type="text" id="nc-distrito" placeholder="ej. San Isidro"></div>
+      <div class="form-row"><label class="form-label">DNI</label><input type="text" id="nc-dni" placeholder="12345678" maxlength="8"></div>
     </div>
+    <div class="form-row"><label class="form-label">Tipo de envío</label>
+      <select id="nc-tipo-envio" onchange="ncToggleTipoEnvio()">
+        <option value="">— sin definir —</option>
+        <option value="motorizado">🏍️ Motorizado</option>
+        <option value="shalom">📦 Shalom</option>
+      </select>
+    </div>
+    <div class="form-row"><label class="form-label" id="nc-distrito-label">Distrito / Provincia</label><input type="text" id="nc-distrito" placeholder="ej. San Isidro"></div>
+    <div class="form-row"><label class="form-label" id="nc-direccion-label">Dirección / Agencia</label><input type="text" id="nc-direccion" placeholder="Calle, número, dpto. o agencia Shalom"></div>
+    <div class="form-row" id="nc-referencia-wrap"><label class="form-label">Referencia</label><input type="text" id="nc-referencia" placeholder="ej. frente al parque..."></div>
     <div class="modal-footer">
       <button class="btn btn-sm" onclick="closeModal('modal-cliente')">Cancelar</button>
       <button class="btn btn-primary btn-sm" onclick="guardarCliente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: historial de una clienta -->
+<div class="modal-overlay" id="modal-historial-cliente">
+  <div class="modal">
+    <div class="modal-title" id="hc-title">Historial</div>
+    <div class="text-muted text-sm mb-12">Cada acción que hizo desde su link de registro, más antigua abajo</div>
+    <div id="hc-lista" style="max-height:420px;overflow-y:auto"></div>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-sm" onclick="closeModal('modal-historial-cliente')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -2918,10 +2940,60 @@ function renderClientesTabla(list){
       <td>${completo?'<span class="badge badge-ok">✓ Completo</span>':'<span class="badge badge-warn">⚠ Incompleto</span>'}</td>
       <td>${c.pedidos_count||0}</td>
       <td>S/ ${c.total_gastado||0}</td>
-      <td><button class="btn btn-xs" onclick="editCliente('${c.id}')">Editar</button></td>
+      <td><button class="btn btn-xs" onclick="editCliente('${c.id}')">Editar</button> <button class="btn btn-xs" onclick="verHistorialCliente('${c.id}','${(c.nombre||'').replace(/'/g,"\\'")}')">📜 Historial</button></td>
     </tr>`;
   }).join(''):'<tr><td colspan="8" class="loading">Sin clientas aún</td></tr>';
 }
+function ncToggleTipoEnvio(){
+  const tipo = document.getElementById('nc-tipo-envio').value;
+  const esShalom = tipo==='shalom';
+  document.getElementById('nc-distrito-label').textContent = esShalom ? 'Departamento' : 'Distrito';
+  document.getElementById('nc-direccion-label').textContent = esShalom ? 'Agencia Shalom' : 'Dirección exacta';
+  document.getElementById('nc-referencia-wrap').style.display = esShalom ? 'none' : 'block';
+}
+
+async function registrarHistorialCliente(clienteId, tipoEvento, datos){
+  try {
+    await dbPost('clientes_historial', {
+      cliente_id: clienteId,
+      tipo_evento: tipoEvento,
+      nombre: datos.nombre||null,
+      tipo_envio: datos.tipo_envio_preferido||null,
+      distrito: datos.distrito||null,
+      direccion: datos.direccion||null,
+      referencia: datos.referencia||null,
+      dni: datos.dni||null
+    });
+  } catch(e){ console.warn('No se pudo guardar historial:', e.message); }
+}
+
+async function verHistorialCliente(id, nombre){
+  document.getElementById('hc-title').textContent = 'Historial — '+(nombre||'');
+  document.getElementById('hc-lista').innerHTML = '<div class="loading">Cargando...</div>';
+  document.getElementById('modal-historial-cliente').classList.add('open');
+  try {
+    const eventos = await dbGet(`clientes_historial?cliente_id=eq.${id}&order=creado_en.desc`);
+    if(!eventos.length){
+      document.getElementById('hc-lista').innerHTML = '<div style="font-size:12.5px;color:var(--text3);padding:12px 0">Sin historial todavía — aún no ha usado su link de registro.</div>';
+      return;
+    }
+    const ICONOS = {registro:'📝 Se registró', actualizacion:'📝 Actualizó sus datos', acumular:'🛍️ Eligió acumular', solicitud_urgente:'🚀 Solicitó envío urgente'};
+    document.getElementById('hc-lista').innerHTML = eventos.map(ev=>{
+      const fecha = new Date(ev.creado_en);
+      const fechaStr = fecha.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'}) + ' · ' + fecha.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+      const esShalom = ev.tipo_envio==='shalom';
+      const datosLinea = ev.distrito||ev.direccion ? `${esShalom?'📦 Shalom':ev.tipo_envio==='motorizado'?'🏍️ Motorizado':''} — ${ev.direccion||''}${ev.distrito?' · '+ev.distrito:''}` : '';
+      return `<div style="border-left:2px solid var(--border);padding:2px 0 14px 14px;margin-left:4px;position:relative">
+        <div style="position:absolute;left:-5px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--pink)"></div>
+        <div style="font-size:11px;color:var(--text3);font-weight:600">${fechaStr}</div>
+        <div style="font-size:13px;font-weight:500;margin-top:2px">${ICONOS[ev.tipo_evento]||ev.tipo_evento}</div>
+        ${datosLinea?`<div style="font-size:11.5px;color:var(--text2);margin-top:2px">${datosLinea}</div>`:''}
+        ${ev.dni?`<div style="font-size:11px;color:var(--text3)">DNI: ${ev.dni}</div>`:''}
+      </div>`;
+    }).join('');
+  } catch(e){ document.getElementById('hc-lista').innerHTML = '<div style="color:var(--red);font-size:12.5px">Error cargando historial: '+e.message+'</div>'; }
+}
+
 function editCliente(id){
   const c=DB.clientes.find(x=>x.id===id);
   if(!c) return;
@@ -2929,16 +3001,27 @@ function editCliente(id){
   document.getElementById('nc-nombre').value=c.nombre||'';
   document.getElementById('nc-tel').value=c.telefono||'';
   document.getElementById('nc-talla').value=c.talla||'';
+  document.getElementById('nc-dni').value=c.dni||'';
+  document.getElementById('nc-tipo-envio').value=c.tipo_envio_preferido||'';
   document.getElementById('nc-distrito').value=c.distrito||'';
+  document.getElementById('nc-direccion').value=c.direccion||'';
+  document.getElementById('nc-referencia').value=c.referencia||'';
+  ncToggleTipoEnvio();
   document.querySelector('#modal-cliente .modal-title').textContent='Editar clienta';
   document.querySelector('#modal-cliente .btn-primary').onclick=guardarCliente;
   document.getElementById('modal-cliente').classList.add('open');
 }
 function openModalNuevaCliente(){
+  editingClienteId=null;
   document.getElementById('nc-nombre').value='';
   document.getElementById('nc-tel').value='';
   document.getElementById('nc-talla').value='';
+  document.getElementById('nc-dni').value='';
+  document.getElementById('nc-tipo-envio').value='';
   document.getElementById('nc-distrito').value='';
+  document.getElementById('nc-direccion').value='';
+  document.getElementById('nc-referencia').value='';
+  ncToggleTipoEnvio();
   document.querySelector('#modal-cliente .modal-title').textContent='Nueva clienta';
   document.querySelector('#modal-cliente .btn-primary').onclick=guardarCliente;
   document.getElementById('modal-cliente').classList.add('open');
@@ -2948,16 +3031,23 @@ async function guardarCliente(){
     nombre:document.getElementById('nc-nombre').value.trim(),
     telefono:document.getElementById('nc-tel').value.trim(),
     talla:document.getElementById('nc-talla').value,
-    distrito:document.getElementById('nc-distrito').value.trim()
+    dni:document.getElementById('nc-dni').value.trim(),
+    tipo_envio_preferido:document.getElementById('nc-tipo-envio').value,
+    distrito:document.getElementById('nc-distrito').value.trim(),
+    direccion:document.getElementById('nc-direccion').value.trim(),
+    referencia:document.getElementById('nc-referencia').value.trim()
   };
   if(!data.telefono){ toast('El teléfono es obligatorio'); return; }
   if(!data.nombre){ toast('El nombre es obligatorio'); return; }
   try {
     if(editingClienteId){
       await dbPatch(`clientes?id=eq.${editingClienteId}`,data);
+      await registrarHistorialCliente(editingClienteId, 'actualizacion', data);
       toast('✓ Clienta actualizada');
     } else {
-      await dbPost('clientes',{...data, pedidos_count:0, total_gastado:0});
+      const creado = await dbPost('clientes',{...data, pedidos_count:0, total_gastado:0});
+      const nuevo = Array.isArray(creado)?creado[0]:creado;
+      if(nuevo?.id) await registrarHistorialCliente(nuevo.id, 'registro', data);
       toast('✓ Clienta registrada');
     }
     closeModal('modal-cliente');
@@ -4260,6 +4350,7 @@ async function rgSolicitarUrgente(){
   if(!rgClienteActual) return;
   try {
     await dbPatch(`clientes?id=eq.${rgClienteActual.id}`, {envio_urgente_en: new Date().toISOString()});
+    await registrarHistorialCliente(rgClienteActual.id, 'solicitud_urgente', rgClienteActual);
     const wrapId = document.getElementById('rg-existente-wrap').style.display==='block' ? 'rg-ex-urgente-wrap' : 'rg-confirm-urgente-wrap';
     document.getElementById(wrapId).innerHTML = `<div style="background:#EAF3DE;color:#27500A;border-radius:10px;padding:12px;text-align:center;font-size:13px;font-weight:600">✓ ¡Listo! Ya avisamos a nuestro equipo</div>`;
   } catch(e){
@@ -4268,6 +4359,7 @@ async function rgSolicitarUrgente(){
 }
 
 function rgConfirmarAcumular(prefijo){
+  if(rgClienteActual) registrarHistorialCliente(rgClienteActual.id, 'acumular', rgClienteActual);
   document.getElementById(prefijo+'-urgente-wrap').innerHTML = `<div style="background:#F1EFE8;color:#5F5E5A;border-radius:10px;padding:12px;text-align:center;font-size:13px;font-weight:600">🛍️ Perfecto, seguimos acumulando tus prendas</div>`;
 }
 
@@ -4344,9 +4436,11 @@ async function rgGuardar(){
     if(existe && existe.length){
       await dbPatch(`clientes?telefono=eq.${tel}`, patch);
       rgClienteActual = {...existe[0], ...patch};
+      await registrarHistorialCliente(rgClienteActual.id, 'actualizacion', patch);
     } else {
       const creado = await dbPost('clientes', {telefono:tel, ...patch, pedidos_count:0, total_gastado:0});
       rgClienteActual = Array.isArray(creado) ? creado[0] : creado;
+      await registrarHistorialCliente(rgClienteActual.id, 'registro', patch);
     }
   } catch(e) {
     errEl.textContent='Error guardando: '+e.message; errEl.style.display='block'; return;
