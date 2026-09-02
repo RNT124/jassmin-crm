@@ -2361,8 +2361,8 @@ async function selectLiveClient(id){
     const c = rows[0];
     if(!c) return;
     currentLiveClient=c;
-    // Buscar pedido activo (acumulando o listo_envio = aún puede recibir prendas)
-    const pedActivos = await dbGet(`pedidos?cliente_id=eq.${id}&estado=in.(acumulando,listo_envio)&order=creado_en.desc&limit=1`);
+    // Buscar pedido activo (cualquier estado antes de "en camino" — aún puede recibir prendas)
+    const pedActivos = await dbGet(`pedidos?cliente_id=eq.${id}&estado=in.(acumulando,listo_envio,pago_pendiente,pago_parcial,pago_completo,empaquetado)&order=creado_en.desc&limit=1`);
     if(pedActivos.length){
       currentCarritoId = pedActivos[0].id; // reutilizamos currentCarritoId para guardar el pedido activo
       const items = await dbGet(`carrito_items?carrito_id=eq.${pedActivos[0].carrito_id}&estado_bolsa=neq.eliminado&select=*,prendas(nombre)`);
@@ -2482,8 +2482,17 @@ async function addToCart(){
     } catch(e){ console.warn('No se pudo descontar stock:', e.message); }
     // Recalcular total del pedido
     const nuevoSubtotal = liveCart.reduce((a,i)=>a+i.precio,0);
-    await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(currentPedidoActivo.costo_envio||0)});
+    const nuevoTotal = nuevoSubtotal+(currentPedidoActivo.costo_envio||0);
+    const patchPedido = {subtotal:nuevoSubtotal, total:nuevoTotal};
+    // Si ya estaba pago_completo o empaquetado, con la prenda nueva vuelve a quedar debiendo — retrocede el estado
+    if(['pago_completo','empaquetado'].includes(currentPedidoActivo.estado) && (currentPedidoActivo.monto_pagado||0) < nuevoTotal){
+      patchPedido.estado = (currentPedidoActivo.monto_pagado||0) > 0 ? 'pago_parcial' : 'pago_pendiente';
+      toast('⚠️ Este pedido ya estaba '+(currentPedidoActivo.estado==='empaquetado'?'empaquetado':'pago completo')+' — vuelve a "falta pago" por la prenda nueva');
+    }
+    await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,patchPedido);
     currentPedidoActivo.subtotal = nuevoSubtotal;
+    currentPedidoActivo.total = nuevoTotal;
+    if(patchPedido.estado) currentPedidoActivo.estado = patchPedido.estado;
     document.getElementById('lv-prenda').value='';
     document.getElementById('lv-talla').innerHTML='<option value="">— talla —</option>';
     document.getElementById('lv-color').innerHTML='<option value="">— color —</option>';
