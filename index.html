@@ -1068,7 +1068,7 @@ textarea{resize:vertical;min-height:72px}
         </div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>Pedido · Clienta</th><th>Teléfono</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Courier</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Pedido · Clienta</th><th>Teléfono</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Registro</th><th>Courier</th><th>Acciones</th></tr></thead>
             <tbody id="pedidos-tbody"></tbody>
           </table>
         </div>
@@ -2806,13 +2806,20 @@ function filtrarPedidosBuscador(q){
 
 async function loadPedidos(f='todos'){
   try {
-    const pedidos = await dbGet('pedidos?select=*,clientes(nombre,telefono)&order=creado_en.desc');
+    const pedidos = await dbGet('pedidos?select=*,clientes(nombre,telefono,direccion,distrito,envio_urgente_en)&order=creado_en.desc');
     DB.pedidos = pedidos;
     let list = pedidos;
     if(f==='por_pagar') list=pedidos.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado));
     if(f==='pago_completo') list=pedidos.filter(p=>p.estado==='pago_completo');
     if(f==='en_camino') list=pedidos.filter(p=>p.estado==='en_camino');
     const falta=p=>p.total-p.monto_pagado;
+    function registroBadge(cl){
+      if(!cl) return '<span class="badge badge-warn">⚠️ Sin datos</span>';
+      const tieneDatos = !!(cl.direccion || cl.distrito);
+      if(!tieneDatos) return '<span class="badge badge-warn">⚠️ Sin datos</span>';
+      if(cl.envio_urgente_en) return '<span class="badge" style="background:#FFE8CC;color:#B3541E">🚀 Urgente</span>';
+      return '<span class="badge badge-gray">🛍️ Acumulando</span>';
+    }
     document.getElementById('pedidos-tbody').innerHTML=list.length?list.map(p=>`
       <tr>
         <td>
@@ -2823,6 +2830,7 @@ async function loadPedidos(f='todos'){
         <td>S/ ${p.total}</td>
         <td>${falta(p)>0?`<span style="color:var(--red)">S/${p.monto_pagado} (-S/${falta(p)})</span>`:`<span style="color:var(--green)">S/${p.monto_pagado} ✓</span>`}</td>
         <td><span class="badge ${ESTADOS_BADGE[p.estado]}">${ESTADOS_LABEL[p.estado]}</span></td>
+        <td>${registroBadge(p.clientes)}</td>
         <td>${p.courier_codigo?`<span style="font-size:11px;font-family:monospace">${p.courier_codigo}</span>`:'—'}</td>
         <td style="display:flex;gap:4px;align-items:center">
           <button class="btn btn-xs" onclick="openPedidoModal('${p.id}')">Ver</button>
@@ -2832,7 +2840,7 @@ async function loadPedidos(f='todos'){
               ? `<button class="btn btn-xs btn-success" onclick="avanzarEstadoDirecto('${p.id}','${p.estado}')">${ESTADOS_ACTION[p.estado]}</button>`
               : ''}
         </td>
-      </tr>`).join(''):'<tr><td colspan="6" class="loading">Sin pedidos</td></tr>';
+      </tr>`).join(''):'<tr><td colspan="7" class="loading">Sin pedidos</td></tr>';
   } catch(e){ console.error('loadPedidos error:',e); }
 }
 
