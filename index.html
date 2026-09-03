@@ -3040,7 +3040,10 @@ async function registrarHistorialCliente(clienteId, tipoEvento, datos){
       referencia: datos.referencia||null,
       dni: datos.dni||null
     });
-  } catch(e){ console.warn('No se pudo guardar historial:', e.message); }
+  } catch(e){
+    console.warn('No se pudo guardar historial:', e.message);
+    if(typeof toast==='function') toast('⚠️ No se guardó el historial: '+e.message);
+  }
 }
 
 async function verHistorialCliente(id, nombre){
