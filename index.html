@@ -2394,7 +2394,7 @@ function updateColorTalla(){
 }
 
 async function liveSearch(val){
-  const clean=val.replace(/\s/g,'');
+  const clean=val.replace(/\D/g,'');
   const res=document.getElementById('live-search-results');
   if(clean.length<4){ res.innerHTML=''; hideClientCard(); return; }
   try {
@@ -2452,11 +2452,25 @@ function hideClientCard(){
 }
 
 async function registrarNuevaEnLive(tel){
+  tel = tel.replace(/\D/g,''); // normalizar igual que en todo el resto del sistema
   try {
+    // Doble chequeo justo antes de crear — por si otra pantalla (ej. la clienta registrándose sola) la creó en este instante
+    const existe = await dbGet(`clientes?telefono=eq.${tel}&limit=1`);
+    if(existe && existe.length){
+      await selectLiveClient(existe[0].id);
+      return;
+    }
     const rows = await dbPost('clientes', {telefono:tel, nombre:'Nueva clienta', pedidos_count:0, total_gastado:0});
     const nueva = Array.isArray(rows)?rows[0]:rows;
     await selectLiveClient(nueva.id);
-  } catch(e){ alert('Error registrando: '+e.message); }
+  } catch(e){
+    // Si falló por duplicado (choque justo en el mismo instante), buscar la que ya se creó y usarla igual
+    try {
+      const existe = await dbGet(`clientes?telefono=eq.${tel}&limit=1`);
+      if(existe && existe.length){ await selectLiveClient(existe[0].id); return; }
+    } catch(e2){}
+    alert('Error registrando: '+e.message);
+  }
 }
 
 async function addToCart(){
@@ -4654,8 +4668,16 @@ async function rgGuardar(){
       rgClienteActual = {...existe[0], ...patch};
       await registrarHistorialCliente(rgClienteActual.id, 'actualizacion', patch);
     } else {
-      const creado = await dbPost('clientes', {telefono:tel, ...patch, pedidos_count:0, total_gastado:0});
-      rgClienteActual = Array.isArray(creado) ? creado[0] : creado;
+      try {
+        const creado = await dbPost('clientes', {telefono:tel, ...patch, pedidos_count:0, total_gastado:0});
+        rgClienteActual = Array.isArray(creado) ? creado[0] : creado;
+      } catch(dupErr){
+        // Choque: alguien más (ej. tu operadora) la creó en este mismo instante — usar ese registro en vez de fallar
+        const existeAhora = await dbGet(`clientes?telefono=eq.${tel}`);
+        if(!existeAhora || !existeAhora.length) throw dupErr;
+        await dbPatch(`clientes?telefono=eq.${tel}`, patch);
+        rgClienteActual = {...existeAhora[0], ...patch};
+      }
       await registrarHistorialCliente(rgClienteActual.id, 'registro', patch);
     }
   } catch(e) {
