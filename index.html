@@ -1061,6 +1061,7 @@ textarea{resize:vertical;min-height:72px}
             <div class="tab" onclick="filterPedidos('por_pagar',this)">Por pagar</div>
             <div class="tab" onclick="filterPedidos('pago_completo',this)">Empaquetar</div>
             <div class="tab" onclick="filterPedidos('en_camino',this)">En camino</div>
+            <div class="tab" onclick="filterPedidos('entregado',this)">Entregados</div>
           </div>
         </div>
         <div style="padding:0 0 12px 0">
@@ -1423,6 +1424,18 @@ textarea{resize:vertical;min-height:72px}
     <div id="hc-lista" style="max-height:420px;overflow-y:auto"></div>
     <div class="modal-footer" style="justify-content:center">
       <button class="btn btn-sm" onclick="closeModal('modal-historial-cliente')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: historial de estados de un pedido -->
+<div class="modal-overlay" id="modal-historial-pedido">
+  <div class="modal">
+    <div class="modal-title" id="hp-title">Historial del pedido</div>
+    <div class="text-muted text-sm mb-12">Cada cambio de estado, con fecha, hora y quién lo hizo</div>
+    <div id="hp-lista" style="max-height:420px;overflow-y:auto"></div>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-sm" onclick="closeModal('modal-historial-pedido')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -2812,6 +2825,7 @@ async function loadPedidos(f='todos'){
     if(f==='por_pagar') list=pedidos.filter(p=>['pago_pendiente','pago_parcial'].includes(p.estado));
     if(f==='pago_completo') list=pedidos.filter(p=>p.estado==='pago_completo');
     if(f==='en_camino') list=pedidos.filter(p=>p.estado==='en_camino');
+    if(f==='entregado') list=pedidos.filter(p=>p.estado==='entregado');
     const falta=p=>p.total-p.monto_pagado;
     function registroBadge(cl){
       if(!cl) return '<span class="badge badge-warn">⚠️ Sin datos</span>';
@@ -2901,7 +2915,11 @@ async function openPedidoModal(id){
       ${p.estado==='pago_completo'?`
         <div style="background:var(--green-light);border-radius:var(--radius-sm);padding:10px 14px;margin-top:8px;font-size:12px;color:var(--green)">
           ✓ Pago completo — listo para empaquetar
-        </div>`:''}`;
+        </div>`:''}
+      <div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="btn btn-sm" onclick="verHistorialPedido('${p.id}','${p.numero}')">📜 Historial</button>
+        ${currentUser?.rol==='admin' && ESTADOS_ANTERIOR[p.estado] ? `<button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="retrocederEstado('${p.id}','${p.estado}')">⏪ Retroceder estado</button>` : ''}
+      </div>`;
     document.getElementById('modal-pedido').classList.add('open');
   } catch(e){ toast('Error cargando pedido: '+e.message); }
 }
@@ -2982,6 +3000,7 @@ async function avanzarEstadoDirecto(id, estadoActual){
       msg='✓ Marcado como empaquetado';
     }
     await dbPatch(`pedidos?id=eq.${id}`,patch);
+    await registrarHistorialPedido(id, estadoActual, next, 'Avance normal');
     // Si se acaba de despachar de verdad, ya no es urgente — se cumplió el reparto
     if(estadoActual==='empaquetado' && next==='en_camino'){
       try {
@@ -2995,7 +3014,70 @@ async function avanzarEstadoDirecto(id, estadoActual){
   } catch(e){ toast('Error actualizando estado: '+e.message); }
 }
 
-// ═══════════════════════════ CLIENTES ═══════════════════════════
+async function registrarHistorialPedido(pedidoId, estadoAnterior, estadoNuevo, nota){
+  try {
+    await dbPost('pedidos_historial', {
+      pedido_id: pedidoId,
+      estado_anterior: estadoAnterior,
+      estado_nuevo: estadoNuevo,
+      usuario: currentUser?.nombre || currentUser?.key || 'admin',
+      nota: nota||null
+    });
+  } catch(e){ console.warn('No se pudo guardar historial de pedido:', e.message); }
+}
+
+const ESTADOS_ANTERIOR = { pago_completo:'pago_parcial', empaquetado:'pago_completo', en_camino:'empaquetado', entregado:'en_camino' };
+
+async function retrocederEstado(id, estadoActual){
+  if(currentUser?.rol!=='admin'){ toast('Solo el administrador puede retroceder estados'); return; }
+  const pedData = await dbGet(`pedidos?id=eq.${id}&select=*`);
+  const ped = pedData[0];
+  if(!ped){ toast('Pedido no encontrado'); return; }
+
+  let anterior = ESTADOS_ANTERIOR[estadoActual];
+  if(estadoActual==='pago_completo') anterior = (ped.monto_pagado||0)>0 ? 'pago_parcial' : 'pago_pendiente';
+  if(!anterior){ toast('No se puede retroceder desde este estado'); return; }
+
+  let mensaje = `¿Retroceder el pedido ${ped.numero} de "${ESTADOS_LABEL[estadoActual]}" a "${ESTADOS_LABEL[anterior]}"?`;
+  if(estadoActual==='en_camino') mensaje += '\n\n⚠️ Esto también borra el código de courier asignado.';
+  if(!confirm(mensaje)) return;
+
+  const patch = {estado: anterior};
+  if(estadoActual==='en_camino') patch.courier_codigo = null;
+
+  try {
+    await dbPatch(`pedidos?id=eq.${id}`, patch);
+    await registrarHistorialPedido(id, estadoActual, anterior, 'Retrocedido manualmente');
+    toast('✓ Pedido regresado a '+ESTADOS_LABEL[anterior]);
+    closeModal('modal-pedido');
+    await loadPedidos(pedidoFiltro);
+    await loadDashboard();
+  } catch(e){ toast('Error retrocediendo: '+e.message); }
+}
+
+async function verHistorialPedido(id, numero){
+  document.getElementById('hp-title').textContent = 'Historial — '+(numero||'');
+  document.getElementById('hp-lista').innerHTML = '<div class="loading">Cargando...</div>';
+  document.getElementById('modal-historial-pedido').classList.add('open');
+  try {
+    const eventos = await dbGet(`pedidos_historial?pedido_id=eq.${id}&order=creado_en.desc`);
+    if(!eventos.length){
+      document.getElementById('hp-lista').innerHTML = '<div style="font-size:12.5px;color:var(--text3);padding:12px 0">Sin historial de cambios de estado todavía.</div>';
+      return;
+    }
+    document.getElementById('hp-lista').innerHTML = eventos.map(ev=>{
+      const fecha = new Date(ev.creado_en);
+      const fechaStr = fecha.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' · ' + fecha.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+      const retro = ev.nota==='Retrocedido manualmente';
+      return `<div style="border-left:2px solid var(--border);padding:2px 0 14px 14px;margin-left:4px;position:relative">
+        <div style="position:absolute;left:-5px;top:4px;width:8px;height:8px;border-radius:50%;background:${retro?'var(--red)':'var(--pink)'}"></div>
+        <div style="font-size:11px;color:var(--text3);font-weight:600">${fechaStr} · ${ev.usuario||'—'}</div>
+        <div style="font-size:13px;font-weight:500;margin-top:2px">${retro?'⏪ ':''}${ESTADOS_LABEL[ev.estado_anterior]||ev.estado_anterior||'—'} → ${ESTADOS_LABEL[ev.estado_nuevo]||ev.estado_nuevo}</div>
+      </div>`;
+    }).join('');
+  } catch(e){ document.getElementById('hp-lista').innerHTML = '<div style="color:var(--red);font-size:12.5px">Error cargando historial: '+e.message+'</div>'; }
+}
+
 async function loadClientes(filter=''){
   try {
     const q = filter
@@ -4968,6 +5050,7 @@ async function confirmarPagoCorte(){
           estado: estadoPedido,
           ...pedPatchExtra
         });
+        if(estadoPedido!==estadoActual) await registrarHistorialPedido(ped.id, estadoActual, estadoPedido, 'Pago validado en Cortes de pago');
         // 5. Registrar en tabla pagos
         await dbPost('pagos',{
           pedido_id: ped.id,
