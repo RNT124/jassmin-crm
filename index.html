@@ -4676,14 +4676,31 @@ async function rgSolicitarUrgente(){
     await registrarHistorialCliente(rgClienteActual.id, 'solicitud_urgente', rgClienteActual);
     const wrapId = document.getElementById('rg-existente-wrap').style.display==='block' ? 'rg-ex-urgente-wrap' : 'rg-confirm-urgente-wrap';
     document.getElementById(wrapId).innerHTML = `<div style="background:#EAF3DE;color:#27500A;border-radius:10px;padding:12px;text-align:center;font-size:13px;font-weight:600">✓ ¡Listo! Ya avisamos a nuestro equipo</div>`;
+    rgAbrirWhatsApp('urgente');
   } catch(e){
     toast('Error: '+e.message);
   }
 }
 
+function rgAbrirWhatsApp(tipo){
+  if(!rgClienteActual) return;
+  const c = rgClienteActual;
+  const esShalom = (c.tipo_envio_preferido||'').startsWith('shalom');
+  const envioTxt = esShalom
+    ? `Shalom — ${c.direccion||'(sin agencia)'} · ${c.distrito||''}`
+    : `Motorizado — ${c.direccion||'(sin dirección)'} · ${c.distrito||''}`;
+  const accionTxt = tipo==='urgente'
+    ? 'Acabo de solicitar que mi pedido salga LO ANTES POSIBLE 🚀'
+    : 'Prefiero seguir ACUMULANDO prendas por ahora 🛍️';
+  const msg = `Hola! Soy ${c.nombre||''} (WA: ${c.telefono||''}).\n${accionTxt}\n\nMis datos de envío:\n${envioTxt}`;
+  const url = `https://wa.me/51961724293?text=${encodeURIComponent(msg)}`;
+  setTimeout(()=>{ window.location.href = url; }, 900);
+}
+
 function rgConfirmarAcumular(prefijo){
   if(rgClienteActual) registrarHistorialCliente(rgClienteActual.id, 'acumular', rgClienteActual);
   document.getElementById(prefijo+'-urgente-wrap').innerHTML = `<div style="background:#F1EFE8;color:#5F5E5A;border-radius:10px;padding:12px;text-align:center;font-size:13px;font-weight:600">🛍️ Perfecto, seguimos acumulando tus prendas</div>`;
+  rgAbrirWhatsApp('acumular');
 }
 
 function rgMostrarFormNuevo(tel){
