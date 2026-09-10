@@ -1049,6 +1049,9 @@ textarea{resize:vertical;min-height:72px}
           <div class="tab" onclick="filterCortes('semana',this)">Esta semana</div>
           <div class="tab" onclick="filterCortes('todos',this)">Todos</div>
         </div>
+        <div style="margin-bottom:12px">
+          <input id="cortes-search" type="text" placeholder="🔍 Buscar por teléfono..." style="width:100%;max-width:280px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarCortes(this.value)">
+        </div>
         <div id="cortes-lista"><div class="loading">Cargando...</div></div>
       </div>
 
@@ -4852,7 +4855,16 @@ function filterCortes(f,el){
   corteFiltro=f;
   document.querySelectorAll('#pg-cortes .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
+  const search=document.getElementById('cortes-search');
+  if(search) search.value='';
   loadCortes(f);
+}
+
+function filtrarCortes(q){
+  q=(q||'').toLowerCase().trim();
+  document.querySelectorAll('#cortes-lista tr[data-tel]').forEach(row=>{
+    row.style.display=(!q||row.dataset.tel.includes(q))?'':'none';
+  });
 }
 
 async function loadCortes(f){
@@ -4913,7 +4925,7 @@ async function loadCortes(f){
             const estado=it.estado_pago||'pendiente';
             const badgeCls=estado==='confirmado'?'badge-ok':estado==='parcial'?'badge-warn':'badge-danger';
             const badgeLbl=estado==='confirmado'?'✓ Pagado':estado==='parcial'?'Parcial':'Pendiente';
-            return `<tr>
+            return `<tr data-tel="${(cl?.telefono||'').toLowerCase()}">
               <td><div class="font-500">${fechaStr}</div><div class="text-hint" style="font-size:11px">${horaStr}</div></td>
               <td><div class="font-500">${cl?.nombre||'—'}</div><div class="text-hint" style="font-size:11px">${cl?.telefono||''}</div></td>
               <td>${it.prendas?.nombre||'—'}</td>
