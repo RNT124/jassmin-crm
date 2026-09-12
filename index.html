@@ -866,7 +866,7 @@ textarea{resize:vertical;min-height:72px}
           </div>
           <div class="tbl-wrap">
             <table class="tbl">
-              <thead><tr><th>#</th><th>Prenda</th><th>Stock</th><th>Vendido (7d)</th><th>Rotación</th></tr></thead>
+              <thead><tr><th>#</th><th>Prenda</th><th>Stock</th><th>Vendido (semana)</th><th>Rotación</th></tr></thead>
               <tbody id="fin-rotacion-tabla"><tr><td colspan="5" class="loading">Cargando...</td></tr></tbody>
             </table>
           </div>
@@ -1577,6 +1577,16 @@ const dbPost  = (p,b) => supaFetch(p, 'POST', JSON.stringify(b), 'return=represe
 const dbPatch = (p,b) => supaFetch(p, 'PATCH', JSON.stringify(b), 'return=representation');
 const dbDelete = p => supaFetch(p, 'DELETE');
 
+// Lunes 00:00 de la semana que contiene `fecha` (o de hoy si no se pasa nada)
+function inicioSemanaLunes(fecha){
+  const d = new Date(fecha||new Date());
+  const dia = d.getDay(); // 0=domingo,1=lunes,...6=sábado
+  const diff = dia===0 ? 6 : dia-1;
+  d.setDate(d.getDate()-diff);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
 // ══════════════ LOCAL FALLBACK DATA ══════════════
 const USERS = {
   admin: { pass:'jassmin2025', nombre:'Renato', rol:'Admin', initials:'R' },
@@ -1718,7 +1728,7 @@ async function loadDashboard(){
     const ayer = new Date(hoy); ayer.setDate(ayer.getDate()-1);
     const ayerStr = ayer.toISOString().slice(0,10);
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString();
-    const inicioSemana = new Date(hoy); inicioSemana.setDate(inicioSemana.getDate()-6); inicioSemana.setHours(0,0,0,0);
+    const inicioSemana = inicioSemanaLunes(hoy);
     const periodo = window.dashboardPeriodo || 'dia';
 
     const [pedidos, clientes, variantes, urgentes] = await Promise.all([
@@ -1867,7 +1877,7 @@ function setDashboardTab(tab){
 async function loadDashboardFinanzas(){
   try {
     const hoy = new Date();
-    const hace7dias = new Date(hoy); hace7dias.setDate(hace7dias.getDate()-7);
+    const hace7dias = inicioSemanaLunes(hoy);
 
     const [prendas, itemsSemana] = await Promise.all([
       dbGet('prendas?select=id,nombre,stock,costo,precio&activo=eq.true'),
@@ -1928,7 +1938,7 @@ async function loadDashboardFinanzas(){
     const STOCK_ALTO = 3;
     const lenta = conVentas.filter(p=>(p.stock||0)>=STOCK_ALTO && p.unidades<=1).sort((a,b)=>(b.stock*(b.costo||0))-(a.stock*(a.costo||0))).slice(0,8);
     document.getElementById('fin-rotacion-lenta').innerHTML = lenta.length ? `
-      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Prenda</th><th>Stock</th><th>Vendido (7d)</th><th>Plata parada</th></tr></thead><tbody>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Prenda</th><th>Stock</th><th>Vendido (semana)</th><th>Plata parada</th></tr></thead><tbody>
       ${lenta.map(p=>`<tr><td>${p.nombre}</td><td style="color:var(--red);font-weight:600">${p.stock}</td><td>${p.unidades}</td><td>S/ ${(p.stock*(p.costo||0)).toFixed(0)}</td></tr>`).join('')}
       </tbody></table></div>` : '<div class="card card-sm" style="font-size:12px;color:var(--text3)">Sin candidatos de rotación lenta por ahora ✓</div>';
 
@@ -2010,7 +2020,7 @@ function filterCompras(f, el){
 
 function rangoFechaCompras(f){
   const hoy = new Date();
-  if(f==='semana'){ const d=new Date(hoy); d.setDate(d.getDate()-7); return d.toISOString().slice(0,10); }
+  if(f==='semana'){ return inicioSemanaLunes(hoy).toISOString().slice(0,10); }
   if(f==='mes'){ return new Date(hoy.getFullYear(),hoy.getMonth(),1).toISOString().slice(0,10); }
   return null; // todos
 }
@@ -4874,7 +4884,7 @@ async function loadCortes(f){
     const ahora=new Date();
     let desde;
     if(f==='hoy'){ desde=new Date(ahora); desde.setHours(0,0,0,0); }
-    else if(f==='semana'){ desde=new Date(ahora); desde.setDate(ahora.getDate()-7); }
+    else if(f==='semana'){ desde=inicioSemanaLunes(ahora); }
     else if(f==='todos'){ desde=null; }
     else { desde=new Date(ahora.getFullYear(),ahora.getMonth(),1); }
 
