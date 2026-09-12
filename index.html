@@ -134,8 +134,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* FORMS */
 .form-row{margin-bottom:12px}
 .form-label{font-size:11px;font-weight:500;color:var(--text2);margin-bottom:4px;display:block}
-input,select,textarea{width:100%;padding:8px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);font-size:13px;color:var(--text);background:var(--surface);outline:none;transition:border .15s;font-family:inherit}
-input:focus,select:focus,textarea:focus{border-color:var(--pink)}
+.form-label .req{color:var(--danger);margin-left:2px}
+.form-hint{font-size:10.5px;color:var(--text-tertiary);margin-top:3px}
+.form-section{font-size:10px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;padding-top:12px;border-top:0.5px solid var(--border)}
+.form-section:first-child{margin-top:0;padding-top:0;border-top:none}
+input,select,textarea{width:100%;padding:8px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);font-size:13px;color:var(--text);background:var(--surface);outline:none;transition:border .15s,box-shadow .15s;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+input.input-error,select.input-error{border-color:var(--danger);background:var(--danger-light)}
+.field-error{font-size:11px;color:var(--danger);margin-top:3px;display:none}
+.field-error.show{display:block}
 textarea{resize:vertical;min-height:72px}
 
 /* BUTTONS */
@@ -1424,28 +1431,34 @@ textarea{resize:vertical;min-height:72px}
 <!-- Modal: nueva clienta -->
 <div class="modal-overlay" id="modal-cliente">
   <div class="modal">
-    <div class="modal-title">Nueva clienta</div>
+    <div class="modal-title" id="nc-modal-title">Nueva clienta</div>
+
+    <div class="form-section">Datos personales</div>
     <div class="grid-2">
-      <div class="form-row"><label class="form-label">Nombre</label><input type="text" id="nc-nombre" placeholder="Nombre completo"></div>
-      <div class="form-row"><label class="form-label">WhatsApp</label><input type="text" id="nc-tel" placeholder="987654321"></div>
+      <div class="form-row"><label class="form-label">Nombre<span class="req">*</span></label><input type="text" id="nc-nombre" placeholder="Nombre completo" oninput="this.classList.remove('input-error');document.getElementById('err-nc-nombre').classList.remove('show')"><div class="field-error" id="err-nc-nombre">Ingresa el nombre completo</div></div>
+      <div class="form-row"><label class="form-label">WhatsApp<span class="req">*</span></label><input type="text" id="nc-tel" placeholder="987654321" oninput="this.classList.remove('input-error');document.getElementById('err-nc-tel').classList.remove('show')"><div class="field-error" id="err-nc-tel">Ingresa un número válido (9 dígitos)</div></div>
     </div>
     <div class="grid-2">
       <div class="form-row"><label class="form-label">Talla habitual</label><select id="nc-talla"><option value="">—</option><option>S</option><option>M</option><option>L</option><option>XL</option></select></div>
       <div class="form-row"><label class="form-label">DNI</label><input type="text" id="nc-dni" placeholder="12345678" maxlength="8"></div>
     </div>
+
+    <div class="form-section">Datos de envío</div>
     <div class="form-row"><label class="form-label">Tipo de envío</label>
       <select id="nc-tipo-envio" onchange="ncToggleTipoEnvio()">
         <option value="">— sin definir —</option>
         <option value="motorizado">🏍️ Motorizado</option>
         <option value="shalom">📦 Shalom</option>
       </select>
+      <div class="form-hint">Define si abajo pide distrito+dirección, o departamento+agencia Shalom</div>
     </div>
     <div class="form-row"><label class="form-label" id="nc-distrito-label">Distrito / Provincia</label><input type="text" id="nc-distrito" placeholder="ej. San Isidro"></div>
     <div class="form-row"><label class="form-label" id="nc-direccion-label">Dirección / Agencia</label><input type="text" id="nc-direccion" placeholder="Calle, número, dpto. o agencia Shalom"></div>
     <div class="form-row" id="nc-referencia-wrap"><label class="form-label">Referencia</label><input type="text" id="nc-referencia" placeholder="ej. frente al parque..."></div>
+
     <div class="modal-footer">
       <button class="btn btn-sm" onclick="closeModal('modal-cliente')">Cancelar</button>
-      <button class="btn btn-primary btn-sm" onclick="guardarCliente()">Guardar</button>
+      <button class="btn btn-primary btn-sm" id="nc-btn-guardar" onclick="guardarCliente()">Guardar</button>
     </div>
   </div>
 </div>
@@ -3260,10 +3273,18 @@ async function verHistorialCliente(id, nombre){
   } catch(e){ document.getElementById('hc-lista').innerHTML = '<div style="color:var(--red);font-size:12.5px">Error cargando historial: '+e.message+'</div>'; }
 }
 
+function ncLimpiarErrores(){
+  ['nc-nombre','nc-tel'].forEach(id=>{
+    document.getElementById(id).classList.remove('input-error');
+    document.getElementById('err-'+id).classList.remove('show');
+  });
+}
+
 function editCliente(id){
   const c=DB.clientes.find(x=>x.id===id);
   if(!c) return;
   editingClienteId=id;
+  ncLimpiarErrores();
   document.getElementById('nc-nombre').value=c.nombre||'';
   document.getElementById('nc-tel').value=c.telefono||'';
   document.getElementById('nc-talla').value=c.talla||'';
@@ -3273,12 +3294,13 @@ function editCliente(id){
   document.getElementById('nc-direccion').value=c.direccion||'';
   document.getElementById('nc-referencia').value=c.referencia||'';
   ncToggleTipoEnvio();
-  document.querySelector('#modal-cliente .modal-title').textContent='Editar clienta';
+  document.getElementById('nc-modal-title').textContent='Editar clienta';
   document.querySelector('#modal-cliente .btn-primary').onclick=guardarCliente;
   document.getElementById('modal-cliente').classList.add('open');
 }
 function openModalNuevaCliente(){
   editingClienteId=null;
+  ncLimpiarErrores();
   document.getElementById('nc-nombre').value='';
   document.getElementById('nc-tel').value='';
   document.getElementById('nc-talla').value='';
@@ -3288,7 +3310,7 @@ function openModalNuevaCliente(){
   document.getElementById('nc-direccion').value='';
   document.getElementById('nc-referencia').value='';
   ncToggleTipoEnvio();
-  document.querySelector('#modal-cliente .modal-title').textContent='Nueva clienta';
+  document.getElementById('nc-modal-title').textContent='Nueva clienta';
   document.querySelector('#modal-cliente .btn-primary').onclick=guardarCliente;
   document.getElementById('modal-cliente').classList.add('open');
 }
@@ -3303,8 +3325,22 @@ async function guardarCliente(){
     direccion:document.getElementById('nc-direccion').value.trim(),
     referencia:document.getElementById('nc-referencia').value.trim()
   };
-  if(!data.telefono){ toast('El teléfono es obligatorio'); return; }
-  if(!data.nombre){ toast('El nombre es obligatorio'); return; }
+  ncLimpiarErrores();
+  let valido = true;
+  if(!data.nombre){
+    document.getElementById('nc-nombre').classList.add('input-error');
+    document.getElementById('err-nc-nombre').classList.add('show');
+    valido = false;
+  }
+  if(!data.telefono || data.telefono.replace(/\D/g,'').length<9){
+    document.getElementById('nc-tel').classList.add('input-error');
+    document.getElementById('err-nc-tel').classList.add('show');
+    valido = false;
+  }
+  if(!valido) return;
+  const btn = document.getElementById('nc-btn-guardar');
+  const txtOriginal = btn.textContent;
+  btn.textContent = 'Guardando...'; btn.disabled = true;
   try {
     if(editingClienteId){
       await dbPatch(`clientes?id=eq.${editingClienteId}`,data);
@@ -3320,6 +3356,7 @@ async function guardarCliente(){
     await loadClientes();
     await loadCatalogoLive(); // actualizar búsqueda en live
   } catch(e){ toast('Error guardando: '+e.message); }
+  finally { btn.textContent = txtOriginal; btn.disabled = false; }
 }
 
 // ═══════════════════════════ CATÁLOGO ═══════════════════════════
