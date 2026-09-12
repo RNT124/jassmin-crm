@@ -1447,7 +1447,7 @@ td.empty-state{padding:20px;text-align:center}
     <div class="modal-title" id="mpc-title">Registrar pago</div>
     <div id="mpc-info" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;font-size:12px"></div>
     <div class="form-row"><label class="form-label">Total de esta prenda (S/) <span class="text-hint">— edítalo si hubo descuento en el live</span></label><input type="number" id="mpc-total" placeholder="0.00" step="0.01" oninput="mpcRecalcularFalta()"></div>
-    <div class="form-row"><label class="form-label">Monto recibido (S/)</label><input type="number" id="mpc-monto" placeholder="0.00" step="0.01"></div>
+    <div class="form-row"><label class="form-label" id="mpc-monto-label">Monto recibido (S/)</label><input type="number" id="mpc-monto" placeholder="0.00" step="0.01"></div>
     <div class="form-row"><label class="form-label">Método</label>
       <select id="mpc-metodo"><option>Yape</option><option>Plin</option><option>Transferencia</option></select>
     </div>
@@ -5173,7 +5173,7 @@ async function loadCortes(f){
               <td>${it.color||'—'}</td>
               <td class="font-500">S/ ${it.precio_unitario||0}</td>
               <td><span class="badge ${badgeCls}">${badgeLbl}</span>${it.monto_pagado&&estado==='parcial'?`<div style="font-size:10px;color:var(--text3)">Abonó S/${it.monto_pagado}</div>`:''}</td>
-              <td>${estado!=='confirmado'?`<button class="btn btn-xs btn-primary" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0})">Validar</button>`:'<span style="color:var(--green);font-size:12px">✓</span>'}</td>
+              <td>${estado!=='confirmado'?`<button class="btn btn-xs btn-primary" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0})">Validar</button>`:`<span style="color:var(--green);font-size:12px;margin-right:6px">✓</span><button class="btn btn-xs" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0},true)">Editar</button>`}</td>
             </tr>`;
           }).join('')}</tbody>
         </table>
@@ -5228,7 +5228,7 @@ async function crearCorte(){
               <td>${it.prendas?.nombre||'—'} ${it.talla?'T-'+it.talla:''} ${it.color?'· '+it.color:''}</td>
               <td class="font-500">S/ ${it.precio_unitario||0}</td>
               <td><span class="badge ${badgeCls}">${badgeLbl}</span></td>
-              <td>${estado!=='confirmado'?`<button class="btn btn-xs btn-primary" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0})">Validar</button>`:'—'}</td>
+              <td>${estado!=='confirmado'?`<button class="btn btn-xs btn-primary" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0})">Validar</button>`:`<button class="btn btn-xs" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0},true)">✓ Editar</button>`}</td>
             </tr>`;
           }).join('')}</tbody>
         </table>
@@ -5237,13 +5237,14 @@ async function crearCorte(){
   } catch(e){ toast('Error: '+e.message); }
 }
 
-function openPagoCorte(itemId,nombre,monto,estadoActual,pagadoActual){
-  currentCorteItem={itemId,monto,estadoActual,pagadoActual};
+function openPagoCorte(itemId,nombre,monto,estadoActual,pagadoActual,esEdicion){
+  currentCorteItem={itemId,monto,estadoActual,pagadoActual,esEdicion:!!esEdicion};
   const falta=monto-(pagadoActual||0);
-  document.getElementById('mpc-title').textContent=`Validar pago — ${nombre}`;
+  document.getElementById('mpc-title').textContent=`${esEdicion?'Editar':'Validar'} pago — ${nombre}`;
+  document.getElementById('mpc-monto-label').textContent = esEdicion ? 'Monto total pagado (S/) — corrige el valor real' : 'Monto recibido (S/)';
   mpcUpdateInfo(monto,pagadoActual);
   document.getElementById('mpc-total').value=monto;
-  document.getElementById('mpc-monto').value=falta;
+  document.getElementById('mpc-monto').value=esEdicion?(pagadoActual||0):falta;
   document.getElementById('mpc-nota').value='';
   document.getElementById('modal-pago-corte').classList.add('open');
 }
@@ -5271,9 +5272,9 @@ async function confirmarPagoCorte(){
   const nota=document.getElementById('mpc-nota').value;
   if(!monto||monto<=0){ toast('Ingresa el monto recibido'); return; }
   if(!totalEditado||totalEditado<=0){ toast('El total de la prenda no puede ser 0'); return; }
-  const {itemId,monto:totalOriginal,pagadoActual}=currentCorteItem;
+  const {itemId,monto:totalOriginal,pagadoActual,esEdicion}=currentCorteItem;
   const descuento = totalOriginal - totalEditado; // >0 si hubo descuento, <0 si se subió el precio (raro, pero lo soportamos)
-  const nuevoPagado=(pagadoActual||0)+monto;
+  const nuevoPagado = esEdicion ? monto : (pagadoActual||0)+monto;
   const nuevoEstado=nuevoPagado>=totalEditado?'confirmado':'parcial';
   try {
     // 1. Actualizar el item del carrito — incluyendo el precio si hubo descuento
