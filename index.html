@@ -77,8 +77,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .sb-logout:hover{color:var(--red)}
 
 /* TOPBAR */
-.tb-title{font-size:14px;font-weight:600;color:var(--text-primary)}
-.tb-subtitle{font-size:11.5px;color:var(--text-tertiary);margin-top:1px}
+.tb-title{font-size:14px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-subtitle{font-size:11.5px;color:var(--text-tertiary);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tb-badge{font-size:10px;padding:2px 8px;border-radius:20px}
 
 /* CARDS */
@@ -270,6 +270,10 @@ td.empty-state{padding:20px;text-align:center}
 
   /* En celular, el sec-header con botones se apila para no desbordar */
   .sec-header{flex-wrap:wrap;gap:8px}
+
+  /* Tarjetas de Solicitudes urgentes (con checkbox de selección múltiple) y su barra de acción masiva */
+  #urgentes-lista .card{flex-wrap:wrap}
+  #urgentes-bulk-bar{flex-wrap:wrap}
 }
 
 @media (max-width: 480px){
