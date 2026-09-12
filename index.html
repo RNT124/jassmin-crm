@@ -1211,10 +1211,14 @@ td.empty-state{padding:20px;text-align:center}
         <div class="sec-header">
           <div class="sec-title">Despacho del día</div>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-sm" onclick="exportarCSVMotorizado()">📊 Exportar CSV Motorizado</button>
-            <button class="btn btn-sm" onclick="imprimirEtiquetasShalom()">🏷️ Imprimir etiquetas Shalom</button>
             <button class="btn btn-sm" onclick="loadDespacho()">↻ Actualizar</button>
           </div>
+        </div>
+        <div class="tabs" style="margin-bottom:14px">
+          <div class="tab active" onclick="filterDespacho('todos',this)">Todos</div>
+          <div class="tab" onclick="filterDespacho('shalom',this)">Shalom</div>
+          <div class="tab" onclick="filterDespacho('motorizado',this)">Motorizado</div>
+          <div class="tab" onclick="filterDespacho('urgentes',this)">🚀 Urgentes</div>
         </div>
 
         <!-- Sección: Listos para empaquetar -->
@@ -1233,6 +1237,13 @@ td.empty-state{padding:20px;text-align:center}
           <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px">
             🚚 Empaquetados — entregar al courier
             <span id="badge-courier-cnt" class="badge badge-info" style="font-size:10px">0</span>
+          </div>
+          <div id="despacho-bulk-bar" style="display:none;position:sticky;top:0;z-index:5;background:var(--primary);color:#fff;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <span id="despacho-bulk-count" style="font-size:12.5px;font-weight:500"></span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkExportarCSV()">📊 Exportar CSV</button>
+              <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkImprimirEtiquetas()">🏷️ Imprimir etiquetas</button>
+            </div>
           </div>
           <div id="despacho-courier">
             <div class="loading">Cargando...</div>
@@ -3649,16 +3660,25 @@ function openModalPrenda(id){
 
 // ═══════════════════════════ DESPACHO DEL DÍA ═══════════════════════════
 let despachoActual=[];
+let despachoFiltro = 'todos';
+function filterDespacho(f, el){
+  despachoFiltro = f;
+  document.querySelectorAll('#pg-despacho .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderDespachoListas();
+}
+
 async function loadDespacho(){
   document.getElementById('despacho-empaquetar').innerHTML='<div class="loading">Cargando...</div>';
   document.getElementById('despacho-courier').innerHTML='<div class="loading">Cargando...</div>';
   try {
     // Listos para empaquetar: pago_completo
-    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,carrito_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
+    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
     // Empaquetados listos para courier
-    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,carrito_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido)&order=creado_en.asc');
+    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
 
     despachoActual = [...empaquetar,...courier];
+    despachoActual.forEach(p=>{ p._tipo = empaquetar.includes(p) ? 'empaquetar' : 'courier'; });
 
     // Pre-ventas pendientes por carrito (en un solo query, para no hacer N+1)
     const carritoIds = despachoActual.map(p=>p.carrito_id).filter(Boolean);
@@ -3675,20 +3695,33 @@ async function loadDespacho(){
     if(total>0){ badge.textContent=total; badge.style.display='inline-block'; }
     else { badge.style.display='none'; }
 
-    document.getElementById('badge-empaquetar-cnt').textContent = empaquetar.length;
-    document.getElementById('badge-courier-cnt').textContent = courier.length;
-
-    // Render empaquetar
-    document.getElementById('despacho-empaquetar').innerHTML = empaquetar.length
-      ? empaquetar.map(p=>renderDespachoCard(p,'empaquetar')).join('')
-      : '<div style="color:var(--text3);font-size:13px;padding:12px 0">No hay pedidos listos para empaquetar</div>';
-
-    // Render courier
-    document.getElementById('despacho-courier').innerHTML = courier.length
-      ? courier.map(p=>renderDespachoCard(p,'courier')).join('')
-      : '<div style="color:var(--text3);font-size:13px;padding:12px 0">No hay pedidos empaquetados pendientes de despacho</div>';
-
+    renderDespachoListas();
   } catch(e){ console.error('loadDespacho error:',e); }
+}
+
+function despachoPasaFiltro(p){
+  if(despachoFiltro==='shalom') return esTipoEnvio(p,'shalom');
+  if(despachoFiltro==='motorizado') return esTipoEnvio(p,'motorizado');
+  if(despachoFiltro==='urgentes') return !!p.clientes?.envio_urgente_en;
+  return true;
+}
+
+function renderDespachoListas(){
+  const empaquetar = despachoActual.filter(p=>p._tipo==='empaquetar' && despachoPasaFiltro(p));
+  const courier = despachoActual.filter(p=>p._tipo==='courier' && despachoPasaFiltro(p));
+
+  document.getElementById('badge-empaquetar-cnt').textContent = empaquetar.length;
+  document.getElementById('badge-courier-cnt').textContent = courier.length;
+
+  document.getElementById('despacho-empaquetar').innerHTML = empaquetar.length
+    ? empaquetar.map(p=>renderDespachoCard(p,'empaquetar')).join('')
+    : '<div class="empty-state">No hay pedidos listos para empaquetar en este filtro</div>';
+
+  document.getElementById('despacho-courier').innerHTML = courier.length
+    ? courier.map(p=>renderDespachoCard(p,'courier')).join('')
+    : '<div class="empty-state">No hay pedidos empaquetados pendientes de despacho en este filtro</div>';
+
+  actualizarBulkDespacho();
 }
 
 function esTipoEnvio(p, tipo){
@@ -3696,9 +3729,48 @@ function esTipoEnvio(p, tipo){
   return t===tipo;
 }
 
-function exportarCSVMotorizado(){
-  const lista = despachoActual.filter(p=>esTipoEnvio(p,'motorizado'));
-  if(!lista.length){ toast('No hay pedidos de Motorizado para exportar'); return; }
+function actualizarBulkDespacho(){
+  const checks = document.querySelectorAll('.desp-check:checked');
+  const bar = document.getElementById('despacho-bulk-bar');
+  if(checks.length>0){
+    bar.style.display='flex';
+    document.getElementById('despacho-bulk-count').textContent = checks.length+' pedido'+(checks.length!==1?'s':'')+' seleccionado'+(checks.length!==1?'s':'');
+  } else {
+    bar.style.display='none';
+  }
+}
+
+function despachoSeleccionados(tipoEsperado){
+  const checks = [...document.querySelectorAll('.desp-check:checked')];
+  const ids = checks.map(c=>c.dataset.id);
+  const noCoincide = checks.some(c=>c.dataset.envio!==tipoEsperado);
+  return {ids, noCoincide};
+}
+
+async function marcarDespachadosSiSeConfirma(ids){
+  if(!ids.length) return;
+  if(!confirm(`¿Marcar estos ${ids.length} pedido(s) como despachados (En camino)?`)) return;
+  const codigo = prompt('Código de seguimiento courier (déjalo vacío si no aplica):') || '';
+  toast('⏳ Marcando como despachados...');
+  try {
+    for(const id of ids){
+      await dbPatch(`pedidos?id=eq.${id}`, {estado:'en_camino', courier_codigo:codigo||null});
+      await registrarHistorialPedido(id, 'empaquetado', 'en_camino', 'Despacho masivo desde Despacho del día');
+      try {
+        const pedRow = await dbGet(`pedidos?id=eq.${id}&select=cliente_id`);
+        if(pedRow[0]?.cliente_id) await dbPatch(`clientes?id=eq.${pedRow[0].cliente_id}`,{envio_urgente_en:null});
+      } catch(e){}
+    }
+    toast(`✓ ${ids.length} pedido(s) marcados como despachados`);
+    await loadDespacho();
+  } catch(e){ toast('Error marcando despachados: '+e.message); }
+}
+
+function bulkExportarCSV(){
+  const {ids, noCoincide} = despachoSeleccionados('motorizado');
+  if(!ids.length){ toast('Selecciona al menos un pedido de Motorizado'); return; }
+  if(noCoincide){ toast('⚠️ Solo selecciona pedidos de Motorizado para exportar el CSV'); return; }
+  const lista = despachoActual.filter(p=>ids.includes(p.id));
   const filas = [['Pedido','Cliente','Telefono','Distrito','Direccion','Total','Falta por cobrar']];
   lista.forEach(p=>{
     const c=p.clientes||{};
@@ -3713,11 +3785,14 @@ function exportarCSVMotorizado(){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('✓ CSV descargado — '+lista.length+' pedido(s)');
+  marcarDespachadosSiSeConfirma(ids);
 }
 
-function imprimirEtiquetasShalom(){
-  const lista = despachoActual.filter(p=>esTipoEnvio(p,'shalom'));
-  if(!lista.length){ toast('No hay pedidos de Shalom para imprimir'); return; }
+function bulkImprimirEtiquetas(){
+  const {ids, noCoincide} = despachoSeleccionados('shalom');
+  if(!ids.length){ toast('Selecciona al menos un pedido de Shalom'); return; }
+  if(noCoincide){ toast('⚠️ Solo selecciona pedidos de Shalom para imprimir etiquetas'); return; }
+  const lista = despachoActual.filter(p=>ids.includes(p.id));
   const win = window.open('', '_blank');
   const etiquetas = lista.map(p=>{
     const c=p.clientes||{};
@@ -3738,6 +3813,7 @@ function imprimirEtiquetasShalom(){
     <script>window.onload=()=>window.print()<\/script>
     </body></html>`);
   win.document.close();
+  marcarDespachadosSiSeConfirma(ids);
 }
 
 function renderDespachoCard(p, tipo){
@@ -3749,8 +3825,12 @@ function renderDespachoCard(p, tipo){
   const labelEnvio = esShalom?'🚚 Shalom':esMoto?'🏍 Motorizado':'📦 '+envio;
   const falta = (p.total||0)-(p.monto_pagado||0);
   const preventaBadge = p._preventaPendiente>0 ? '<span class="badge" style="font-size:11px;background:#FFE8CC;color:#B3541E">🕒 '+p._preventaPendiente+' en pre-venta</span>' : '';
+  const urgenteBadge = c.envio_urgente_en ? '<span class="badge" style="font-size:11px;background:var(--primary-light);color:var(--primary-hover)">🚀 Urgente</span>' : '';
+  const checkbox = tipo==='courier' ? '<input type="checkbox" class="desp-check" data-id="'+p.id+'" data-envio="'+(esShalom?'shalom':esMoto?'motorizado':'')+'" onchange="actualizarBulkDespacho()" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;margin-top:2px">' : '';
 
-  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+(p._preventaPendiente>0?'#E8A33D':(tipo==='empaquetar'?'var(--green)':'var(--blue)'))+'">'
+  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+(p._preventaPendiente>0?'#E8A33D':(tipo==='empaquetar'?'var(--green)':'var(--blue)'))+';display:flex;gap:10px">'
+    + checkbox
+    + '<div style="flex:1;min-width:0">'
     + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">'
       + '<div>'
         + '<div style="font-weight:700;font-size:14px">'+p.numero+'</div>'
@@ -3759,6 +3839,7 @@ function renderDespachoCard(p, tipo){
       + '</div>'
       + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'
         + '<span class="badge '+colorEnvio+'" style="font-size:11px">'+labelEnvio+'</span>'
+        + urgenteBadge
         + preventaBadge
         + '<span style="font-size:12px;font-weight:600">S/ '+(p.total||0)+'</span>'
         + (falta>0?'<span style="font-size:11px;color:var(--red)">Falta S/ '+falta+'</span>':'<span style="font-size:11px;color:var(--green)">✓ Pagado</span>')
@@ -3772,6 +3853,7 @@ function renderDespachoCard(p, tipo){
         ? '<button class="btn btn-sm btn-success" onclick="avanzarEstadoDirecto(&quot;'+p.id+'&quot;,&quot;pago_completo&quot;);setTimeout(loadDespacho,800)">✓ Marcar empaquetado</button>'
         : '<button class="btn btn-sm btn-primary" onclick="avanzarEstadoDirecto(&quot;'+p.id+'&quot;,&quot;empaquetado&quot;);setTimeout(loadDespacho,800)">🚚 Registrar despacho</button>')
     + '</div>'
+  + '</div>'
   + '</div>';
 }
 
