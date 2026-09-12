@@ -847,26 +847,31 @@ textarea{resize:vertical;min-height:72px}
               <button class="btn btn-xs" data-p="mes" onclick="setDashboardPeriodo('mes')">Mes</button>
             </div>
           </div>
+
+          <!-- ── Nivel 1: KPIs ── -->
           <div class="metrics-grid" id="db-metrics"></div>
 
+          <!-- ── Nivel 2: Tendencia ── -->
+          <div class="caption-text mb-8" style="margin-top:var(--sp-4)">Tendencia</div>
+          <div class="card card-sm mb-16">
+            <div class="card-title" id="db-ventas-titulo">Ventas de hoy</div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+              <span class="text-muted text-sm">Total</span>
+              <span class="font-600" style="font-size:15px" id="db-semana-total">S/ 0</span>
+            </div>
+            <div class="bars" id="db-bars"></div>
+          </div>
+
+          <!-- ── Nivel 3: Accionable ── -->
+          <div class="caption-text mb-8">Qué necesita tu atención</div>
           <div class="grid-2 mb-16">
             <div>
               <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Alertas</div>
               <div id="db-alertas"><div class="loading">Cargando...</div></div>
             </div>
-
             <div>
               <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Pedidos en curso</div>
               <div class="kanban-grid" id="db-kanban" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:8px"></div>
-
-              <div class="card card-sm mt-8">
-                <div class="card-title" id="db-ventas-titulo">Ventas de hoy</div>
-                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-                  <span class="text-muted text-sm">Total</span>
-                  <span class="font-600" style="font-size:15px" id="db-semana-total">S/ 0</span>
-                </div>
-                <div class="bars" id="db-bars"></div>
-              </div>
             </div>
           </div>
 
@@ -885,6 +890,7 @@ textarea{resize:vertical;min-height:72px}
         <div id="db-tab-finanzas" style="display:none">
           <div class="metrics-grid" id="fin-metrics"><div class="loading">Cargando...</div></div>
 
+          <div class="caption-text mb-8" style="margin-top:var(--sp-4)">Tendencia — esta semana</div>
           <div class="grid-2 mb-16">
             <div>
               <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">🏆 Top ganancia de la semana</div>
@@ -896,6 +902,7 @@ textarea{resize:vertical;min-height:72px}
             </div>
           </div>
 
+          <div class="caption-text mb-8">Qué necesita tu atención</div>
           <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--red)">⚠️ Rotación lenta — candidatos a promocionar o liquidar</div>
           <div id="fin-rotacion-lenta" class="mb-16"><div class="loading">Cargando...</div></div>
 
