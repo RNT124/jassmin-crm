@@ -145,6 +145,15 @@ input.input-error,select.input-error{border-color:var(--danger);background:var(-
 .field-error.show{display:block}
 textarea{resize:vertical;min-height:72px}
 
+/* ESTADOS DE CARGA Y VACÍOS (Fase 6) */
+.loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:28px 12px;color:var(--text-tertiary);font-size:12.5px}
+.loading::before{content:'';width:14px;height:14px;flex-shrink:0;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+td.loading{display:table-cell;padding:20px;text-align:center}
+td.loading::before{display:inline-block;vertical-align:middle;margin-right:8px}
+.empty-state{display:block;text-align:center;padding:28px 16px;color:var(--text-tertiary);font-size:12.5px}
+td.empty-state{padding:20px;text-align:center}
+
 /* BUTTONS */
 .btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);transition:all .15s;display:inline-flex;align-items:center;gap:6px}
 .btn:hover{background:var(--gray-light)}
@@ -1926,9 +1935,9 @@ async function loadDashboard(){
       const top = Object.values(porPrenda).sort((a,b)=>b.ingresos-a.ingresos).slice(0,8);
       document.getElementById('db-top-prendas').innerHTML = top.length ? top.map((t,i)=>
         `<tr><td class="text-hint">${i+1}</td><td>${t.nombre}</td><td>${t.unidades}</td><td>S/ ${t.ingresos.toFixed(0)}</td></tr>`
-      ).join('') : `<tr><td colspan="4" class="loading">Sin ventas ${rangoLabel}</td></tr>`;
+      ).join('') : `<tr><td colspan="4" class="empty-state">Sin ventas ${rangoLabel}</td></tr>`;
     } else {
-      document.getElementById('db-top-prendas').innerHTML = `<tr><td colspan="4" class="loading">Sin ventas ${rangoLabel}</td></tr>`;
+      document.getElementById('db-top-prendas').innerHTML = `<tr><td colspan="4" class="empty-state">Sin ventas ${rangoLabel}</td></tr>`;
     }
   } catch(e){ console.error('Dashboard error:',e); }
 }
@@ -2014,7 +2023,7 @@ async function loadDashboardFinanzas(){
     document.getElementById('fin-rotacion-tabla').innerHTML = rotacion.length ? rotacion.map((p,i)=>`
       <tr><td class="text-hint">${i+1}</td><td>${p.nombre}</td><td>${p.stock}</td><td>${p.unidades}</td>
       <td><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;max-width:80px;height:6px;background:var(--gray-light);border-radius:3px;overflow:hidden"><div style="width:${Math.min(p.ratio*100,100)}%;height:100%;background:${p.ratio>0.5?'var(--green)':p.ratio>0.15?'var(--amber)':'var(--red)'}"></div></div><span style="font-size:11px;color:var(--text3)">${(p.ratio).toFixed(2)}</span></div></td></tr>`
-    ).join('') : `<tr><td colspan="5" class="loading">Sin datos</td></tr>`;
+    ).join('') : `<tr><td colspan="5" class="empty-state">Sin datos</td></tr>`;
 
   } catch(e){ console.error('Dashboard finanzas error:',e); }
 }
@@ -2971,7 +2980,7 @@ async function loadPedidos(f='todos'){
               ? `<button class="btn btn-xs btn-success" onclick="avanzarEstadoDirecto('${p.id}','${p.estado}')">${ESTADOS_ACTION[p.estado]}</button>`
               : ''}
         </td>
-      </tr>`).join(''):'<tr><td colspan="7" class="loading">Sin pedidos</td></tr>';
+      </tr>`).join(''):'<tr><td colspan="7" class="empty-state">Sin pedidos</td></tr>';
   } catch(e){ console.error('loadPedidos error:',e); }
 }
 
@@ -3225,7 +3234,7 @@ function renderClientesTabla(list){
       <td>S/ ${c.total_gastado||0}</td>
       <td><button class="btn btn-xs" onclick="editCliente('${c.id}')">Editar</button> <button class="btn btn-xs" onclick="verHistorialCliente('${c.id}','${(c.nombre||'').replace(/'/g,"\\'")}')">📜 Historial</button></td>
     </tr>`;
-  }).join(''):'<tr><td colspan="8" class="loading">Sin clientas aún</td></tr>';
+  }).join(''):'<tr><td colspan="8" class="empty-state">Sin clientas aún</td></tr>';
 }
 function ncToggleTipoEnvio(){
   const tipo = document.getElementById('nc-tipo-envio').value;
@@ -3390,7 +3399,7 @@ function renderCatalogoTabla(prendas){
         <button class="btn btn-xs" onclick="openModalPrenda('${p.id}')">Editar</button>
         <button class="btn btn-xs" onclick="togglePrenda('${p.id}',${p.activo})">${p.activo?'Desactivar':'Activar'}</button>
       </td>
-    </tr>`).join(''):'<tr><td colspan="8" class="loading">Sin prendas aún</td></tr>';
+    </tr>`).join(''):'<tr><td colspan="8" class="empty-state">Sin prendas aún</td></tr>';
 
   // Poblar filtro de categorías (una sola vez)
   const catSel = document.getElementById('catalogo-cat-filtro');
@@ -3517,7 +3526,7 @@ async function loadStock(){
 
 function renderStockTabla(rows){
   if(!rows.length){
-    document.getElementById('stock-tbody').innerHTML='<tr><td colspan="5" class="loading">Sin stock cargado — ve al Catálogo, edita una prenda y agrega stock por talla/color</td></tr>';
+    document.getElementById('stock-tbody').innerHTML='<tr><td colspan="5" class="empty-state">Sin stock cargado — ve al Catálogo, edita una prenda y agrega stock por talla/color</td></tr>';
     return;
   }
   document.getElementById('stock-tbody').innerHTML = rows.map(r=>{
