@@ -1208,17 +1208,19 @@ td.empty-state{padding:20px;text-align:center}
 
       <!-- ── DESPACHO DEL DÍA ── -->
       <div id="pg-despacho" class="page">
-        <div class="sec-header">
-          <div class="sec-title">Despacho del día</div>
-          <div style="display:flex;gap:8px">
+        <div class="sec-header" style="margin-bottom:8px">
+          <div class="tabs" style="margin:0;border:none">
+            <div class="tab active" onclick="filterDespacho('todos',this)">Todos</div>
+            <div class="tab" onclick="filterDespacho('shalom',this)">Shalom</div>
+            <div class="tab" onclick="filterDespacho('motorizado',this)">Motorizado</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text2);cursor:pointer;user-select:none">
+              <input type="checkbox" id="despacho-solo-urgentes" onchange="toggleSoloUrgentesDespacho()" style="width:15px;height:15px;cursor:pointer">
+              🚀 Solo urgentes
+            </label>
             <button class="btn btn-sm" onclick="loadDespacho()">↻ Actualizar</button>
           </div>
-        </div>
-        <div class="tabs" style="margin-bottom:14px">
-          <div class="tab active" onclick="filterDespacho('todos',this)">Todos</div>
-          <div class="tab" onclick="filterDespacho('shalom',this)">Shalom</div>
-          <div class="tab" onclick="filterDespacho('motorizado',this)">Motorizado</div>
-          <div class="tab" onclick="filterDespacho('urgentes',this)">🚀 Urgentes</div>
         </div>
 
         <!-- Sección: Listos para empaquetar -->
@@ -3661,10 +3663,15 @@ function openModalPrenda(id){
 // ═══════════════════════════ DESPACHO DEL DÍA ═══════════════════════════
 let despachoActual=[];
 let despachoFiltro = 'todos';
+let despachoSoloUrgentes = false;
 function filterDespacho(f, el){
   despachoFiltro = f;
   document.querySelectorAll('#pg-despacho .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
+  renderDespachoListas();
+}
+function toggleSoloUrgentesDespacho(){
+  despachoSoloUrgentes = document.getElementById('despacho-solo-urgentes').checked;
   renderDespachoListas();
 }
 
@@ -3700,9 +3707,9 @@ async function loadDespacho(){
 }
 
 function despachoPasaFiltro(p){
-  if(despachoFiltro==='shalom') return esTipoEnvio(p,'shalom');
-  if(despachoFiltro==='motorizado') return esTipoEnvio(p,'motorizado');
-  if(despachoFiltro==='urgentes') return !!p.clientes?.envio_urgente_en;
+  if(despachoFiltro==='shalom' && !esTipoEnvio(p,'shalom')) return false;
+  if(despachoFiltro==='motorizado' && !esTipoEnvio(p,'motorizado')) return false;
+  if(despachoSoloUrgentes && !p.clientes?.envio_urgente_en) return false;
   return true;
 }
 
