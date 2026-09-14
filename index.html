@@ -1546,13 +1546,19 @@ td.empty-state{padding:20px;text-align:center}
     <div class="modal-title">📦 Registrar compra de mercadería</div>
     <div class="text-muted text-sm mb-12">Suma al stock y — si había pre-ventas de esta prenda — las resuelve automáticamente, empezando por las más antiguas.</div>
     <div class="form-row"><label class="form-label">Prenda</label>
-      <select id="mc-prenda" onchange="mcActualizarTallasColores()"><option value="">— seleccionar —</option></select>
+      <input type="text" id="mc-prenda-buscar" list="mc-prenda-datalist" placeholder="Escribe para buscar..." oninput="mcSeleccionarPrenda()" autocomplete="off">
+      <datalist id="mc-prenda-datalist"></datalist>
+      <input type="hidden" id="mc-prenda">
     </div>
     <div class="form-row"><label class="form-label">Talla</label>
       <select id="mc-talla"><option value="">—</option></select>
     </div>
     <div class="form-row"><label class="form-label">Color</label>
-      <input type="text" id="mc-color" placeholder="ej. negro">
+      <select id="mc-color" onchange="mcToggleColorNuevo()"><option value="">— primero elige la prenda —</option></select>
+    </div>
+    <div class="form-row" id="mc-color-nuevo-wrap" style="display:none">
+      <label class="form-label">Nombre del color nuevo</label>
+      <input type="text" id="mc-color-nuevo" placeholder="ej. verde oliva">
     </div>
     <div class="form-row"><label class="form-label">Cantidad comprada</label><input type="number" id="mc-cantidad" placeholder="0" min="1"></div>
     <div class="form-row"><label class="form-label">Costo total pagado (S/)</label><input type="number" id="mc-costo" placeholder="0.00" step="0.01"></div>
@@ -2171,10 +2177,14 @@ async function loadCompras(){
 }
 
 function abrirModalCompra(){
-  const sel = document.getElementById('mc-prenda');
-  sel.innerHTML = '<option value="">— seleccionar —</option>' + DB.prendas.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
+  document.getElementById('mc-prenda-buscar').value='';
+  document.getElementById('mc-prenda').value='';
+  const datalist = document.getElementById('mc-prenda-datalist');
+  datalist.innerHTML = DB.prendas.map(p=>`<option value="${p.nombre}">`).join('');
   document.getElementById('mc-talla').innerHTML = '<option value="">—</option>';
-  document.getElementById('mc-color').value='';
+  document.getElementById('mc-color').innerHTML = '<option value="">— primero elige la prenda —</option>';
+  document.getElementById('mc-color-nuevo-wrap').style.display='none';
+  document.getElementById('mc-color-nuevo').value='';
   document.getElementById('mc-cantidad').value='';
   document.getElementById('mc-costo').value='';
   document.getElementById('mc-proveedor').value='';
@@ -2182,21 +2192,50 @@ function abrirModalCompra(){
   document.getElementById('modal-compra').classList.add('open');
 }
 
-function mcActualizarTallasColores(){
+function mcSeleccionarPrenda(){
+  const nombreEscrito = document.getElementById('mc-prenda-buscar').value.trim();
+  const prenda = DB.prendas.find(p=>p.nombre===nombreEscrito);
+  document.getElementById('mc-prenda').value = prenda?.id||'';
+  if(prenda) mcActualizarTallasColores();
+}
+
+async function mcActualizarTallasColores(){
   const prenda = DB.prendas.find(p=>p.id===document.getElementById('mc-prenda').value);
-  const tallas = prenda?.tallas ? String(prenda.tallas).split(',').map(t=>t.trim()).filter(Boolean) : [];
+  if(!prenda) return;
+  const tallas = prenda.tallas ? String(prenda.tallas).split(',').map(t=>t.trim()).filter(Boolean) : [];
   document.getElementById('mc-talla').innerHTML = '<option value="">—</option>' + tallas.map(t=>`<option>${t}</option>`).join('');
+
+  // Colores ya existentes para esta prenda (desde el stock real, no texto libre)
+  const colorSel = document.getElementById('mc-color');
+  colorSel.innerHTML = '<option value="">Cargando colores...</option>';
+  try {
+    const variantes = await dbGet(`prenda_stock?prenda_id=eq.${prenda.id}&select=color`);
+    const colores = [...new Set(variantes.map(v=>v.color).filter(Boolean))].sort();
+    colorSel.innerHTML = '<option value="">— seleccionar —</option>'
+      + colores.map(c=>`<option value="${c}">${c}</option>`).join('')
+      + '<option value="__otro__">+ Es un color nuevo (escribir)</option>';
+  } catch(e){
+    colorSel.innerHTML = '<option value="">— seleccionar —</option><option value="__otro__">+ Es un color nuevo (escribir)</option>';
+  }
+  document.getElementById('mc-color-nuevo-wrap').style.display='none';
+}
+
+function mcToggleColorNuevo(){
+  const esOtro = document.getElementById('mc-color').value==='__otro__';
+  document.getElementById('mc-color-nuevo-wrap').style.display = esOtro?'block':'none';
 }
 
 async function guardarCompra(){
   const prendaId = document.getElementById('mc-prenda').value;
   const talla = document.getElementById('mc-talla').value;
-  const color = document.getElementById('mc-color').value.trim();
+  const colorSelValue = document.getElementById('mc-color').value;
+  const color = colorSelValue==='__otro__' ? document.getElementById('mc-color-nuevo').value.trim() : colorSelValue;
   const cantidad = parseInt(document.getElementById('mc-cantidad').value||0);
   const costoTotal = parseFloat(document.getElementById('mc-costo').value||0);
   const proveedor = document.getElementById('mc-proveedor').value.trim();
   const fecha = document.getElementById('mc-fecha').value || new Date().toISOString().slice(0,10);
-  if(!prendaId){ toast('Selecciona la prenda'); return; }
+  if(!prendaId){ toast('Busca y selecciona la prenda de la lista'); return; }
+  if(!color){ toast('Selecciona o escribe el color'); return; }
   if(!cantidad||cantidad<=0){ toast('Ingresa la cantidad comprada'); return; }
   if(!costoTotal||costoTotal<=0){ toast('Ingresa el costo total pagado'); return; }
   try {
