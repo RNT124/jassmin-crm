@@ -3831,7 +3831,7 @@ function bulkExportarCSV(){
   lista.forEach(p=>{
     const c=p.clientes||{};
     const falta=(p.total||0)-(p.monto_pagado||0);
-    datos.push([hoy, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono?parseInt(c.telefono):'', 'entrega', falta>0?falta:0, '', 'ROPA', '', p.notas||'']);
+    datos.push([hoy, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono?parseInt(c.telefono):'', 'entrega', falta>0?falta:0, '', 'ROPA', '', '']);
   });
 
   const ws = XLSX.utils.aoa_to_sheet(datos);
