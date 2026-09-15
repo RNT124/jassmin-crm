@@ -3817,11 +3817,13 @@ function bulkExportarCSV(){
   if(!ids.length){ toast('Selecciona al menos un pedido de Motorizado'); return; }
   if(noCoincide){ toast('⚠️ Solo selecciona pedidos de Motorizado para exportar el CSV'); return; }
   const lista = despachoActual.filter(p=>ids.includes(p.id));
-  const filas = [['Pedido','Cliente','Telefono','Distrito','Direccion','Total','Falta por cobrar']];
+  const hoy = new Date();
+  const fechaEntrega = String(hoy.getDate()).padStart(2,'0')+'/'+String(hoy.getMonth()+1).padStart(2,'0')+'/'+hoy.getFullYear();
+  const filas = [['FECHA ENTREGA','CLIENTE','DISTRITO','DIRECCIÓN DE ENTREGA','CELULAR','TIPO DE SERVICIO','COBRAR S/','ANOTACIONES ADICIONALES','DESCRIPCION DEL PAQUETE']];
   lista.forEach(p=>{
     const c=p.clientes||{};
     const falta=(p.total||0)-(p.monto_pagado||0);
-    filas.push([p.numero, c.nombre||'', c.telefono||'', c.distrito||'', c.direccion||'', p.total||0, falta>0?falta:0]);
+    filas.push([fechaEntrega, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono||'', 'entrega', falta>0?falta:0, '', 'ropa']);
   });
   const csv = filas.map(f=>f.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
