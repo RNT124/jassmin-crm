@@ -1247,7 +1247,7 @@ td.empty-state{padding:20px;text-align:center}
           <div id="despacho-bulk-bar" style="display:none;position:sticky;top:0;z-index:5;background:var(--primary);color:#fff;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
             <span id="despacho-bulk-count" style="font-size:12.5px;font-weight:500"></span>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkExportarCSV()">📊 Exportar CSV</button>
+              <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkExportarCSV()">📊 Exportar Excel</button>
               <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkImprimirEtiquetas()">🏷️ Imprimir etiquetas</button>
             </div>
           </div>
@@ -3819,24 +3819,37 @@ async function marcarDespachadosSiSeConfirma(ids){
 function bulkExportarCSV(){
   const {ids, noCoincide} = despachoSeleccionados('motorizado');
   if(!ids.length){ toast('Selecciona al menos un pedido de Motorizado'); return; }
-  if(noCoincide){ toast('⚠️ Solo selecciona pedidos de Motorizado para exportar el CSV'); return; }
+  if(noCoincide){ toast('⚠️ Solo selecciona pedidos de Motorizado para exportar el Excel'); return; }
   const lista = despachoActual.filter(p=>ids.includes(p.id));
   const hoy = new Date();
-  const fechaEntrega = String(hoy.getDate()).padStart(2,'0')+'/'+String(hoy.getMonth()+1).padStart(2,'0')+'/'+hoy.getFullYear();
-  const filas = [['FECHA ENTREGA','CLIENTE','DISTRITO','DIRECCIÓN DE ENTREGA','CELULAR','TIPO DE SERVICIO','COBRAR S/','ANOTACIONES ADICIONALES','DESCRIPCION DEL PAQUETE']];
+
+  const datos = [
+    ['','','','','','','','','','',''],
+    ['DATOS DEL CLIENTE','','','','','','','','DATOS DEL PRODUCTO 1','',''],
+    ['FECHA ENTREGA','CLIENTE','DISTRITO','DIRECCIÓN DE ENTREGA','CELULAR','TIPO DE SERVICIO','COBRAR S/','','DESCRIPCION DEL PAQUETE','PESO (KG)','COMENTARIO']
+  ];
   lista.forEach(p=>{
     const c=p.clientes||{};
     const falta=(p.total||0)-(p.monto_pagado||0);
-    filas.push([fechaEntrega, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono||'', 'entrega', falta>0?falta:0, p.notas||'', 'ropa']);
+    datos.push([hoy, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono?parseInt(c.telefono):'', 'entrega', falta>0?falta:0, '', 'ROPA', '', p.notas||'']);
   });
-  const csv = filas.map(f=>f.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href=url; a.download='despacho-motorizado-'+new Date().toISOString().slice(0,10)+'.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast('✓ CSV descargado — '+lista.length+' pedido(s)');
+
+  const ws = XLSX.utils.aoa_to_sheet(datos);
+  ws['!merges'] = [
+    {s:{r:1,c:0}, e:{r:1,c:6}},
+    {s:{r:1,c:8}, e:{r:1,c:10}}
+  ];
+  ws['!cols'] = [{wch:12},{wch:22},{wch:18},{wch:38},{wch:12},{wch:14},{wch:10},{wch:3},{wch:16},{wch:10},{wch:24}];
+  // Formatear la columna de fecha (A) como fecha corta
+  for(let r=3; r<datos.length; r++){
+    const cell = ws[XLSX.utils.encode_cell({r, c:0})];
+    if(cell) cell.z = 'dd/mm/yyyy';
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Hoja 1');
+  XLSX.writeFile(wb, 'despacho-motorizado-'+hoy.toISOString().slice(0,10)+'.xlsx');
+
+  toast('✓ Excel descargado — '+lista.length+' pedido(s)');
   marcarDespachadosSiSeConfirma(ids);
 }
 
