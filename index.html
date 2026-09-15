@@ -633,7 +633,9 @@ td.empty-state{padding:20px;text-align:center}
             <div id="rg-ex-detalle" style="font-size:12.5px;color:#1A1A18;line-height:1.8"></div>
           </div>
           <div id="rg-ex-urgente-wrap" style="display:none;margin-bottom:12px">
-            <button class="f5-btn-full" style="background:#B3184A" onclick="rgSolicitarUrgente()">🚀 Solicitar envío lo antes posible</button>
+            <label style="display:block;font-size:11px;color:#5F5E5A;margin-bottom:4px;text-align:left">¿Alguna indicación para tu entrega? <span style="color:#9C9A92;font-weight:400">(opcional)</span></label>
+            <input type="text" id="rg-ex-nota" class="f5-input" placeholder="ej. entregar antes de las 6pm" style="margin-bottom:10px">
+            <button class="f5-btn-full" style="background:#B3184A" onclick="rgSolicitarUrgente('rg-ex')">🚀 Solicitar envío lo antes posible</button>
             <div style="font-size:11px;color:#9C9A92;margin-top:6px;text-align:center">Le avisamos a nuestro equipo para que programe tu envío cuanto antes</div>
             <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A;margin-top:8px" onclick="rgConfirmarAcumular('rg-ex')">🛍️ Prefiero seguir acumulando</button>
           </div>
@@ -708,7 +710,9 @@ td.empty-state{padding:20px;text-align:center}
             <div id="rg-confirm-detalle" style="font-size:12.5px;color:#1A1A18;line-height:1.8"></div>
           </div>
           <div id="rg-confirm-urgente-wrap" style="display:none;margin-bottom:12px">
-            <button class="f5-btn-full" style="background:#B3184A" onclick="rgSolicitarUrgente()">🚀 Solicitar envío lo antes posible</button>
+            <label style="display:block;font-size:11px;color:#5F5E5A;margin-bottom:4px;text-align:left">¿Alguna indicación para tu entrega? <span style="color:#9C9A92;font-weight:400">(opcional)</span></label>
+            <input type="text" id="rg-confirm-nota" class="f5-input" placeholder="ej. entregar antes de las 6pm" style="margin-bottom:10px">
+            <button class="f5-btn-full" style="background:#B3184A" onclick="rgSolicitarUrgente('rg-confirm')">🚀 Solicitar envío lo antes posible</button>
             <div style="font-size:11px;color:#9C9A92;margin-top:6px;text-align:center">Le avisamos a nuestro equipo para que programe tu envío cuanto antes</div>
             <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A;margin-top:8px" onclick="rgConfirmarAcumular('rg-confirm')">🛍️ Prefiero seguir acumulando</button>
           </div>
@@ -3719,9 +3723,9 @@ async function loadDespacho(){
   document.getElementById('despacho-courier').innerHTML='<div class="loading">Cargando...</div>';
   try {
     // Listos para empaquetar: pago_completo
-    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
+    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
     // Empaquetados listos para courier
-    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
+    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
 
     despachoActual = [...empaquetar,...courier];
     despachoActual.forEach(p=>{ p._tipo = empaquetar.includes(p) ? 'empaquetar' : 'courier'; });
@@ -3823,7 +3827,7 @@ function bulkExportarCSV(){
   lista.forEach(p=>{
     const c=p.clientes||{};
     const falta=(p.total||0)-(p.monto_pagado||0);
-    filas.push([fechaEntrega, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono||'', 'entrega', falta>0?falta:0, '', 'ropa']);
+    filas.push([fechaEntrega, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono||'', 'entrega', falta>0?falta:0, p.notas||'', 'ropa']);
   });
   const csv = filas.map(f=>f.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
@@ -4935,6 +4939,8 @@ async function rgBuscar(){
   }
 }
 
+let rgPedidoActivoId = null;
+
 async function rgMostrarExistente(cl){
   document.getElementById('rg-buscar-wrap').style.display='none';
   document.getElementById('rg-existente-wrap').style.display='block';
@@ -4946,17 +4952,25 @@ async function rgMostrarExistente(cl){
 
   // ¿Tiene algún pedido activo (no entregado ni cancelado) al que priorizar?
   try {
-    const activos = await dbGet(`pedidos?cliente_id=eq.${cl.id}&estado=not.in.(entregado,cancelado)&select=id&limit=1`);
-    document.getElementById('rg-ex-urgente-wrap').style.display = (activos && activos.length) ? 'block' : 'none';
+    const activos = await dbGet(`pedidos?cliente_id=eq.${cl.id}&estado=not.in.(entregado,cancelado)&select=id&order=creado_en.desc&limit=1`);
+    rgPedidoActivoId = (activos && activos.length) ? activos[0].id : null;
+    document.getElementById('rg-ex-urgente-wrap').style.display = rgPedidoActivoId ? 'block' : 'none';
+    const notaInput = document.getElementById('rg-ex-nota');
+    if(notaInput) notaInput.value='';
   } catch(e){
     document.getElementById('rg-ex-urgente-wrap').style.display='none';
   }
 }
 
-async function rgSolicitarUrgente(){
+async function rgSolicitarUrgente(prefijo){
   if(!rgClienteActual) return;
   try {
+    const notaEl = document.getElementById(prefijo+'-nota');
+    const nota = notaEl ? notaEl.value.trim() : '';
     await dbPatch(`clientes?id=eq.${rgClienteActual.id}`, {envio_urgente_en: new Date().toISOString()});
+    if(rgPedidoActivoId && nota){
+      await dbPatch(`pedidos?id=eq.${rgPedidoActivoId}`, {notas: nota});
+    }
     await registrarHistorialCliente(rgClienteActual.id, 'solicitud_urgente', rgClienteActual);
     const wrapId = document.getElementById('rg-existente-wrap').style.display==='block' ? 'rg-ex-urgente-wrap' : 'rg-confirm-urgente-wrap';
     document.getElementById(wrapId).innerHTML = `<div style="background:#EAF3DE;color:#27500A;border-radius:10px;padding:12px;text-align:center;font-size:13px;font-weight:600">✓ ¡Listo! Ya avisamos a nuestro equipo</div>`;
@@ -5086,10 +5100,14 @@ async function rgGuardar(){
   // ¿Ya tiene pedidos acumulados/activos? Si sí, ofrecer solicitar envío urgente
   const urgenteWrap = document.getElementById('rg-confirm-urgente-wrap');
   urgenteWrap.style.display = 'none';
+  rgPedidoActivoId = null;
   if(rgClienteActual?.id){
     try {
-      const activos = await dbGet(`pedidos?cliente_id=eq.${rgClienteActual.id}&estado=not.in.(entregado,cancelado)&select=id&limit=1`);
-      urgenteWrap.style.display = (activos && activos.length) ? 'block' : 'none';
+      const activos = await dbGet(`pedidos?cliente_id=eq.${rgClienteActual.id}&estado=not.in.(entregado,cancelado)&select=id&order=creado_en.desc&limit=1`);
+      rgPedidoActivoId = (activos && activos.length) ? activos[0].id : null;
+      urgenteWrap.style.display = rgPedidoActivoId ? 'block' : 'none';
+      const notaInput = document.getElementById('rg-confirm-nota');
+      if(notaInput) notaInput.value='';
     } catch(e){}
   }
 }
