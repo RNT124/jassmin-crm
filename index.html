@@ -1275,6 +1275,7 @@ td.empty-state{padding:20px;text-align:center}
         <div style="display:flex;gap:12px;margin-top:8px;font-size:12px;color:var(--text2)" id="trk-meta"></div>
       </div>
       <div id="trk-banner" style="margin:12px 16px 0;border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:10px"></div>
+      <div id="trk-envio-nota" style="display:none;margin:10px 16px 0;background:#FFF3E0;border-radius:var(--radius);padding:10px 14px;font-size:12px;color:#7A4A00"></div>
       <div style="padding:14px 16px">
         <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:12px">Estado del pedido</div>
         <div id="trk-timeline"></div>
@@ -3830,8 +3831,9 @@ function bulkExportarCSV(){
   ];
   lista.forEach(p=>{
     const c=p.clientes||{};
-    const falta=(p.total||0)-(p.monto_pagado||0);
-    datos.push([hoy, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono?parseInt(c.telefono):'', 'entrega', falta>0?falta:0, '', 'ROPA', '', '']);
+    // El envío motorizado lo cobra directo el motorizado (externo al sistema) — siempre su costo fijo, salvo que ya lo haya pagado por adelantado
+    const cobrar = p.envio_pagado ? 0 : (p.costo_envio||14);
+    datos.push([hoy, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono?parseInt(c.telefono):'', 'entrega', cobrar, '', 'ROPA', '', '']);
   });
 
   const ws = XLSX.utils.aoa_to_sheet(datos);
@@ -4211,6 +4213,16 @@ function renderTrackingPage(ped){
   const b=banners[ped.estado]||banners.pago_pendiente;
   document.getElementById('trk-banner').style.cssText=`background:${b.bg};color:${b.c};border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:3px;margin:12px 16px 0`;
   document.getElementById('trk-banner').innerHTML=`<div style="font-weight:600;font-size:13px">${b.lbl}</div><div style="font-size:12px;opacity:.85">${b.sub}</div>`;
+
+  // Aviso aparte (no forma parte del saldo interno del sistema) — el motorizado cobra el envío en la puerta
+  const notaEnvio = document.getElementById('trk-envio-nota');
+  const esMotorizado = (ped.tipo_envio||'').startsWith('motorizado');
+  if(esMotorizado && !ped.envio_pagado && (ped.costo_envio||0)>0 && ped.estado!=='entregado' && ped.estado!=='cancelado'){
+    notaEnvio.style.display='block';
+    notaEnvio.innerHTML = `🏍️ <strong>Recuerda:</strong> al recibir tu pedido, paga <strong>S/${ped.costo_envio}</strong> al motorizado — el envío se cobra directo en la entrega.`;
+  } else {
+    notaEnvio.style.display='none';
+  }
   const ORDEN=['pago_pendiente','pago_parcial','pago_completo','empaquetado','en_camino','entregado'];
   const steps=[
     {key:'pago_pendiente',lbl:'Pedido creado'},
