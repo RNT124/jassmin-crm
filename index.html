@@ -1525,6 +1525,40 @@ td.empty-state{padding:20px;text-align:center}
   </div>
 </div>
 
+<!-- Modal: desglose de ventas por talla/color -->
+<div class="modal-overlay" id="modal-desglose-ventas">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-title" id="dv-title">Ventas por talla/color</div>
+    <div class="tabs" style="margin-bottom:12px">
+      <div class="tab active" onclick="filterDesgloseVentas('hoy',this)">Hoy</div>
+      <div class="tab" onclick="filterDesgloseVentas('semana',this)">Esta semana</div>
+      <div class="tab" onclick="filterDesgloseVentas('mes',this)">Este mes</div>
+      <div class="tab" onclick="filterDesgloseVentas('todos',this)">Todos</div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Talla</th><th>Color</th><th>Vendido</th><th>Ingreso</th><th>Stock ingresado (histórico)</th></tr></thead>
+        <tbody id="dv-tbody"><tr><td colspan="5" class="loading">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-sm" onclick="closeModal('modal-desglose-ventas')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: detalle de ventas de una talla/color específica -->
+<div class="modal-overlay" id="modal-detalle-venta">
+  <div class="modal">
+    <div class="modal-title" id="dvd-title">Detalle de ventas</div>
+    <div class="text-muted text-sm mb-12">Clienta y fecha de cada venta, en el periodo seleccionado</div>
+    <div id="dvd-lista" style="max-height:400px;overflow-y:auto"></div>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-sm" onclick="closeModal('modal-detalle-venta')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: link de seguimiento generado -->
 <div class="modal-overlay" id="modal-link">
   <div class="modal" style="text-align:center">
@@ -3436,6 +3470,92 @@ async function guardarCliente(){
   finally { btn.textContent = txtOriginal; btn.disabled = false; }
 }
 
+// ═══════════════════════════ DESGLOSE DE VENTAS POR TALLA/COLOR ═══════════════════════════
+let dvPrendaId = null, dvPrendaNombre = '', dvFiltro = 'hoy', dvDatos = [];
+
+function rangoFechaDesglose(f){
+  const hoy = new Date();
+  if(f==='hoy'){ const d=new Date(hoy); d.setHours(0,0,0,0); return d; }
+  if(f==='semana'){ return inicioSemanaLunes(hoy); }
+  if(f==='mes'){ return new Date(hoy.getFullYear(),hoy.getMonth(),1); }
+  return null; // todos
+}
+
+function abrirDesgloseVentas(prendaId, nombre){
+  dvPrendaId = prendaId; dvPrendaNombre = nombre; dvFiltro = 'hoy';
+  document.getElementById('dv-title').textContent = 'Ventas — '+nombre;
+  document.querySelectorAll('#modal-desglose-ventas .tab').forEach((t,i)=>t.classList.toggle('active', i===0));
+  document.getElementById('modal-desglose-ventas').classList.add('open');
+  loadDesgloseVentas();
+}
+
+function filterDesgloseVentas(f, el){
+  dvFiltro = f;
+  document.querySelectorAll('#modal-desglose-ventas .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  loadDesgloseVentas();
+}
+
+async function loadDesgloseVentas(){
+  document.getElementById('dv-tbody').innerHTML = '<tr><td colspan="5" class="loading">Cargando...</td></tr>';
+  try {
+    const desde = rangoFechaDesglose(dvFiltro);
+    const filtroFecha = desde ? `agregado_en=gte.${desde.toISOString()}&` : '';
+    const [ventas, compras] = await Promise.all([
+      dbGet(`carrito_items?prenda_id=eq.${dvPrendaId}&${filtroFecha}estado_bolsa=neq.eliminado&select=talla,color,precio_unitario`),
+      dbGet(`compras?prenda_id=eq.${dvPrendaId}&select=talla,color,cantidad`)
+    ]);
+    dvDatos = ventas;
+
+    const combos = {};
+    const clave = (t,c) => (t||'—')+'||'+(c||'—');
+    ventas.forEach(v=>{
+      const k = clave(v.talla, v.color);
+      if(!combos[k]) combos[k] = {talla:v.talla, color:v.color, unidades:0, ingreso:0, stock:0};
+      combos[k].unidades += 1;
+      combos[k].ingreso += (v.precio_unitario||0);
+    });
+    compras.forEach(c=>{
+      const k = clave(c.talla, c.color);
+      if(!combos[k]) combos[k] = {talla:c.talla, color:c.color, unidades:0, ingreso:0, stock:0};
+      combos[k].stock += (c.cantidad||0);
+    });
+
+    const filas = Object.values(combos).sort((a,b)=>(a.talla||'').localeCompare(b.talla||'')||(a.color||'').localeCompare(b.color||''));
+    document.getElementById('dv-tbody').innerHTML = filas.length ? filas.map(f=>`
+      <tr style="cursor:pointer" onclick="verDetalleVenta('${(f.talla||'').replace(/'/g,"\\'")}','${(f.color||'').replace(/'/g,"\\'")}')">
+        <td>${f.talla||'—'}</td>
+        <td>${f.color||'—'}</td>
+        <td class="font-500">${f.unidades}</td>
+        <td>S/ ${f.ingreso}</td>
+        <td class="text-muted">${f.stock}</td>
+      </tr>`).join('') : '<tr><td colspan="5" class="empty-state">Sin ventas registradas en este periodo</td></tr>';
+  } catch(e){ document.getElementById('dv-tbody').innerHTML = `<tr><td colspan="5" style="color:var(--red)">Error: ${e.message}</td></tr>`; }
+}
+
+async function verDetalleVenta(talla, color){
+  document.getElementById('dvd-title').textContent = `${dvPrendaNombre} — T-${talla||'—'} · ${color||'—'}`;
+  document.getElementById('dvd-lista').innerHTML = '<div class="loading">Cargando...</div>';
+  document.getElementById('modal-detalle-venta').classList.add('open');
+  try {
+    const desde = rangoFechaDesglose(dvFiltro);
+    const filtroFecha = desde ? `agregado_en=gte.${desde.toISOString()}&` : '';
+    const items = await dbGet(`carrito_items?prenda_id=eq.${dvPrendaId}&talla=eq.${encodeURIComponent(talla)}&color=eq.${encodeURIComponent(color)}&${filtroFecha}estado_bolsa=neq.eliminado&select=agregado_en,precio_unitario,carritos(clientes(nombre,telefono))&order=agregado_en.desc`);
+    document.getElementById('dvd-lista').innerHTML = items.length ? items.map(it=>{
+      const cl = it.carritos?.clientes||{};
+      const fecha = new Date(it.agregado_en);
+      const fechaStr = fecha.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' · ' + fecha.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+      return `<div style="border-bottom:0.5px solid var(--border);padding:8px 0;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:500">${cl.nombre||'—'}</div>
+          <div style="font-size:11px;color:var(--text3)">${cl.telefono||''} · ${fechaStr}</div>
+        </div>
+        <div style="font-size:12.5px;font-weight:600">S/ ${it.precio_unitario||0}</div>
+      </div>`;
+    }).join('') : '<div class="empty-state">Sin ventas de esta combinación en este periodo</div>';
+  } catch(e){ document.getElementById('dvd-lista').innerHTML = `<div style="color:var(--red);font-size:12.5px">Error: ${e.message}</div>`; }
+}
+
 // ═══════════════════════════ CATÁLOGO ═══════════════════════════
 async function loadCatalogo(){
   try {
@@ -3459,6 +3579,7 @@ function renderCatalogoTabla(prendas){
       <td style="display:flex;gap:4px">
         <button class="btn btn-xs" onclick="openModalPrenda('${p.id}')">Editar</button>
         <button class="btn btn-xs" onclick="togglePrenda('${p.id}',${p.activo})">${p.activo?'Desactivar':'Activar'}</button>
+        <button class="btn btn-xs" onclick="abrirDesgloseVentas('${p.id}','${(p.nombre||'').replace(/'/g,"\\'")}')" title="Ver ventas por talla/color">📊</button>
       </td>
     </tr>`).join(''):'<tr><td colspan="8" class="empty-state">Sin prendas aún</td></tr>';
 
