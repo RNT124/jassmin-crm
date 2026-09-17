@@ -932,6 +932,39 @@ td.empty-state{padding:20px;text-align:center}
               <tbody id="fin-rotacion-tabla"><tr><td colspan="5" class="loading">Cargando...</td></tr></tbody>
             </table>
           </div>
+
+          <div class="sec-header" style="margin-top:24px">
+            <div class="sec-title" style="font-size:13px">🔍 Consulta de ventas — todas las prendas por talla/color</div>
+          </div>
+          <div class="tabs" style="margin-bottom:10px">
+            <div class="tab active" onclick="filterConsultaVentas('hoy',this)">Hoy</div>
+            <div class="tab" onclick="filterConsultaVentas('semana',this)">Esta semana</div>
+            <div class="tab" onclick="filterConsultaVentas('mes',this)">Este mes</div>
+            <div class="tab" onclick="filterConsultaVentas('todos',this)">Todos</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <input id="cv-buscar" type="text" placeholder="🔍 Buscar prenda..." style="flex:1;min-width:160px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="renderConsultaVentas()">
+            <select id="cv-categoria" onchange="renderConsultaVentas()" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px"><option value="">Categoría: todas</option></select>
+            <select id="cv-talla" onchange="renderConsultaVentas()" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px"><option value="">Talla: todas</option></select>
+            <select id="cv-color" onchange="renderConsultaVentas()" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px"><option value="">Color: todos</option></select>
+            <select id="cv-orden" onchange="renderConsultaVentas()" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+              <option value="vendido_desc">Ordenar: más vendido</option>
+              <option value="vendido_asc">Ordenar: menos vendido</option>
+              <option value="ingreso_desc">Ordenar: mayor ingreso</option>
+              <option value="stock_asc">Ordenar: stock más bajo</option>
+              <option value="rotacion_asc">Ordenar: rotación más lenta</option>
+            </select>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text2);cursor:pointer;user-select:none;margin-bottom:10px">
+            <input type="checkbox" id="cv-sin-ventas" onchange="renderConsultaVentas()" style="width:15px;height:15px;cursor:pointer">
+            Solo mostrar combinaciones sin ventas en este periodo
+          </label>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>Prenda</th><th>Talla</th><th>Color</th><th>Categoría</th><th>Vendido</th><th>Ingreso</th><th>Stock actual</th><th>Rotación</th></tr></thead>
+              <tbody id="cv-tbody"><tr><td colspan="8" class="loading">Cargando...</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -2009,7 +2042,7 @@ function setDashboardTab(tab){
   document.getElementById('db-tab-finanzas').style.display = tab==='finanzas'?'block':'none';
   document.getElementById('db-tab-btn-operacion').classList.toggle('active', tab==='operacion');
   document.getElementById('db-tab-btn-finanzas').classList.toggle('active', tab==='finanzas');
-  if(tab==='finanzas') loadDashboardFinanzas();
+  if(tab==='finanzas'){ loadDashboardFinanzas(); loadConsultaVentas(); }
 }
 
 async function loadDashboardFinanzas(){
@@ -2088,6 +2121,111 @@ async function loadDashboardFinanzas(){
     ).join('') : `<tr><td colspan="5" class="empty-state">Sin datos</td></tr>`;
 
   } catch(e){ console.error('Dashboard finanzas error:',e); }
+}
+
+// ═══════════════════════════ CONSULTA DE VENTAS — TODAS LAS PRENDAS POR TALLA/COLOR ═══════════════════════════
+let cvFiltro = 'hoy';
+let cvDatos = [];
+
+function filterConsultaVentas(f, el){
+  cvFiltro = f;
+  document.querySelectorAll('#db-tab-finanzas .tabs:last-of-type .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  loadConsultaVentas();
+}
+
+async function loadConsultaVentas(){
+  document.getElementById('cv-tbody').innerHTML = '<tr><td colspan="8" class="loading">Cargando...</td></tr>';
+  try {
+    const desde = rangoFechaDesglose(cvFiltro);
+    const filtroFecha = desde ? `agregado_en=gte.${desde.toISOString()}&` : '';
+
+    const [prendas, variantes, ventas] = await Promise.all([
+      dbGet('prendas?select=id,nombre,categoria&activo=eq.true'),
+      dbGet('prenda_stock?select=prenda_id,talla,color,cantidad'),
+      dbGet(`carrito_items?${filtroFecha}estado_bolsa=neq.eliminado&select=prenda_id,talla,color,precio_unitario`)
+    ]);
+
+    const prendaPorId = {};
+    prendas.forEach(p=>{ prendaPorId[p.id] = p; });
+
+    const ventasPorClave = {};
+    ventas.forEach(v=>{
+      const k = v.prenda_id+'||'+(v.talla||'—')+'||'+(v.color||'—');
+      if(!ventasPorClave[k]) ventasPorClave[k] = {unidades:0, ingreso:0};
+      ventasPorClave[k].unidades += 1;
+      ventasPorClave[k].ingreso += (v.precio_unitario||0);
+    });
+
+    cvDatos = variantes.filter(v=>prendaPorId[v.prenda_id]).map(v=>{
+      const p = prendaPorId[v.prenda_id];
+      const k = v.prenda_id+'||'+(v.talla||'—')+'||'+(v.color||'—');
+      const venta = ventasPorClave[k] || {unidades:0, ingreso:0};
+      return {
+        prendaId: v.prenda_id, nombre: p.nombre, categoria: p.categoria||'—',
+        talla: v.talla||'—', color: v.color||'—', stock: v.cantidad||0,
+        vendido: venta.unidades, ingreso: venta.ingreso,
+        rotacion: venta.unidades/Math.max(v.cantidad||0,1)
+      };
+    });
+
+    // Poblar los selects de categoría/talla/color (una sola vez por carga)
+    const categorias = [...new Set(cvDatos.map(d=>d.categoria))].sort();
+    const tallas = [...new Set(cvDatos.map(d=>d.talla))].sort();
+    const colores = [...new Set(cvDatos.map(d=>d.color))].sort();
+    const selCat = document.getElementById('cv-categoria');
+    const valCat = selCat.value;
+    selCat.innerHTML = '<option value="">Categoría: todas</option>' + categorias.map(c=>`<option value="${c}">${c}</option>`).join('');
+    selCat.value = valCat;
+    const selTalla = document.getElementById('cv-talla');
+    const valTalla = selTalla.value;
+    selTalla.innerHTML = '<option value="">Talla: todas</option>' + tallas.map(t=>`<option value="${t}">${t}</option>`).join('');
+    selTalla.value = valTalla;
+    const selColor = document.getElementById('cv-color');
+    const valColor = selColor.value;
+    selColor.innerHTML = '<option value="">Color: todos</option>' + colores.map(c=>`<option value="${c}">${c}</option>`).join('');
+    selColor.value = valColor;
+
+    renderConsultaVentas();
+  } catch(e){ document.getElementById('cv-tbody').innerHTML = `<tr><td colspan="8" style="color:var(--red)">Error: ${e.message}</td></tr>`; }
+}
+
+function renderConsultaVentas(){
+  const texto = (document.getElementById('cv-buscar')?.value||'').toLowerCase().trim();
+  const categoria = document.getElementById('cv-categoria')?.value||'';
+  const talla = document.getElementById('cv-talla')?.value||'';
+  const color = document.getElementById('cv-color')?.value||'';
+  const orden = document.getElementById('cv-orden')?.value||'vendido_desc';
+  const soloSinVentas = document.getElementById('cv-sin-ventas')?.checked||false;
+
+  let filas = cvDatos.filter(d=>
+    (!texto || d.nombre.toLowerCase().includes(texto)) &&
+    (!categoria || d.categoria===categoria) &&
+    (!talla || d.talla===talla) &&
+    (!color || d.color===color) &&
+    (!soloSinVentas || d.vendido===0)
+  );
+
+  const ordenadores = {
+    vendido_desc: (a,b)=>b.vendido-a.vendido,
+    vendido_asc: (a,b)=>a.vendido-b.vendido,
+    ingreso_desc: (a,b)=>b.ingreso-a.ingreso,
+    stock_asc: (a,b)=>a.stock-b.stock,
+    rotacion_asc: (a,b)=>a.rotacion-b.rotacion
+  };
+  filas.sort(ordenadores[orden]||ordenadores.vendido_desc);
+
+  document.getElementById('cv-tbody').innerHTML = filas.length ? filas.map(f=>`
+    <tr>
+      <td class="font-500">${f.nombre}</td>
+      <td>${f.talla}</td>
+      <td>${f.color}</td>
+      <td class="text-muted">${f.categoria}</td>
+      <td>${f.vendido}</td>
+      <td>S/ ${f.ingreso}</td>
+      <td class="${f.stock<=2?'':''}" style="${f.stock<=2?'color:var(--red);font-weight:600':''}">${f.stock}</td>
+      <td>${f.rotacion.toFixed(2)}</td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty-state">Sin resultados con estos filtros</td></tr>';
 }
 
 function setDashboardPeriodo(p){
