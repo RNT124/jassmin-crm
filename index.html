@@ -1905,7 +1905,7 @@ async function loadDashboard(){
     const [pedidos, clientes, variantes, urgentes] = await Promise.all([
       dbGet('pedidos?select=*&order=creado_en.desc'),
       dbGet('clientes?select=id,creado_en'),
-      dbGet('prendas?select=id,nombre,stock&activo=eq.true').catch(()=>[]),
+      dbGet('prendas?select=id,nombre,stock,costo&activo=eq.true').catch(()=>[]),
       dbGet('clientes?envio_urgente_en=not.is.null&select=id').catch(()=>[])
     ]);
 
@@ -1938,6 +1938,21 @@ async function loadDashboard(){
     const vendidoAnt = noCancel.filter(enRangoAnt).reduce((a,p)=>a+(p.subtotal||0),0);
     const deltaPeriodo = vendidoAnt>0 ? Math.round((vendidoPeriodo-vendidoAnt)/vendidoAnt*100) : (vendidoPeriodo>0?100:0);
     const deltaTxt = periodo==='dia'?'vs ayer':periodo==='semana'?'vs semana pasada':'vs mes pasado';
+
+    // ── Ganancia bruta del periodo (mismos pedidos que "Vendido") ──
+    const costoPorPrenda = {};
+    variantes.forEach(v=>{ costoPorPrenda[v.id] = v.costo||0; });
+    const carritoIdsPeriodo = noCancel.filter(enRango).map(p=>p.carrito_id).filter(Boolean);
+    let gananciaBruta = vendidoPeriodo, margenPct = 0;
+    if(carritoIdsPeriodo.length){
+      try {
+        const itemsPeriodo = await dbGet(`carrito_items?carrito_id=in.(${carritoIdsPeriodo.join(',')})&estado_bolsa=neq.eliminado&select=carrito_id,prenda_id`);
+        const costoTotal = itemsPeriodo.reduce((a,it)=>a+(costoPorPrenda[it.prenda_id]||0),0);
+        gananciaBruta = vendidoPeriodo - costoTotal;
+      } catch(e){ gananciaBruta = vendidoPeriodo; }
+    }
+    margenPct = vendidoPeriodo>0 ? Math.round(gananciaBruta/vendidoPeriodo*100) : 0;
+
     const porCobrar = activos.reduce((a,p)=>a+Math.max((p.total||0)-(p.monto_pagado||0),0),0);
     const nuevosPeriodo = pedidos.filter(enRango).length;
     const ticketProm = noCancel.length ? Math.round(noCancel.reduce((a,p)=>a+(p.total||0),0)/noCancel.length) : 0;
@@ -1946,6 +1961,7 @@ async function loadDashboard(){
 
     document.getElementById('db-metrics').innerHTML=`
       <div class="metric"><div class="metric-val">S/ ${vendidoPeriodo.toFixed(0)}</div><div class="metric-lbl">Vendido ${rangoLabel}</div><div class="metric-delta ${deltaPeriodo>=0?'delta-up':''}" style="${deltaPeriodo<0?'color:var(--red)':''}">${deltaPeriodo>=0?'↑':'↓'} ${Math.abs(deltaPeriodo)}% ${deltaTxt}</div></div>
+      <div class="metric"><div class="metric-val" style="color:var(--green)">S/ ${gananciaBruta.toFixed(0)}</div><div class="metric-lbl">Ganancia bruta ${rangoLabel}</div><div class="metric-delta text-hint">${margenPct}% de margen</div></div>
       <div class="metric"><div class="metric-val">S/ ${porCobrar.toFixed(0)}</div><div class="metric-lbl">Por cobrar</div><div class="metric-delta text-hint">en pedidos activos</div></div>
       <div class="metric"><div class="metric-val">${activos.length}</div><div class="metric-lbl">Pedidos activos</div><div class="metric-delta text-hint">${nuevosPeriodo} nuevo${nuevosPeriodo!==1?'s':''} ${rangoLabel}</div></div>
       <div class="metric"><div class="metric-val">S/ ${ticketProm}</div><div class="metric-lbl">Ticket promedio</div></div>
