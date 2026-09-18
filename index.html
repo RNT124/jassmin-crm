@@ -762,7 +762,7 @@ td.empty-state{padding:20px;text-align:center}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
       Enlaces
     </div>
-    <div class="sb-item active" onclick="nav('dashboard',this)">
+    <div class="sb-item active" id="sb-item-dashboard" onclick="nav('dashboard',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
       Dashboard
     </div>
@@ -789,6 +789,10 @@ td.empty-state{padding:20px;text-align:center}
     <div class="sb-item" onclick="nav('cortes',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="3"/></svg>
       Cortes de pago
+    </div>
+    <div class="sb-item" id="sb-item-asistencia" onclick="nav('asistencia',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
+      Control de Asistencia
     </div>
     <div class="sb-item" onclick="nav('pedidos',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7l-8-4-8 4v10l8 4 8-4V7z"/><path d="M12 3v18M4 7l8 4 8-4"/></svg>
@@ -1135,7 +1139,7 @@ td.empty-state{padding:20px;text-align:center}
       <div id="pg-cortes" class="page">
         <div class="sec-header">
           <div class="sec-title">Cortes de pago</div>
-          <button class="btn btn-primary btn-sm" onclick="openModalCorte()">+ Nuevo corte</button>
+          <button class="btn btn-primary btn-sm" id="btn-nuevo-corte" onclick="openModalCorte()">+ Nuevo corte</button>
         </div>
         <div class="metrics-grid" id="cortes-metrics"></div>
         <div class="tabs" style="margin-bottom:12px">
@@ -1148,6 +1152,14 @@ td.empty-state{padding:20px;text-align:center}
           <input id="cortes-search" type="text" placeholder="🔍 Buscar por teléfono..." style="width:100%;max-width:280px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarCortes(this.value)">
         </div>
         <div id="cortes-lista"><div class="loading">Cargando...</div></div>
+      </div>
+
+      <!-- ── ASISTENCIA ── -->
+      <div id="pg-asistencia" class="page">
+        <div class="sec-header">
+          <div class="sec-title">Control de Asistencia</div>
+        </div>
+        <div id="asistencia-content"><div class="loading">Cargando...</div></div>
       </div>
 
       <!-- ── PEDIDOS ── -->
@@ -1745,8 +1757,15 @@ function inicioSemanaLunes(fecha){
 // ══════════════ LOCAL FALLBACK DATA ══════════════
 const USERS = {
   admin: { pass:'jassmin2025', nombre:'Renato', rol:'Admin', initials:'R' },
-  operador: { pass:'tienda123', nombre:'Operador', rol:'Operador', initials:'O' }
+  operador: { pass:'tienda123', nombre:'Operador', rol:'Operador', initials:'O' },
+  ximena: { pass:'ximenita.com', nombre:'Ximena', rol:'Trabajador', initials:'X' }
 };
+
+// Pago por día trabajado (Control de Asistencia)
+const PAGO_DIA_COMPLETO = 40;
+const PAGO_MEDIO_DIA = 25;
+function esTrabajador(){ return !!(currentUser && currentUser.rol==='trabajador'); }
+function ocultarMontosCortes(){ return esTrabajador(); }
 
 let currentUser = null;
 let currentLiveClient = null;
@@ -1819,12 +1838,16 @@ async function doLogin(){
   document.getElementById('app-page').style.display='flex';
   document.getElementById('sb-avatar').textContent=currentUser.nombre[0];
   document.getElementById('sb-uname').textContent=currentUser.nombre;
-  document.getElementById('sb-urole').textContent=currentUser.rol==='admin'?'Admin':'Operador';
+  document.getElementById('sb-urole').textContent=currentUser.rol==='admin'?'Admin':(currentUser.rol==='trabajador'?'Trabajador':'Operador');
   if(currentUser.rol!=='admin') document.getElementById('sb-catalogo').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-stock').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-config').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-admin-section').style.display='none';
+  if(currentUser.rol==='trabajador') document.getElementById('sb-item-dashboard').style.display='none';
+  if(currentUser.rol==='trabajador') document.getElementById('btn-nuevo-corte').style.display='none';
+  if(currentUser.rol==='operador') document.getElementById('sb-item-asistencia').style.display='none';
   initApp();
+  if(currentUser.rol==='trabajador') nav('asistencia', document.getElementById('sb-item-asistencia'));
 
   // Verificar con Supabase en background (para obtener datos actualizados del usuario)
   try {
@@ -1853,12 +1876,14 @@ function toggleSidebarMobile(force){
 }
 
 function nav(page, el){
+  // Las trabajadoras no ven el Dashboard — se redirige a Asistencia como respaldo
+  if(page==='dashboard' && esTrabajador()) page='asistencia';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   document.getElementById('pg-'+page).classList.add('active');
   if(el) el.classList.add('active');
   toggleSidebarMobile(false); // cerrar el menú en celular al navegar
-  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho'};
+  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho',asistencia:'Control de Asistencia'};
   const subtitles={
     dashboard:'Resumen de tu negocio, hoy',
     live:'Busca a tu clienta y agrega las prendas que va llevando',
@@ -1871,7 +1896,8 @@ function nav(page, el){
     urgentes:'Clientas que pidieron prioridad en el próximo reparto',
     compras:'Registra reposición de mercadería y gastos del negocio',
     config:'Ajustes y acciones administrativas',
-    despacho:'Pedidos listos para empaquetar y enviar hoy'
+    despacho:'Pedidos listos para empaquetar y enviar hoy',
+    asistencia: esTrabajador() ? 'Marca tu entrada y salida del día' : 'Historial de asistencia y cálculo de pago de tus trabajadoras'
   };
   document.getElementById('tb-title').textContent=titles[page]||page;
   document.getElementById('tb-subtitle').textContent=subtitles[page]||'';
@@ -1884,12 +1910,15 @@ function nav(page, el){
   if(page==='despacho') loadDespacho();
   if(page==='urgentes') loadUrgentes();
   if(page==='compras') loadCompras();
+  if(page==='asistencia') loadAsistencia();
 }
 
 // ═══════════════════════════ INIT ═══════════════════════════
 async function initApp(){
   // Carga en paralelo solo lo esencial — dashboard y catálogo para el live
-  Promise.all([loadDashboard(), loadCatalogoLive(), loadStock()]);
+  const tareas=[loadCatalogoLive(), loadStock()];
+  if(currentUser.rol!=='trabajador') tareas.push(loadDashboard());
+  Promise.all(tareas);
 }
 
 async function loadDashboard(){
@@ -5484,12 +5513,21 @@ async function loadCortes(f){
     const totalVendido=items.reduce((a,it)=>a+(it.precio_unitario||0),0);
     const totalPagado=items.filter(it=>it.estado_pago==='confirmado').reduce((a,it)=>a+(it.monto_pagado||it.precio_unitario||0),0);
     const pendiente=totalVendido-totalPagado;
+    const pagadosCount=items.filter(it=>it.estado_pago==='confirmado').length;
+    const pendientesCount=items.length-pagadosCount;
 
-    document.getElementById('cortes-metrics').innerHTML=`
-      <div class="metric"><div class="metric-val">S/ ${totalVendido.toFixed(0)}</div><div class="metric-lbl">Total vendido</div></div>
-      <div class="metric" style="background:var(--green-light)"><div class="metric-val" style="color:var(--green)">S/ ${totalPagado.toFixed(0)}</div><div class="metric-lbl">Cobrado</div></div>
-      <div class="metric" style="background:var(--red-light)"><div class="metric-val" style="color:var(--red)">S/ ${pendiente.toFixed(0)}</div><div class="metric-lbl">Pendiente</div></div>
-      <div class="metric"><div class="metric-val">${items.length}</div><div class="metric-lbl">Prendas registradas</div></div>`;
+    if(ocultarMontosCortes()){
+      document.getElementById('cortes-metrics').innerHTML=`
+        <div class="metric"><div class="metric-val">${items.length}</div><div class="metric-lbl">Prendas registradas</div></div>
+        <div class="metric" style="background:var(--green-light)"><div class="metric-val" style="color:var(--green)">${pagadosCount}</div><div class="metric-lbl">Pagadas</div></div>
+        <div class="metric" style="background:var(--red-light)"><div class="metric-val" style="color:var(--red)">${pendientesCount}</div><div class="metric-lbl">Pendientes</div></div>`;
+    } else {
+      document.getElementById('cortes-metrics').innerHTML=`
+        <div class="metric"><div class="metric-val">S/ ${totalVendido.toFixed(0)}</div><div class="metric-lbl">Total vendido</div></div>
+        <div class="metric" style="background:var(--green-light)"><div class="metric-val" style="color:var(--green)">S/ ${totalPagado.toFixed(0)}</div><div class="metric-lbl">Cobrado</div></div>
+        <div class="metric" style="background:var(--red-light)"><div class="metric-val" style="color:var(--red)">S/ ${pendiente.toFixed(0)}</div><div class="metric-lbl">Pendiente</div></div>
+        <div class="metric"><div class="metric-val">${items.length}</div><div class="metric-lbl">Prendas registradas</div></div>`;
+    }
 
     DB_cortes=items;
 
@@ -5503,6 +5541,7 @@ async function loadCortes(f){
     }
 
     // Botón nuevo corte manual encima
+    const ocultaMonto=ocultarMontosCortes();
     document.getElementById('cortes-lista').innerHTML=`
       <div class="tbl-wrap">
         <table class="tbl">
@@ -5512,9 +5551,9 @@ async function loadCortes(f){
             <th>Prenda</th>
             <th>Talla</th>
             <th>Color</th>
-            <th>Monto</th>
+            ${ocultaMonto?'':'<th>Monto</th>'}
             <th>Estado pago</th>
-            <th>Acción</th>
+            ${ocultaMonto?'':'<th>Acción</th>'}
           </tr></thead>
           <tbody>${items.map(it=>{
             const cl=it.carritos?.clientes;
@@ -5530,9 +5569,9 @@ async function loadCortes(f){
               <td>${it.prendas?.nombre||'—'}</td>
               <td>${it.talla||'—'}</td>
               <td>${it.color||'—'}</td>
-              <td class="font-500">S/ ${it.precio_unitario||0}</td>
-              <td><span class="badge ${badgeCls}">${badgeLbl}</span>${it.monto_pagado&&estado==='parcial'?`<div style="font-size:10px;color:var(--text3)">Abonó S/${it.monto_pagado}</div>`:''}</td>
-              <td>${estado!=='confirmado'?`<button class="btn btn-xs btn-primary" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0})">Validar</button>`:`<span style="color:var(--green);font-size:12px;margin-right:6px">✓</span><button class="btn btn-xs" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0},true)">Editar</button>`}</td>
+              ${ocultaMonto?'':`<td class="font-500">S/ ${it.precio_unitario||0}</td>`}
+              <td><span class="badge ${badgeCls}">${badgeLbl}</span>${(!ocultaMonto&&it.monto_pagado&&estado==='parcial')?`<div style="font-size:10px;color:var(--text3)">Abonó S/${it.monto_pagado}</div>`:''}</td>
+              ${ocultaMonto?'':`<td>${estado!=='confirmado'?`<button class="btn btn-xs btn-primary" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0})">Validar</button>`:`<span style="color:var(--green);font-size:12px;margin-right:6px">✓</span><button class="btn btn-xs" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0},true)">Editar</button>`}</td>`}
             </tr>`;
           }).join('')}</tbody>
         </table>
@@ -5722,6 +5761,223 @@ function toast(msg, tipo='info'){
   el._t = setTimeout(()=>{ el.style.opacity='0'; }, 2800);
 }
 document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+
+// ═══════════════════════════ ASISTENCIA ═══════════════════════════
+let asistenciaHoy = null;
+let asistenciaFiltro = 'mes';
+let asistenciaTrabajadorSel = 'todos';
+
+function tipoDiaAsistencia(row){
+  if(row.hora_salida) return 'completo';
+  if(row.hora_salida_almuerzo) return 'medio_dia';
+  return 'en_curso';
+}
+function fmtHoraAsist(iso){ return iso ? new Date(iso).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}) : '—'; }
+function fmtFechaAsist(f){ if(!f) return '—'; const [y,m,d]=f.split('-'); return `${d}/${m}/${y}`; }
+function rangoFechasAsistencia(f){
+  const ahora=new Date();
+  let desde;
+  if(f==='hoy'){ desde=new Date(ahora); desde.setHours(0,0,0,0); }
+  else if(f==='semana'){ desde=inicioSemanaLunes(ahora); }
+  else if(f==='todos'){ desde=null; }
+  else { desde=new Date(ahora.getFullYear(),ahora.getMonth(),1); }
+  return desde;
+}
+
+async function cargarAsistenciaHoy(){
+  if(!esTrabajador()){ asistenciaHoy=null; return; }
+  const hoyStr=new Date().toISOString().slice(0,10);
+  try{
+    const rows=await dbGet(`asistencia?usuario=eq.${currentUser.key}&fecha=eq.${hoyStr}&select=*`);
+    asistenciaHoy = rows && rows.length ? rows[0] : null;
+  }catch(e){ asistenciaHoy=null; }
+}
+
+function renderBotonesAsistencia(){
+  const a=asistenciaHoy;
+  if(!a || !a.hora_entrada){
+    return `<button class="btn btn-primary btn-sm" onclick="marcarEntrada()">🟢 Marcar entrada</button>`;
+  }
+  if(!a.hora_salida_almuerzo && !a.hora_salida){
+    return `<button class="btn btn-sm" onclick="marcarSalidaAlmuerzo()">🍽️ Salida a almorzar</button>
+            <button class="btn btn-primary btn-sm" onclick="marcarSalidaFinal()">🔴 Marcar salida (día completo)</button>`;
+  }
+  if(a.hora_salida_almuerzo && !a.hora_regreso_almuerzo && !a.hora_salida){
+    return `<button class="btn btn-primary btn-sm" onclick="marcarRegresoAlmuerzo()">↩️ Regreso de almuerzo</button>
+            <span class="text-hint" style="font-size:11px;display:block;margin-top:6px">Si no vuelves a marcar hoy, se contará como medio día</span>`;
+  }
+  if(a.hora_regreso_almuerzo && !a.hora_salida){
+    return `<button class="btn btn-primary btn-sm" onclick="marcarSalidaFinal()">🔴 Marcar salida</button>`;
+  }
+  if(a.hora_salida){
+    return `<span class="badge badge-ok" style="font-size:12px;padding:6px 12px">✓ Día completado — Día completo</span>`;
+  }
+  return '';
+}
+
+async function marcarPasoAsistencia(campo, etiqueta){
+  const hoyStr=new Date().toISOString().slice(0,10);
+  const ahoraISO=new Date().toISOString();
+  try{
+    if(!asistenciaHoy){
+      const rows=await dbPost('asistencia', {usuario:currentUser.key, fecha:hoyStr, [campo]:ahoraISO});
+      asistenciaHoy = rows[0];
+    } else {
+      const rows=await supaFetch(`asistencia?id=eq.${asistenciaHoy.id}&${campo}=is.null`, 'PATCH', JSON.stringify({[campo]:ahoraISO}), 'return=representation');
+      if(!rows || !rows.length){ toast('Ese horario ya había sido marcado'); await loadAsistencia(); return; }
+      asistenciaHoy = rows[0];
+    }
+    toast(`✓ ${etiqueta} registrada — ${new Date(ahoraISO).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}`);
+    await loadAsistencia();
+  }catch(e){ toast('Error: '+e.message); }
+}
+function marcarEntrada(){ marcarPasoAsistencia('hora_entrada','Entrada'); }
+function marcarSalidaAlmuerzo(){ marcarPasoAsistencia('hora_salida_almuerzo','Salida a almorzar'); }
+function marcarRegresoAlmuerzo(){ marcarPasoAsistencia('hora_regreso_almuerzo','Regreso de almuerzo'); }
+function marcarSalidaFinal(){ marcarPasoAsistencia('hora_salida','Salida'); }
+
+function filterAsistencia(f){
+  asistenciaFiltro=f;
+  loadAsistencia();
+}
+function filterAsistenciaTrabajador(u){
+  asistenciaTrabajadorSel=u;
+  loadAsistencia();
+}
+
+async function loadAsistencia(){
+  const cont=document.getElementById('asistencia-content');
+  cont.innerHTML='<div class="loading">Cargando...</div>';
+  try{
+    if(esTrabajador()){ await cargarAsistenciaHoy(); await renderAsistenciaTrabajador(); }
+    else { await renderAsistenciaAdmin(); }
+  }catch(e){
+    cont.innerHTML=`<div style="color:var(--red);font-size:12px;padding:12px">Error: ${e.message}</div>`;
+  }
+}
+
+async function renderAsistenciaTrabajador(){
+  const cont=document.getElementById('asistencia-content');
+  const desde=rangoFechasAsistencia(asistenciaFiltro);
+  const cond=[`usuario=eq.${currentUser.key}`,'order=fecha.desc'];
+  if(desde) cond.push(`fecha=gte.${desde.toISOString().slice(0,10)}`);
+  const rows=await dbGet(`asistencia?${cond.join('&')}`);
+
+  const completos=rows.filter(r=>tipoDiaAsistencia(r)==='completo').length;
+  const medios=rows.filter(r=>tipoDiaAsistencia(r)==='medio_dia').length;
+
+  cont.innerHTML=`
+    <div class="card" style="margin-bottom:16px;padding:20px">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;font-weight:500">Hoy · ${new Date().toLocaleDateString('es-PE',{weekday:'long',day:'2-digit',month:'2-digit'})}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">${renderBotonesAsistencia()}</div>
+    </div>
+    <div class="metrics-grid" style="margin-bottom:14px">
+      <div class="metric"><div class="metric-val">${completos}</div><div class="metric-lbl">Días completos</div></div>
+      <div class="metric" style="background:var(--amber-light)"><div class="metric-val" style="color:var(--amber-dark)">${medios}</div><div class="metric-lbl">Medios días</div></div>
+      <div class="metric"><div class="metric-val">${rows.length}</div><div class="metric-lbl">Días registrados</div></div>
+    </div>
+    <div class="tabs" style="margin-bottom:12px">
+      <div class="tab ${asistenciaFiltro==='mes'?'active':''}" onclick="filterAsistencia('mes')">Este mes</div>
+      <div class="tab ${asistenciaFiltro==='semana'?'active':''}" onclick="filterAsistencia('semana')">Esta semana</div>
+      <div class="tab ${asistenciaFiltro==='todos'?'active':''}" onclick="filterAsistencia('todos')">Todos</div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Fecha</th><th>Entrada</th><th>Salida almuerzo</th><th>Regreso</th><th>Salida</th><th>Tipo de día</th></tr></thead>
+        <tbody>${rows.length?rows.map(r=>{
+          const tipo=tipoDiaAsistencia(r);
+          const tipoLbl=tipo==='completo'?'Día completo':tipo==='medio_dia'?'Medio día':'En curso';
+          const tipoBadge=tipo==='completo'?'badge-ok':tipo==='medio_dia'?'badge-warn':'badge-gray';
+          return `<tr>
+            <td class="font-500">${fmtFechaAsist(r.fecha)}</td>
+            <td>${fmtHoraAsist(r.hora_entrada)}</td>
+            <td>${fmtHoraAsist(r.hora_salida_almuerzo)}</td>
+            <td>${fmtHoraAsist(r.hora_regreso_almuerzo)}</td>
+            <td>${fmtHoraAsist(r.hora_salida)}</td>
+            <td><span class="badge ${tipoBadge}">${tipoLbl}</span></td>
+          </tr>`;
+        }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">Sin registros en este período</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+
+async function renderAsistenciaAdmin(){
+  const cont=document.getElementById('asistencia-content');
+  const desde=rangoFechasAsistencia(asistenciaFiltro);
+  const cond=[];
+  if(desde) cond.push(`fecha=gte.${desde.toISOString().slice(0,10)}`);
+  if(asistenciaTrabajadorSel!=='todos') cond.push(`usuario=eq.${asistenciaTrabajadorSel}`);
+  cond.push('order=fecha.desc');
+  const rows=await dbGet(`asistencia?${cond.join('&')}`);
+
+  const trabajadores=Object.entries(USERS).filter(([k,v])=>v.rol.toLowerCase()==='trabajador');
+
+  const resumenPorUsuario={};
+  rows.forEach(r=>{
+    if(!resumenPorUsuario[r.usuario]) resumenPorUsuario[r.usuario]={completos:0,medios:0};
+    const tipo=tipoDiaAsistencia(r);
+    if(tipo==='completo') resumenPorUsuario[r.usuario].completos++;
+    else if(tipo==='medio_dia') resumenPorUsuario[r.usuario].medios++;
+  });
+  const usuariosConDatos=Object.keys(resumenPorUsuario);
+  const totalGeneral=Object.values(resumenPorUsuario).reduce((a,s)=>a+s.completos*PAGO_DIA_COMPLETO+s.medios*PAGO_MEDIO_DIA,0);
+
+  const resumenFilas=usuariosConDatos.length?usuariosConDatos.map(u=>{
+    const s=resumenPorUsuario[u];
+    const nombre=USERS[u]?.nombre||u;
+    const total=s.completos*PAGO_DIA_COMPLETO+s.medios*PAGO_MEDIO_DIA;
+    return `<tr>
+      <td class="font-500">${nombre}</td>
+      <td>${s.completos}</td>
+      <td>${s.medios}</td>
+      <td class="font-500" style="color:var(--green)">S/ ${total}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:16px">Sin registros en este período</td></tr>`;
+
+  cont.innerHTML=`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <select id="asist-trabajador-sel" onchange="filterAsistenciaTrabajador(this.value)" style="padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+        <option value="todos" ${asistenciaTrabajadorSel==='todos'?'selected':''}>Todas las trabajadoras</option>
+        ${trabajadores.map(([k,v])=>`<option value="${k}" ${asistenciaTrabajadorSel===k?'selected':''}>${v.nombre}</option>`).join('')}
+      </select>
+      <div class="tabs" style="margin:0">
+        <div class="tab ${asistenciaFiltro==='mes'?'active':''}" onclick="filterAsistencia('mes')">Este mes</div>
+        <div class="tab ${asistenciaFiltro==='semana'?'active':''}" onclick="filterAsistencia('semana')">Esta semana</div>
+        <div class="tab ${asistenciaFiltro==='todos'?'active':''}" onclick="filterAsistencia('todos')">Todos</div>
+      </div>
+    </div>
+
+    <div class="sec-title" style="font-size:13px;margin-bottom:8px">Resumen para pago</div>
+    <div class="tbl-wrap" style="margin-bottom:20px">
+      <table class="tbl">
+        <thead><tr><th>Trabajadora</th><th>Días completos (S/${PAGO_DIA_COMPLETO})</th><th>Medios días (S/${PAGO_MEDIO_DIA})</th><th>Total a pagar</th></tr></thead>
+        <tbody>${resumenFilas}</tbody>
+        ${usuariosConDatos.length>1?`<tfoot><tr style="font-weight:600"><td>Total general</td><td></td><td></td><td style="color:var(--green)">S/ ${totalGeneral}</td></tr></tfoot>`:''}
+      </table>
+    </div>
+
+    <div class="sec-title" style="font-size:13px;margin-bottom:8px">Detalle diario</div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Trabajadora</th><th>Fecha</th><th>Entrada</th><th>Salida almuerzo</th><th>Regreso</th><th>Salida</th><th>Tipo de día</th></tr></thead>
+        <tbody>${rows.length?rows.map(r=>{
+          const tipo=tipoDiaAsistencia(r);
+          const tipoLbl=tipo==='completo'?'Día completo':tipo==='medio_dia'?'Medio día':'En curso';
+          const tipoBadge=tipo==='completo'?'badge-ok':tipo==='medio_dia'?'badge-warn':'badge-gray';
+          const nombre=USERS[r.usuario]?.nombre||r.usuario;
+          return `<tr>
+            <td class="font-500">${nombre}</td>
+            <td>${fmtFechaAsist(r.fecha)}</td>
+            <td>${fmtHoraAsist(r.hora_entrada)}</td>
+            <td>${fmtHoraAsist(r.hora_salida_almuerzo)}</td>
+            <td>${fmtHoraAsist(r.hora_regreso_almuerzo)}</td>
+            <td>${fmtHoraAsist(r.hora_salida)}</td>
+            <td><span class="badge ${tipoBadge}">${tipoLbl}</span></td>
+          </tr>`;
+        }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px">Sin registros en este período</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
 
 // Check URL params — routing público
 (function(){
