@@ -2542,10 +2542,12 @@ async function bulkRegistrarDespacho(){
   } catch(e){ toast('Error en despacho masivo: '+e.message); }
 }
 
+let urgentesCopyData = {};
 async function loadUrgentes(){
   document.getElementById('urgentes-lista').innerHTML='<div class="loading">Cargando...</div>';
+  urgentesCopyData = {};
   try {
-    const clientes = await dbGet('clientes?envio_urgente_en=not.is.null&select=id,nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en&order=envio_urgente_en.asc');
+    const clientes = await dbGet('clientes?envio_urgente_en=not.is.null&select=id,nombre,telefono,dni,talla,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en&order=envio_urgente_en.asc');
 
     const badge = document.getElementById('badge-urgentes');
     if(clientes.length>0){ badge.textContent=clientes.length; badge.style.display='inline-block'; }
@@ -2586,7 +2588,22 @@ async function loadUrgentes(){
       const mins = Math.floor((Date.now()-new Date(cl.envio_urgente_en).getTime())/60000);
       const tiempo = mins<60 ? `hace ${mins} min` : mins<1440 ? `hace ${Math.floor(mins/60)}h` : `hace ${Math.floor(mins/1440)}d`;
       const esShalom = (cl.tipo_envio_preferido||'').startsWith('shalom');
-      const etiqueta = esShalom?'📦 Shalom — '+(cl.direccion||''):'🏍️ Motorizado — '+(cl.distrito||'');
+      const etiqueta = esShalom
+        ? `📦 Shalom — Agencia: ${cl.direccion||'—'} (${cl.distrito||'—'})`
+        : `🏍️ Motorizado — ${cl.direccion||'—'}, ${cl.distrito||'—'}${cl.referencia?' · Ref: '+cl.referencia:''}`;
+
+      // Texto completo para el botón "Copiar"
+      const lineasCopy = [
+        `Nombre: ${cl.nombre||'—'}`,
+        `Teléfono: ${cl.telefono||'—'}`,
+        `DNI: ${cl.dni||'—'}`,
+        `Talla: ${cl.talla||'—'}`,
+        esShalom ? `Envío: Shalom` : `Envío: Motorizado`,
+        esShalom ? `Agencia: ${cl.direccion||'—'}` : `Dirección: ${cl.direccion||'—'}`,
+        esShalom ? `Ciudad/Departamento: ${cl.distrito||'—'}` : `Distrito: ${cl.distrito||'—'}`,
+      ];
+      if(!esShalom && cl.referencia) lineasCopy.push(`Referencia: ${cl.referencia}`);
+      urgentesCopyData[cl.id] = lineasCopy.join('\n');
 
       let accion, estadoLbl;
       if(ped.estado==='acumulando'){
@@ -2613,14 +2630,26 @@ async function loadUrgentes(){
           ${ped.estado==='empaquetado'?`<input type="checkbox" class="urg-check" data-id="${ped.id}" onchange="actualizarBulkUrgentes()" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">`:''}
           <div>
             <div style="font-weight:600;font-size:13.5px">${cl.nombre} <span style="font-weight:400;color:var(--text3);font-size:11.5px">· solicitado ${tiempo}</span></div>
-            <div style="font-size:12px;color:var(--text2)">${cl.telefono} · ${etiqueta}</div>
+            <div style="font-size:12px;color:var(--text2)">📱 ${cl.telefono} · 🪪 DNI ${cl.dni||'—'} · Talla ${cl.talla||'—'}</div>
+            <div style="font-size:12px;color:var(--text2)">${etiqueta}</div>
             <div style="font-size:11.5px;color:var(--text3);margin-top:2px">Pedido ${ped.numero||'(sin generar)'} · <strong>${estadoLbl}</strong></div>
           </div>
         </div>
-        ${accion}
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <button class="btn btn-xs" onclick="copiarDatosUrgente('${cl.id}')" title="Copiar todos los datos de la clienta">📋 Copiar</button>
+          ${accion}
+        </div>
       </div>`;
     }).join('');
   } catch(e){ console.error('loadUrgentes error:',e); }
+}
+
+function copiarDatosUrgente(id){
+  const texto = urgentesCopyData[id];
+  if(!texto) return;
+  navigator.clipboard.writeText(texto)
+    .then(()=>toast('✓ Datos copiados'))
+    .catch(()=>toast('No se pudo copiar — copia manual'));
 }
 
 async function loadCarritos(){
@@ -5314,7 +5343,7 @@ function rgAbrirWhatsApp(tipo){
   const c = rgClienteActual;
   const esShalom = (c.tipo_envio_preferido||'').startsWith('shalom');
   const envioTxt = esShalom
-    ? `Shalom — ${c.direccion||'(sin agencia)'} · ${c.distrito||''}`
+    ? `Shalom — ${c.direccion||'(sin agencia)'} · ${c.distrito||''}${c.dni?`\nDNI: ${c.dni}`:''}`
     : `Motorizado — ${c.direccion||'(sin dirección)'} · ${c.distrito||''}`;
   const accionTxt = tipo==='urgente'
     ? 'Acabo de solicitar que mi pedido salga LO ANTES POSIBLE 🚀'
