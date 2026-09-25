@@ -807,6 +807,10 @@ td.empty-state{padding:20px;text-align:center}
       Despacho
       <span id="badge-despacho" style="margin-left:auto;background:var(--pink);color:#fff;font-size:10px;padding:1px 7px;border-radius:20px;display:none">0</span>
     </div>
+    <div class="sb-item" id="sb-item-inventario" onclick="nav('inventario',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z"/><rect x="4" y="4" width="16" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+      Inventario
+    </div>
 
     <div class="sb-section" id="sb-admin-section">Administración</div>
     <div class="sb-item" id="sb-catalogo" onclick="nav('catalogo',this)">
@@ -1255,6 +1259,21 @@ td.empty-state{padding:20px;text-align:center}
         </div>
       </div>
 
+      <!-- ── INVENTARIO (conteo físico) ── -->
+      <div id="pg-inventario" class="page">
+        <div class="sec-header">
+          <div class="sec-title">Inventario</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-primary" onclick="invIniciarGeneral()">📋 Inventario general</button>
+            <button class="btn btn-sm" onclick="invAbrirSeleccionParcial()">📋 Inventario parcial</button>
+          </div>
+        </div>
+        <div class="text-muted text-sm mb-16">Cuenta físicamente tu mercadería y compárala contra lo que dice el sistema. Al confirmar, ajusta el stock y queda guardado en el historial.</div>
+
+        <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Conteos anteriores</div>
+        <div id="inventario-historial"><div class="loading">Cargando...</div></div>
+      </div>
+
       <!-- ── DESPACHO DEL DÍA ── -->
       <div id="pg-despacho" class="page">
         <div class="sec-header" style="margin-bottom:8px">
@@ -1693,6 +1712,74 @@ td.empty-state{padding:20px;text-align:center}
   </div>
 </div>
 
+<!-- Modal selección Inventario parcial -->
+<div class="modal-overlay" id="modal-inventario-seleccion">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">📋 Inventario parcial — ¿qué quieres contar?</div>
+    <div class="text-muted text-sm mb-12">Elige una o varias categorías, y/o busca prendas específicas. Puedes combinar ambas.</div>
+
+    <div class="form-row">
+      <label class="form-label">Categorías</label>
+      <div id="invsel-categorias" class="pill-row" style="gap:6px;margin-top:4px"></div>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">Prendas específicas</label>
+      <input type="text" id="invsel-prenda-buscar" list="invsel-prenda-datalist" placeholder="Escribe para buscar y agregar..." oninput="invSelAgregarPrendaBuscada()" autocomplete="off">
+      <datalist id="invsel-prenda-datalist"></datalist>
+      <div id="invsel-prendas-pills" class="pill-row" style="gap:6px;margin-top:8px"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-inventario-seleccion')">Cancelar</button>
+      <button class="btn btn-sm btn-primary" onclick="invContinuarParcial()">Continuar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal pantalla de conteo + resumen -->
+<div class="modal-overlay" id="modal-inventario-conteo">
+  <div class="modal" style="max-width:900px;max-height:88vh;overflow-y:auto">
+    <div class="modal-title" id="inv-conteo-titulo">📋 Conteo de inventario</div>
+
+    <div id="inv-vista-conteo">
+      <div style="position:sticky;top:-20px;background:var(--surface);z-index:2;padding:6px 0 10px;margin-bottom:8px;border-bottom:0.5px solid var(--border)">
+        <input id="inv-conteo-search" type="text" placeholder="🔍 Buscar prenda dentro de este conteo..." style="width:100%;max-width:320px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="invFiltrarConteo()">
+        <div id="inv-conteo-progreso" style="font-size:12px;color:var(--text2);margin-top:6px;font-weight:500"></div>
+      </div>
+      <div id="inv-conteo-lista"></div>
+    </div>
+
+    <div id="inv-vista-resumen" style="display:none">
+      <div id="inv-resumen-totales" style="margin-bottom:14px"></div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Prenda</th><th>Talla</th><th>Color</th><th>Sistema</th><th>Contado</th><th>Diferencia</th></tr></thead>
+          <tbody id="inv-resumen-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-sm" id="inv-btn-cancelar" onclick="closeModal('modal-inventario-conteo')">Cancelar</button>
+      <button class="btn btn-sm" id="inv-btn-volver" style="display:none" onclick="invVolverAConteo()">← Volver a editar</button>
+      <button class="btn btn-sm btn-primary" id="inv-btn-siguiente" onclick="invVerResumen()">Ver resumen →</button>
+      <button class="btn btn-sm btn-success" id="inv-btn-confirmar" style="display:none" onclick="invConfirmarGuardar()">✓ Confirmar y guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal detalle de un conteo pasado (solo lectura) -->
+<div class="modal-overlay" id="modal-inventario-detalle">
+  <div class="modal" style="max-width:700px;max-height:85vh;overflow-y:auto">
+    <div class="modal-title" id="invdet-titulo">Detalle del conteo</div>
+    <div id="invdet-contenido"></div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-inventario-detalle')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Registrar Gasto -->
 <div class="modal-overlay" id="modal-gasto">
   <div class="modal">
@@ -1884,6 +1971,7 @@ async function doLogin(){
   if(currentUser.rol==='trabajador') document.getElementById('sb-item-dashboard').style.display='none';
   if(currentUser.rol==='trabajador') document.getElementById('btn-nuevo-corte').style.display='none';
   if(currentUser.rol==='operador') document.getElementById('sb-item-asistencia').style.display='none';
+  if(currentUser.rol==='operador') document.getElementById('sb-item-inventario').style.display='none';
   initApp();
   if(currentUser.rol==='trabajador') nav('asistencia', document.getElementById('sb-item-asistencia'));
 
@@ -1921,7 +2009,7 @@ function nav(page, el){
   document.getElementById('pg-'+page).classList.add('active');
   if(el) el.classList.add('active');
   toggleSidebarMobile(false); // cerrar el menú en celular al navegar
-  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho',asistencia:'Control de Asistencia'};
+  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho',asistencia:'Control de Asistencia',inventario:'Inventario'};
   const subtitles={
     dashboard:'Resumen de tu negocio, hoy',
     live:'Busca a tu clienta y agrega las prendas que va llevando',
@@ -1935,7 +2023,8 @@ function nav(page, el){
     compras:'Registra reposición de mercadería y gastos del negocio',
     config:'Ajustes y acciones administrativas',
     despacho:'Pedidos listos para empaquetar y enviar hoy',
-    asistencia: esTrabajador() ? 'Marca tu entrada y salida del día' : 'Historial de asistencia y cálculo de pago de tus trabajadoras'
+    asistencia: esTrabajador() ? 'Marca tu entrada y salida del día' : 'Historial de asistencia y cálculo de pago de tus trabajadoras',
+    inventario:'Cuenta tu mercadería física y compárala contra el sistema'
   };
   document.getElementById('tb-title').textContent=titles[page]||page;
   document.getElementById('tb-subtitle').textContent=subtitles[page]||'';
@@ -1949,6 +2038,7 @@ function nav(page, el){
   if(page==='urgentes') loadUrgentes();
   if(page==='compras') loadCompras();
   if(page==='asistencia') loadAsistencia();
+  if(page==='inventario') loadInventarioHistorial();
 }
 
 // ═══════════════════════════ INIT ═══════════════════════════
@@ -2677,6 +2767,293 @@ async function guardarCompra(){
     await loadCatalogo();
     await loadCatalogoLive();
   } catch(e){ toast('Error registrando compra: '+e.message); }
+}
+
+// ═══════════════════════════ INVENTARIO (conteo físico) ═══════════════════════════
+let invTipo = null;          // 'general' | 'parcial'
+let invScopePrendaIds = null; // Set de prenda_id en alcance (null = todas)
+let invPrendasEnConteo = [];  // [{prenda, variantes:[{talla,color,stock_sistema}]}]
+let invDiferencias = [];      // resultado calculado al ver el resumen
+let invSelCategorias = new Set();
+let invSelPrendas = [];       // [{id,nombre}]
+
+// ---------- Selección para "parcial" ----------
+function invAbrirSeleccionParcial(){
+  invSelCategorias = new Set();
+  invSelPrendas = [];
+  const cats = [...new Set((DB.prendas||[]).filter(p=>p.activo).map(p=>p.categoria).filter(Boolean))].sort();
+  document.getElementById('invsel-categorias').innerHTML = cats.length ? cats.map(c=>`
+    <span class="badge badge-gray" style="cursor:pointer;padding:5px 10px" data-cat="${c}" onclick="invSelToggleCategoria('${c.replace(/'/g,"\\'")}')">${c}</span>
+  `).join('') : '<span class="text-hint" style="font-size:12px">Sin categorías registradas</span>';
+  document.getElementById('invsel-prenda-buscar').value='';
+  document.getElementById('invsel-prendas-pills').innerHTML='';
+  const datalist = document.getElementById('invsel-prenda-datalist');
+  datalist.innerHTML = (DB.prendas||[]).filter(p=>p.activo).map(p=>`<option value="${p.nombre}">`).join('');
+  document.getElementById('modal-inventario-seleccion').classList.add('open');
+}
+
+function invSelToggleCategoria(cat){
+  if(invSelCategorias.has(cat)) invSelCategorias.delete(cat); else invSelCategorias.add(cat);
+  document.querySelectorAll('#invsel-categorias [data-cat]').forEach(el=>{
+    const activa = invSelCategorias.has(el.dataset.cat);
+    el.className = 'badge '+(activa?'badge-ok':'badge-gray');
+  });
+}
+
+function invSelAgregarPrendaBuscada(){
+  const txt = document.getElementById('invsel-prenda-buscar').value.trim();
+  const prenda = (DB.prendas||[]).find(p=>(p.nombre||'').toLowerCase()===txt.toLowerCase());
+  if(prenda && !invSelPrendas.some(p=>p.id===prenda.id)){
+    invSelPrendas.push({id:prenda.id, nombre:prenda.nombre});
+    document.getElementById('invsel-prenda-buscar').value='';
+    invSelRenderPrendasPills();
+  }
+}
+function invSelQuitarPrenda(id){
+  invSelPrendas = invSelPrendas.filter(p=>p.id!==id);
+  invSelRenderPrendasPills();
+}
+function invSelRenderPrendasPills(){
+  document.getElementById('invsel-prendas-pills').innerHTML = invSelPrendas.map(p=>`
+    <span class="badge badge-info" style="display:inline-flex;align-items:center;gap:5px;padding:4px 8px">${p.nombre}
+      <span style="cursor:pointer;font-weight:700" onclick="invSelQuitarPrenda('${p.id}')">×</span>
+    </span>`).join('');
+}
+
+function invContinuarParcial(){
+  if(!invSelCategorias.size && !invSelPrendas.length){ toast('Elige al menos una categoría o una prenda'); return; }
+  const idsPorCategoria = (DB.prendas||[]).filter(p=>p.activo && invSelCategorias.has(p.categoria)).map(p=>p.id);
+  const idsEspecificos = invSelPrendas.map(p=>p.id);
+  invScopePrendaIds = new Set([...idsPorCategoria, ...idsEspecificos]);
+  closeModal('modal-inventario-seleccion');
+  invIniciarConteo('parcial');
+}
+
+function invIniciarGeneral(){
+  invScopePrendaIds = null;
+  invIniciarConteo('general');
+}
+
+// ---------- Pantalla de conteo ----------
+async function invIniciarConteo(tipo){
+  invTipo = tipo;
+  document.getElementById('inv-conteo-titulo').textContent = tipo==='general' ? '📋 Inventario general' : '📋 Inventario parcial';
+  document.getElementById('inv-vista-conteo').style.display='block';
+  document.getElementById('inv-vista-resumen').style.display='none';
+  document.getElementById('inv-btn-cancelar').style.display='inline-flex';
+  document.getElementById('inv-btn-volver').style.display='none';
+  document.getElementById('inv-btn-siguiente').style.display='inline-flex';
+  document.getElementById('inv-btn-confirmar').style.display='none';
+  document.getElementById('inv-conteo-search').value='';
+  document.getElementById('inv-conteo-lista').innerHTML='<div class="loading">Cargando stock...</div>';
+  document.getElementById('modal-inventario-conteo').classList.add('open');
+
+  try{
+    let prendas = (DB.prendas||[]).filter(p=>p.activo);
+    if(invScopePrendaIds) prendas = prendas.filter(p=>invScopePrendaIds.has(p.id));
+    prendas = [...prendas].sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
+
+    const variantes = await dbGet('prenda_stock?select=id,prenda_id,talla,color,cantidad&order=talla,color');
+    const porPrenda = {};
+    variantes.forEach(v=>{ (porPrenda[v.prenda_id]=porPrenda[v.prenda_id]||[]).push(v); });
+
+    invPrendasEnConteo = prendas
+      .map(p=>({ prenda:p, variantes: (porPrenda[p.id]||[]) }))
+      .filter(g=>g.variantes.length>0);
+
+    invRenderConteo();
+  }catch(e){
+    document.getElementById('inv-conteo-lista').innerHTML=`<div style="color:var(--red);font-size:12px;padding:12px">Error: ${e.message}</div>`;
+  }
+}
+
+function invRenderConteo(){
+  const cont = document.getElementById('inv-conteo-lista');
+  if(!invPrendasEnConteo.length){
+    cont.innerHTML='<div class="empty-state">No hay prendas con stock en este alcance</div>';
+    invActualizarProgreso();
+    return;
+  }
+  cont.innerHTML = invPrendasEnConteo.map(g=>{
+    const tallas = [...new Set(g.variantes.map(v=>v.talla))];
+    const colores = [...new Set(g.variantes.map(v=>v.color))];
+    const mapa = {};
+    g.variantes.forEach(v=>{ mapa[`${v.talla}|${v.color}`] = v; });
+    let tabla = '<table class="tbl" style="min-width:100%"><thead><tr><th style="min-width:90px">Color \\ Talla</th>'
+      + tallas.map(t=>`<th style="text-align:center">${t}</th>`).join('') + '</tr></thead><tbody>';
+    colores.forEach(c=>{
+      tabla += `<tr><td class="font-500">${c}</td>`;
+      tallas.forEach(t=>{
+        const v = mapa[`${t}|${c}`];
+        if(!v){ tabla += '<td style="text-align:center;color:var(--text3)">—</td>'; return; }
+        tabla += `<td style="text-align:center;padding:4px">
+          <input type="number" class="inv-cant-input" data-stock-id="${v.id}" data-prenda-id="${v.prenda_id}" data-pnombre="${(g.prenda.nombre||'').replace(/"/g,'&quot;')}" data-talla="${t.replace(/"/g,'&quot;')}" data-color="${c.replace(/"/g,'&quot;')}" data-sistema="${v.cantidad||0}" min="0" placeholder="—" style="width:60px;text-align:center;padding:5px" oninput="invActualizarProgreso()">
+          <div style="font-size:10px;color:var(--text3)">sistema: ${v.cantidad||0}</div>
+        </td>`;
+      });
+      tabla += '</tr>';
+    });
+    tabla += '</tbody></table>';
+    return `<div class="card mb-16" data-prenda-nombre="${(g.prenda.nombre||'').toLowerCase()}">
+      <div class="card-title" style="margin-bottom:8px">${g.prenda.nombre}${g.prenda.codigo?` <span class="text-hint">(${g.prenda.codigo})</span>`:''}</div>
+      <div style="overflow-x:auto">${tabla}</div>
+    </div>`;
+  }).join('');
+  invActualizarProgreso();
+}
+
+function invFiltrarConteo(){
+  const q = (document.getElementById('inv-conteo-search').value||'').toLowerCase().trim();
+  document.querySelectorAll('#inv-conteo-lista [data-prenda-nombre]').forEach(card=>{
+    card.style.display = (!q || card.dataset.prendaNombre.includes(q)) ? '' : 'none';
+  });
+}
+
+function invActualizarProgreso(){
+  const inputs = document.querySelectorAll('.inv-cant-input');
+  const contadas = [...inputs].filter(i=>i.value!=='').length;
+  const el = document.getElementById('inv-conteo-progreso');
+  if(el) el.textContent = `${contadas} de ${inputs.length} combinaciones contadas`;
+}
+
+// ---------- Resumen de diferencias ----------
+function invVerResumen(){
+  const inputs = [...document.querySelectorAll('.inv-cant-input')].filter(i=>i.value!=='');
+  if(!inputs.length){ toast('Cuenta al menos una combinación antes de continuar'); return; }
+
+  invDiferencias = inputs.map(i=>{
+    const sistema = parseInt(i.dataset.sistema)||0;
+    const contado = parseInt(i.value)||0;
+    return { stockId:i.dataset.stockId, prendaId:i.dataset.prendaId, prendaNombre:i.dataset.pnombre||'', talla:i.dataset.talla, color:i.dataset.color, sistema, contado, diferencia:contado-sistema };
+  });
+
+  const conDiferencia = invDiferencias.filter(d=>d.diferencia!==0);
+  const neta = conDiferencia.reduce((a,d)=>a+d.diferencia,0);
+  const totalesEl = document.getElementById('inv-resumen-totales');
+  totalesEl.innerHTML = `
+    <div class="metrics-grid">
+      <div class="metric"><div class="metric-val">${invDiferencias.length}</div><div class="metric-lbl">Contadas</div></div>
+      <div class="metric" style="background:${conDiferencia.length?'var(--amber-light)':'var(--green-light)'}"><div class="metric-val" style="color:${conDiferencia.length?'var(--amber-dark)':'var(--green)'}">${conDiferencia.length}</div><div class="metric-lbl">Con diferencia</div></div>
+      <div class="metric"><div class="metric-val" style="color:${neta<0?'var(--red)':neta>0?'var(--green)':'var(--text)'}">${neta>0?'+':''}${neta}</div><div class="metric-lbl">Diferencia neta</div></div>
+    </div>`;
+
+  document.getElementById('inv-resumen-tbody').innerHTML = conDiferencia.length ? conDiferencia.map(d=>`
+    <tr>
+      <td class="font-500">${d.prendaNombre}</td>
+      <td>${d.talla}</td>
+      <td>${d.color}</td>
+      <td>${d.sistema}</td>
+      <td>${d.contado}</td>
+      <td style="color:${d.diferencia<0?'var(--red)':'var(--green)'};font-weight:600">${d.diferencia>0?'+':''}${d.diferencia}</td>
+    </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--green);padding:16px">✓ Todo coincide — sin diferencias</td></tr>';
+
+  document.getElementById('inv-vista-conteo').style.display='none';
+  document.getElementById('inv-vista-resumen').style.display='block';
+  document.getElementById('inv-btn-siguiente').style.display='none';
+  document.getElementById('inv-btn-volver').style.display='inline-flex';
+  document.getElementById('inv-btn-confirmar').style.display='inline-flex';
+}
+
+function invVolverAConteo(){
+  document.getElementById('inv-vista-conteo').style.display='block';
+  document.getElementById('inv-vista-resumen').style.display='none';
+  document.getElementById('inv-btn-siguiente').style.display='inline-flex';
+  document.getElementById('inv-btn-volver').style.display='none';
+  document.getElementById('inv-btn-confirmar').style.display='none';
+}
+
+async function invConfirmarGuardar(){
+  if(!invDiferencias.length) return;
+  try{
+    const conDiferencia = invDiferencias.filter(d=>d.diferencia!==0);
+    const sesion = await dbPost('inventario_sesiones', {
+      tipo: invTipo, usuario: currentUser.key,
+      total_contadas: invDiferencias.length,
+      total_diferencias: conDiferencia.length,
+      diferencia_neta: conDiferencia.reduce((a,d)=>a+d.diferencia,0)
+    });
+    const sesionId = (Array.isArray(sesion)?sesion[0]:sesion).id;
+
+    const detalle = invDiferencias.map(d=>({
+      sesion_id: sesionId, prenda_id: d.prendaId, prenda_nombre: d.prendaNombre,
+      talla: d.talla, color: d.color, stock_sistema: d.sistema, stock_contado: d.contado, diferencia: d.diferencia
+    }));
+    await dbPost('inventario_detalle', detalle);
+
+    const prendasAfectadas = new Set();
+    for(const d of conDiferencia){
+      await dbPatch(`prenda_stock?id=eq.${d.stockId}`, {cantidad:d.contado});
+      prendasAfectadas.add(d.prendaId);
+    }
+    for(const prendaId of prendasAfectadas){
+      const variantes = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&select=cantidad`);
+      const stockTotal = variantes.reduce((a,v)=>a+(v.cantidad||0),0);
+      await dbPatch(`prendas?id=eq.${prendaId}`,{stock:stockTotal});
+    }
+
+    closeModal('modal-inventario-conteo');
+    toast(`✓ Inventario guardado — ${conDiferencia.length} ajuste(s) aplicado(s)`);
+    await loadStock();
+    await loadCatalogo();
+    await loadCatalogoLive();
+    await loadInventarioHistorial();
+  }catch(e){ toast('Error guardando inventario: '+e.message); }
+}
+
+// ---------- Historial ----------
+async function loadInventarioHistorial(){
+  const cont = document.getElementById('inventario-historial');
+  cont.innerHTML='<div class="loading">Cargando...</div>';
+  try{
+    const sesiones = await dbGet('inventario_sesiones?order=fecha.desc&limit=30');
+    if(!sesiones.length){ cont.innerHTML='<div class="empty-state">Aún no has hecho ningún conteo de inventario</div>'; return; }
+    cont.innerHTML = `<div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Quién</th><th>Contadas</th><th>Con diferencia</th><th>Neta</th><th></th></tr></thead>
+      <tbody>${sesiones.map(s=>{
+        const fecha = new Date(s.fecha);
+        const fechaStr = fecha.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+fecha.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+        const nombre = USERS[s.usuario]?.nombre || s.usuario;
+        const neta = s.diferencia_neta||0;
+        return `<tr>
+          <td>${fechaStr}</td>
+          <td><span class="badge badge-gray">${s.tipo==='general'?'General':'Parcial'}</span></td>
+          <td>${nombre}</td>
+          <td>${s.total_contadas||0}</td>
+          <td>${(s.total_diferencias||0)>0?`<span class="badge badge-warn">${s.total_diferencias}</span>`:'<span class="badge badge-ok">0</span>'}</td>
+          <td style="color:${neta<0?'var(--red)':neta>0?'var(--green)':'var(--text)'};font-weight:600">${neta>0?'+':''}${neta}</td>
+          <td><button class="btn btn-xs" onclick="invVerDetalleSesion('${s.id}')">Ver detalle</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+  }catch(e){
+    cont.innerHTML=`<div style="color:var(--red);font-size:12px;padding:12px">Error: ${e.message}</div>`;
+  }
+}
+
+async function invVerDetalleSesion(sesionId){
+  document.getElementById('invdet-titulo').textContent='Detalle del conteo';
+  document.getElementById('invdet-contenido').innerHTML='<div class="loading">Cargando...</div>';
+  document.getElementById('modal-inventario-detalle').classList.add('open');
+  try{
+    const filas = await dbGet(`inventario_detalle?sesion_id=eq.${sesionId}&order=prenda_nombre,talla,color`);
+    const conDiferencia = filas.filter(f=>f.diferencia!==0);
+    document.getElementById('invdet-contenido').innerHTML = `
+      <div class="text-muted text-sm mb-12">${filas.length} combinación(es) contadas — ${conDiferencia.length} con diferencia</div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Prenda</th><th>Talla</th><th>Color</th><th>Sistema</th><th>Contado</th><th>Diferencia</th></tr></thead>
+        <tbody>${filas.length?filas.map(f=>`
+          <tr>
+            <td class="font-500">${f.prenda_nombre||'—'}</td>
+            <td>${f.talla}</td>
+            <td>${f.color}</td>
+            <td>${f.stock_sistema}</td>
+            <td>${f.stock_contado}</td>
+            <td style="color:${f.diferencia<0?'var(--red)':f.diferencia>0?'var(--green)':'var(--text3)'};font-weight:600">${f.diferencia>0?'+':''}${f.diferencia}</td>
+          </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px">Sin registros</td></tr>'}</tbody>
+      </table></div>`;
+  }catch(e){
+    document.getElementById('invdet-contenido').innerHTML=`<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+  }
 }
 
 function abrirModalGasto(){
