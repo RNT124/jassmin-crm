@@ -1744,8 +1744,15 @@ td.empty-state{padding:20px;text-align:center}
 
     <div id="inv-vista-conteo">
       <div style="position:sticky;top:-20px;background:var(--surface);z-index:2;padding:6px 0 10px;margin-bottom:8px;border-bottom:0.5px solid var(--border)">
-        <input id="inv-conteo-search" type="text" placeholder="🔍 Buscar prenda dentro de este conteo..." style="width:100%;max-width:320px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="invFiltrarConteo()">
-        <div id="inv-conteo-progreso" style="font-size:12px;color:var(--text2);margin-top:6px;font-weight:500"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input id="inv-conteo-search" type="text" placeholder="🔍 Buscar prenda dentro de este conteo..." style="flex:1;min-width:200px;max-width:300px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="invAplicarFiltros()">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text2);cursor:pointer;user-select:none">
+            <input type="checkbox" id="inv-solo-pendientes" onchange="invAplicarFiltros()" style="width:15px;height:15px;cursor:pointer">
+            Mostrar solo pendientes
+          </label>
+          <button class="btn btn-xs" style="margin-left:auto" onclick="invMarcarTodoPendienteCoincide()">✓ Marcar todo lo pendiente como coincide</button>
+        </div>
+        <div id="inv-conteo-progreso" style="font-size:12px;color:var(--text2);margin-top:8px;font-weight:500"></div>
       </div>
       <div id="inv-conteo-lista"></div>
     </div>
@@ -2845,6 +2852,7 @@ async function invIniciarConteo(tipo){
   document.getElementById('inv-btn-siguiente').style.display='inline-flex';
   document.getElementById('inv-btn-confirmar').style.display='none';
   document.getElementById('inv-conteo-search').value='';
+  document.getElementById('inv-solo-pendientes').checked=false;
   document.getElementById('inv-conteo-lista').innerHTML='<div class="loading">Cargando stock...</div>';
   document.getElementById('modal-inventario-conteo').classList.add('open');
 
@@ -2894,26 +2902,68 @@ function invRenderConteo(){
       tabla += '</tr>';
     });
     tabla += '</tbody></table>';
-    return `<div class="card mb-16" data-prenda-nombre="${(g.prenda.nombre||'').toLowerCase()}">
-      <div class="card-title" style="margin-bottom:8px">${g.prenda.nombre}${g.prenda.codigo?` <span class="text-hint">(${g.prenda.codigo})</span>`:''}</div>
+    return `<div class="card mb-16" data-prenda-nombre="${(g.prenda.nombre||'').toLowerCase()}" data-prenda-id="${g.prenda.id}">
+      <div class="card-title" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span>${g.prenda.nombre}${g.prenda.codigo?` <span class="text-hint">(${g.prenda.codigo})</span>`:''}</span>
+        <span id="inv-badge-${g.prenda.id}" class="badge badge-gray" style="font-size:10.5px">Pendiente</span>
+        <button class="btn btn-xs" style="margin-left:auto" onclick="invMarcarCoincidePrenda('${g.prenda.id}')">✓ Coincide</button>
+      </div>
       <div style="overflow-x:auto">${tabla}</div>
     </div>`;
   }).join('');
   invActualizarProgreso();
 }
 
-function invFiltrarConteo(){
+function invAplicarFiltros(){
   const q = (document.getElementById('inv-conteo-search').value||'').toLowerCase().trim();
+  const soloPendientes = document.getElementById('inv-solo-pendientes').checked;
   document.querySelectorAll('#inv-conteo-lista [data-prenda-nombre]').forEach(card=>{
-    card.style.display = (!q || card.dataset.prendaNombre.includes(q)) ? '' : 'none';
+    const pasaTexto = !q || card.dataset.prendaNombre.includes(q);
+    const completa = card.dataset.completa==='1';
+    const pasaPendiente = !soloPendientes || !completa;
+    card.style.display = (pasaTexto && pasaPendiente) ? '' : 'none';
   });
 }
 
 function invActualizarProgreso(){
   const inputs = document.querySelectorAll('.inv-cant-input');
   const contadas = [...inputs].filter(i=>i.value!=='').length;
+
+  // Estado por prenda (badge + data-completa para el filtro)
+  let prendasCompletas = 0;
+  document.querySelectorAll('#inv-conteo-lista [data-prenda-id]').forEach(card=>{
+    const inputsCard = card.querySelectorAll('.inv-cant-input');
+    const completa = [...inputsCard].every(i=>i.value!=='');
+    card.dataset.completa = completa ? '1' : '0';
+    const badge = document.getElementById('inv-badge-'+card.dataset.prendaId);
+    if(badge){
+      badge.textContent = completa ? '✓ Completa' : 'Pendiente';
+      badge.className = 'badge '+(completa?'badge-ok':'badge-gray');
+    }
+    if(completa) prendasCompletas++;
+  });
+
+  const totalPrendas = invPrendasEnConteo.length;
   const el = document.getElementById('inv-conteo-progreso');
-  if(el) el.textContent = `${contadas} de ${inputs.length} combinaciones contadas`;
+  if(el) el.textContent = `${contadas} de ${inputs.length} combinaciones contadas — ${prendasCompletas} de ${totalPrendas} prendas completas${totalPrendas-prendasCompletas>0?` (${totalPrendas-prendasCompletas} pendiente${totalPrendas-prendasCompletas!==1?'s':''})`:''}`;
+
+  invAplicarFiltros();
+}
+
+function invMarcarCoincidePrenda(prendaId){
+  document.querySelectorAll(`.inv-cant-input[data-prenda-id="${prendaId}"]`).forEach(inp=>{
+    inp.value = inp.dataset.sistema;
+  });
+  invActualizarProgreso();
+}
+
+function invMarcarTodoPendienteCoincide(){
+  const pendientes = [...document.querySelectorAll('.inv-cant-input')].filter(i=>i.value==='');
+  if(!pendientes.length){ toast('No queda ninguna combinación pendiente'); return; }
+  if(!confirm(`Esto va a llenar ${pendientes.length} combinación(es) que aún no contaste con el valor del sistema, como si coincidieran. ¿Continuar?`)) return;
+  pendientes.forEach(i=>{ i.value = i.dataset.sistema; });
+  invActualizarProgreso();
+  toast(`✓ ${pendientes.length} combinación(es) marcadas como coincide`);
 }
 
 // ---------- Resumen de diferencias ----------
