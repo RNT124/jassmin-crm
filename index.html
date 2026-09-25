@@ -1181,9 +1181,16 @@ td.empty-state{padding:20px;text-align:center}
         <div style="padding:0 0 12px 0">
           <input id="pedidos-search" type="text" placeholder="🔍 Buscar por teléfono o nombre..." style="width:100%;max-width:320px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarPedidosBuscador(this.value)">
         </div>
+        <div id="pedidos-bulk-bar" style="display:none;position:sticky;top:0;z-index:5;background:var(--primary);color:#fff;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <span id="pedidos-bulk-count" style="font-size:12.5px;font-weight:500"></span>
+          <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkMarcarEntregados()">✓ Marcar seleccionados como entregados</button>
+        </div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>Pedido · Clienta</th><th>Teléfono</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Registro</th><th>Courier</th><th>Acciones</th></tr></thead>
+            <thead><tr>
+              <th class="pedidos-check-col" style="width:26px;display:none"><input type="checkbox" id="pedidos-check-all" onchange="pedidosToggleAll(this)" style="cursor:pointer"></th>
+              <th>Pedido · Clienta</th><th>Teléfono</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Registro</th><th>Courier</th><th>Acciones</th>
+            </tr></thead>
             <tbody id="pedidos-tbody"></tbody>
           </table>
         </div>
@@ -4007,6 +4014,12 @@ async function loadPedidos(f='todos'){
     if(f==='pago_completo') list=pedidos.filter(p=>p.estado==='pago_completo');
     if(f==='en_camino') list=pedidos.filter(p=>p.estado==='en_camino');
     if(f==='entregado') list=pedidos.filter(p=>p.estado==='entregado');
+
+    // Selección múltiple solo tiene sentido en la pestaña "En camino"
+    document.querySelectorAll('.pedidos-check-col').forEach(el=>el.style.display = f==='en_camino' ? '' : 'none');
+    document.getElementById('pedidos-check-all').checked=false;
+    document.getElementById('pedidos-bulk-bar').style.display='none';
+
     const falta=p=>p.total-p.monto_pagado;
     function registroBadge(cl){
       if(!cl) return '<span class="badge badge-warn">⚠️ Sin datos</span>';
@@ -4017,6 +4030,7 @@ async function loadPedidos(f='todos'){
     }
     document.getElementById('pedidos-tbody').innerHTML=list.length?list.map(p=>`
       <tr>
+        <td class="pedidos-check-col" style="display:${f==='en_camino'?'':'none'}">${f==='en_camino'?`<input type="checkbox" class="ped-check" data-id="${p.id}" onchange="actualizarBulkPedidos()">`:''}</td>
         <td>
           <div class="font-500">${p.numero}</div>
           <div style="font-size:11px;color:var(--text3);margin-top:1px">${p.clientes?.nombre||'—'}</div>
@@ -4035,8 +4049,40 @@ async function loadPedidos(f='todos'){
               ? `<button class="btn btn-xs btn-success" onclick="avanzarEstadoDirecto('${p.id}','${p.estado}')">${ESTADOS_ACTION[p.estado]}</button>`
               : ''}
         </td>
-      </tr>`).join(''):'<tr><td colspan="7" class="empty-state">Sin pedidos</td></tr>';
+      </tr>`).join(''):`<tr><td colspan="${f==='en_camino'?'8':'7'}" class="empty-state">Sin pedidos</td></tr>`;
   } catch(e){ console.error('loadPedidos error:',e); }
+}
+
+function pedidosToggleAll(cb){
+  document.querySelectorAll('.ped-check').forEach(c=>{ c.checked = cb.checked; });
+  actualizarBulkPedidos();
+}
+
+function actualizarBulkPedidos(){
+  const checks = document.querySelectorAll('.ped-check:checked');
+  const bar = document.getElementById('pedidos-bulk-bar');
+  if(checks.length>0){
+    bar.style.display='flex';
+    document.getElementById('pedidos-bulk-count').textContent = checks.length+' pedido'+(checks.length!==1?'s':'')+' seleccionado'+(checks.length!==1?'s':'');
+  } else {
+    bar.style.display='none';
+  }
+}
+
+async function bulkMarcarEntregados(){
+  const ids = [...document.querySelectorAll('.ped-check:checked')].map(c=>c.dataset.id);
+  if(!ids.length) return;
+  if(!confirm(`¿Marcar ${ids.length} pedido(s) como entregados?`)) return;
+  toast('⏳ Actualizando...');
+  try{
+    for(const id of ids){
+      await dbPatch(`pedidos?id=eq.${id}`, {estado:'entregado'});
+      await registrarHistorialPedido(id, 'en_camino', 'entregado', 'Confirmación masiva desde Pedidos');
+    }
+    toast(`✓ ${ids.length} pedido(s) marcados como entregados`);
+    await loadPedidos('en_camino');
+    loadDashboard();
+  }catch(e){ toast('Error en actualización masiva: '+e.message); }
 }
 
 async function openPedidoModal(id){
