@@ -1585,6 +1585,26 @@ td.empty-state{padding:20px;text-align:center}
   </div>
 </div>
 
+<!-- Modal: validar pago agrupado por clienta -->
+<div class="modal-overlay" id="modal-pago-cliente">
+  <div class="modal">
+    <div class="modal-title" id="mpcli-title">Validar pago</div>
+    <div id="mpcli-info" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;font-size:12px"></div>
+    <div class="form-row"><label class="form-label">Monto recibido (S/)</label><input type="number" id="mpcli-monto" placeholder="0.00" step="0.01"></div>
+    <div class="form-row"><label class="form-label">Método</label>
+      <select id="mpcli-metodo"><option>Yape</option><option>Plin</option><option>Transferencia</option></select>
+    </div>
+    <div class="form-row"><label class="form-label">Nota <span class="text-hint">(opcional)</span></label>
+      <input type="text" id="mpcli-nota" placeholder="ej. Yape llegó a las 9:15pm">
+    </div>
+    <div class="text-hint" style="font-size:11.5px;margin-top:-6px;margin-bottom:10px">El monto se reparte solo entre sus prendas pendientes, empezando por la más antigua.</div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-pago-cliente')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmarPagoCliente()">Confirmar pago</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: nueva clienta -->
 <div class="modal-overlay" id="modal-cliente">
   <div class="modal">
@@ -6301,6 +6321,7 @@ function copiarLink(num){
 let corteFiltro='mes';
 let DB_cortes=[];
 let currentCorteItem=null;
+let currentCorteCliente=null;
 
 function filterCortes(f,el){
   corteFiltro=f;
@@ -6313,10 +6334,12 @@ function filterCortes(f,el){
 
 function filtrarCortes(q){
   q=(q||'').toLowerCase().trim();
-  document.querySelectorAll('#cortes-lista tr[data-tel]').forEach(row=>{
-    row.style.display=(!q||row.dataset.tel.includes(q))?'':'none';
+  document.querySelectorAll('#cortes-lista [data-tel]').forEach(card=>{
+    card.style.display=(!q||card.dataset.tel.includes(q))?'':'none';
   });
 }
+
+let DB_cortesPorCliente = {};
 
 async function loadCortes(f){
   document.getElementById('cortes-lista').innerHTML='<div class="loading">Cargando...</div>';
@@ -6332,9 +6355,9 @@ async function loadCortes(f){
     const filtroFecha = desde ? `agregado_en=gte.${desde.toISOString()}&` : '';
     const items=await dbGet(`carrito_items?${filtroFecha}estado_bolsa=neq.eliminado&select=*,prendas(nombre,precio),carritos(cliente_id,clientes(nombre,telefono))&order=agregado_en.desc`);
 
-    // Agrupar por clienta+fecha para vista de corte
+    // Total vendido y cobrado real (incluye abonos parciales, no solo prendas 100% confirmadas)
     const totalVendido=items.reduce((a,it)=>a+(it.precio_unitario||0),0);
-    const totalPagado=items.filter(it=>it.estado_pago==='confirmado').reduce((a,it)=>a+(it.monto_pagado||it.precio_unitario||0),0);
+    const totalPagado=items.reduce((a,it)=>a+(it.monto_pagado||0),0);
     const pendiente=totalVendido-totalPagado;
     const pagadosCount=items.filter(it=>it.estado_pago==='confirmado').length;
     const pendientesCount=items.length-pagadosCount;
@@ -6363,43 +6386,162 @@ async function loadCortes(f){
       return;
     }
 
-    // Botón nuevo corte manual encima
+    // Agrupar por clienta (mismo número de teléfono)
+    const grupos = {};
+    items.forEach(it=>{
+      const cl = it.carritos?.clientes;
+      const key = cl?.telefono || `sin-tel-${cl?.nombre||it.id}`;
+      if(!grupos[key]) grupos[key] = { nombre: cl?.nombre||'Sin datos', telefono: cl?.telefono||'', items: [] };
+      grupos[key].items.push(it);
+    });
+    DB_cortesPorCliente = grupos;
+
+    const listaClientes = Object.entries(grupos).map(([key,g])=>{
+      const vendido = g.items.reduce((a,it)=>a+(it.precio_unitario||0),0);
+      const pagado = g.items.reduce((a,it)=>a+(it.monto_pagado||0),0);
+      return { key, ...g, vendido, pagado, falta: vendido-pagado };
+    }).sort((a,b)=>{
+      if((a.falta>0)!==(b.falta>0)) return a.falta>0?-1:1; // con saldo pendiente primero
+      return (a.nombre||'').localeCompare(b.nombre||'');
+    });
+
     const ocultaMonto=ocultarMontosCortes();
-    document.getElementById('cortes-lista').innerHTML=`
-      <div class="tbl-wrap">
-        <table class="tbl">
-          <thead><tr>
-            <th>Fecha / Hora</th>
-            <th>Clienta</th>
-            <th>Prenda</th>
-            <th>Talla</th>
-            <th>Color</th>
-            ${ocultaMonto?'':'<th>Monto</th>'}
-            <th>Estado pago</th>
-            ${ocultaMonto?'':'<th>Acción</th>'}
-          </tr></thead>
-          <tbody>${items.map(it=>{
-            const cl=it.carritos?.clientes;
-            const fecha=new Date(it.agregado_en);
-            const fechaStr=fecha.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'});
-            const horaStr=fecha.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
-            const estado=it.estado_pago||'pendiente';
-            const badgeCls=estado==='confirmado'?'badge-ok':estado==='parcial'?'badge-warn':'badge-danger';
-            const badgeLbl=estado==='confirmado'?'✓ Pagado':estado==='parcial'?'Parcial':'Pendiente';
-            return `<tr data-tel="${(cl?.telefono||'').toLowerCase()}">
-              <td><div class="font-500">${fechaStr}</div><div class="text-hint" style="font-size:11px">${horaStr}</div></td>
-              <td><div class="font-500">${cl?.nombre||'—'}</div><div class="text-hint" style="font-size:11px">${cl?.telefono||''}</div></td>
-              <td>${it.prendas?.nombre||'—'}</td>
-              <td>${it.talla||'—'}</td>
-              <td>${it.color||'—'}</td>
-              ${ocultaMonto?'':`<td class="font-500">S/ ${it.precio_unitario||0}</td>`}
-              <td><span class="badge ${badgeCls}">${badgeLbl}</span>${(!ocultaMonto&&it.monto_pagado&&estado==='parcial')?`<div style="font-size:10px;color:var(--text3)">Abonó S/${it.monto_pagado}</div>`:''}</td>
-              ${ocultaMonto?'':`<td>${estado!=='confirmado'?`<button class="btn btn-xs btn-primary" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0})">Validar</button>`:`<span style="color:var(--green);font-size:12px;margin-right:6px">✓</span><button class="btn btn-xs" onclick="openPagoCorte('${it.id}','${cl?.nombre||''}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0},true)">Editar</button>`}</td>`}
-            </tr>`;
-          }).join('')}</tbody>
-        </table>
+    document.getElementById('cortes-lista').innerHTML = listaClientes.map(g=>{
+      const itemsOrdenados = [...g.items].sort((a,b)=>new Date(a.agregado_en)-new Date(b.agregado_en));
+      const filasDetalle = itemsOrdenados.map(it=>{
+        const fecha=new Date(it.agregado_en);
+        const fechaStr=fecha.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})+' '+fecha.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+        const estado=it.estado_pago||'pendiente';
+        const badgeCls=estado==='confirmado'?'badge-ok':estado==='parcial'?'badge-warn':'badge-danger';
+        const badgeLbl=estado==='confirmado'?'✓ Pagado':estado==='parcial'?'Parcial':'Pendiente';
+        return `<tr>
+          <td style="font-size:11.5px;color:var(--text3)">${fechaStr}</td>
+          <td>${it.prendas?.nombre||'—'}</td>
+          <td>${it.talla||'—'}</td>
+          <td>${it.color||'—'}</td>
+          ${ocultaMonto?'':`<td class="font-500">S/ ${it.precio_unitario||0}</td>`}
+          <td><span class="badge ${badgeCls}">${badgeLbl}</span>${(!ocultaMonto&&it.monto_pagado&&estado==='parcial')?`<div style="font-size:10px;color:var(--text3)">Abonó S/${it.monto_pagado}</div>`:''}</td>
+          ${ocultaMonto?'':`<td>${estado!=='confirmado'?`<button class="btn btn-xs" onclick="openPagoCorte('${it.id}','${(g.nombre||'').replace(/'/g,"\\'")}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0},false,'${it.carrito_id}')">Validar</button>`:`<button class="btn btn-xs" onclick="openPagoCorte('${it.id}','${(g.nombre||'').replace(/'/g,"\\'")}',${it.precio_unitario||0},'${estado}',${it.monto_pagado||0},true,'${it.carrito_id}')">Editar</button>`}</td>`}
+        </tr>`;
+      }).join('');
+
+      return `<div class="card mb-16" data-tel="${(g.telefono||'').toLowerCase()}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:600;font-size:14px">${g.nombre}</div>
+            <div style="font-size:12px;color:var(--text2)">${g.telefono||'Sin teléfono'} · ${g.items.length} prenda${g.items.length!==1?'s':''}</div>
+          </div>
+          ${ocultaMonto?'':(g.falta>0
+            ? `<button class="btn btn-sm btn-primary" onclick="abrirPagoCliente('${key_escape(g.key)}')">💰 Validar pago (S/${g.falta.toFixed(0)})</button>`
+            : `<span class="badge badge-ok" style="padding:6px 12px;font-size:12px">✓ Todo pagado</span>`)}
+        </div>
+        ${ocultaMonto?'':`<div style="display:flex;gap:16px;margin-top:10px;font-size:12.5px;flex-wrap:wrap">
+          <span>Vendido: <strong>S/${g.vendido.toFixed(0)}</strong></span>
+          <span style="color:var(--green)">Pagado: <strong>S/${g.pagado.toFixed(0)}</strong></span>
+          <span style="color:${g.falta>0?'var(--red)':'var(--text3)'}">Falta: <strong>S/${g.falta.toFixed(0)}</strong></span>
+        </div>`}
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;font-size:12px;color:var(--text3)">Ver ${g.items.length} prenda${g.items.length!==1?'s':''}</summary>
+          <div class="tbl-wrap" style="margin-top:8px">
+            <table class="tbl">
+              <thead><tr><th>Fecha</th><th>Prenda</th><th>Talla</th><th>Color</th>${ocultaMonto?'':'<th>Monto</th>'}<th>Estado</th>${ocultaMonto?'':'<th></th>'}</tr></thead>
+              <tbody>${filasDetalle}</tbody>
+            </table>
+          </div>
+        </details>
       </div>`;
+    }).join('');
   } catch(e){ document.getElementById('cortes-lista').innerHTML=`<div style="color:var(--red);font-size:12px;padding:12px">Error: ${e.message}</div>`; }
+}
+
+// Las keys de clientes (teléfono) pueden tener comillas raras en casos sin-tel; esto las hace seguras para el onclick
+function key_escape(k){ return String(k).replace(/'/g,"\\'"); }
+
+function abrirPagoCliente(key){
+  const g = DB_cortesPorCliente[key];
+  if(!g) return;
+  const vendido = g.items.reduce((a,it)=>a+(it.precio_unitario||0),0);
+  const pagado = g.items.reduce((a,it)=>a+(it.monto_pagado||0),0);
+  const falta = vendido-pagado;
+  currentCorteCliente = { key, nombre:g.nombre, telefono:g.telefono, items:g.items };
+  document.getElementById('mpcli-title').textContent = `Validar pago — ${g.nombre}`;
+  document.getElementById('mpcli-info').innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Prendas</span><span class="font-500">${g.items.length}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Total vendido</span><span class="font-500">S/ ${vendido.toFixed(2)}</span></div>
+    ${pagado>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Ya abonado</span><span style="color:var(--green)">S/ ${pagado.toFixed(2)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between"><span>Falta cobrar</span><span style="color:${falta>0?'var(--red)':'var(--green)'}" class="font-500">S/ ${falta.toFixed(2)}</span></div>`;
+  document.getElementById('mpcli-monto').value = falta>0?falta.toFixed(2):'';
+  document.getElementById('mpcli-metodo').value = 'Yape';
+  document.getElementById('mpcli-nota').value='';
+  document.getElementById('modal-pago-cliente').classList.add('open');
+}
+
+async function confirmarPagoCliente(){
+  if(!currentCorteCliente) return;
+  const monto = parseFloat(document.getElementById('mpcli-monto').value||0);
+  const metodo = document.getElementById('mpcli-metodo').value;
+  const nota = document.getElementById('mpcli-nota').value;
+  if(!monto||monto<=0){ toast('Ingresa el monto recibido'); return; }
+
+  const pendientes = [...currentCorteCliente.items]
+    .filter(it => ((it.precio_unitario||0)-(it.monto_pagado||0)) > 0)
+    .sort((a,b)=>new Date(a.agregado_en)-new Date(b.agregado_en));
+
+  if(!pendientes.length){ toast('Esta clienta ya no tiene prendas pendientes de pago'); return; }
+
+  let restante = monto;
+  const cambios = [];
+  for(const it of pendientes){
+    if(restante<=0) break;
+    const falta = (it.precio_unitario||0)-(it.monto_pagado||0);
+    const aplicar = Math.min(restante, falta);
+    const nuevoPagado = (it.monto_pagado||0)+aplicar;
+    const nuevoEstado = nuevoPagado>=(it.precio_unitario||0) ? 'confirmado' : 'parcial';
+    cambios.push({ id: it.id, carrito_id: it.carrito_id, aplicar, monto_pagado: nuevoPagado, estado_pago: nuevoEstado });
+    restante -= aplicar;
+  }
+  const sobrante = restante;
+
+  toast('⏳ Registrando pago...');
+  try {
+    // 1. Actualizar todas las prendas en paralelo
+    await Promise.all(cambios.map(c =>
+      dbPatch(`carrito_items?id=eq.${c.id}`, { monto_pagado:c.monto_pagado, estado_pago:c.estado_pago })
+    ));
+
+    // 2. Agrupar lo aplicado por carrito y recalcular cada pedido afectado, en paralelo
+    const porCarrito = {};
+    cambios.forEach(c=>{ porCarrito[c.carrito_id] = (porCarrito[c.carrito_id]||0)+c.aplicar; });
+
+    await Promise.all(Object.entries(porCarrito).map(async ([carritoId, aplicadoCarrito])=>{
+      const todosItems = await dbGet(`carrito_items?carrito_id=eq.${carritoId}&estado_bolsa=neq.eliminado&select=monto_pagado`);
+      const totalPagadoCarrito = todosItems.reduce((a,it)=>a+(it.monto_pagado||0),0);
+      const pedidos = await dbGet(`pedidos?carrito_id=eq.${carritoId}&order=creado_en.desc&limit=1&select=*`);
+      if(!pedidos.length) return;
+      const ped = pedidos[0];
+      const totalRequerido = montoRequeridoPedido(ped);
+      const estadoActual = ped.estado;
+      let estadoPedido = estadoActual;
+      if(['acumulando','listo_envio','pago_pendiente','pago_parcial'].includes(estadoActual)){
+        estadoPedido = totalPagadoCarrito >= totalRequerido ? 'pago_completo' :
+                       totalPagadoCarrito > 0 ? (estadoActual==='listo_envio'?'listo_envio':'acumulando') : estadoActual;
+        if(estadoActual==='listo_envio' && totalPagadoCarrito>=totalRequerido) estadoPedido='pago_completo';
+      }
+      await dbPatch(`pedidos?id=eq.${ped.id}`, { monto_pagado: totalPagadoCarrito, estado: estadoPedido });
+      if(estadoPedido!==estadoActual) await registrarHistorialPedido(ped.id, estadoActual, estadoPedido, 'Pago validado en Cortes de pago (agrupado por clienta)');
+      await dbPost('pagos', { pedido_id: ped.id, metodo, monto: aplicadoCarrito, estado:'confirmado', confirmado_por: currentUser?.nombre||'operador' });
+    }));
+
+    closeModal('modal-pago-cliente');
+    toast(sobrante>0
+      ? `✓ Pago registrado — se aplicaron S/${(monto-sobrante).toFixed(2)}, sobró S/${sobrante.toFixed(2)} sin prendas pendientes`
+      : `✓ Pago registrado — S/${monto.toFixed(2)} aplicado`);
+
+    loadCortes(corteFiltro);
+    loadPedidos(pedidoFiltro);
+    loadCarritos();
+    loadDashboard();
+  } catch(e){ toast('Error: '+e.message); }
 }
 
 function openModalCorte(){
@@ -6458,8 +6600,8 @@ async function crearCorte(){
   } catch(e){ toast('Error: '+e.message); }
 }
 
-function openPagoCorte(itemId,nombre,monto,estadoActual,pagadoActual,esEdicion){
-  currentCorteItem={itemId,monto,estadoActual,pagadoActual,esEdicion:!!esEdicion};
+function openPagoCorte(itemId,nombre,monto,estadoActual,pagadoActual,esEdicion,carritoId){
+  currentCorteItem={itemId,monto,estadoActual,pagadoActual,esEdicion:!!esEdicion,carritoId:carritoId||null};
   const falta=monto-(pagadoActual||0);
   document.getElementById('mpc-title').textContent=`${esEdicion?'Editar':'Validar'} pago — ${nombre}`;
   document.getElementById('mpc-monto-label').textContent = esEdicion ? 'Monto total pagado (S/) — corrige el valor real' : 'Monto recibido (S/)';
@@ -6493,7 +6635,7 @@ async function confirmarPagoCorte(){
   const nota=document.getElementById('mpc-nota').value;
   if(!monto||monto<=0){ toast('Ingresa el monto recibido'); return; }
   if(!totalEditado||totalEditado<=0){ toast('El total de la prenda no puede ser 0'); return; }
-  const {itemId,monto:totalOriginal,pagadoActual,esEdicion}=currentCorteItem;
+  const {itemId,monto:totalOriginal,pagadoActual,esEdicion,carritoId}=currentCorteItem;
   const descuento = totalOriginal - totalEditado; // >0 si hubo descuento, <0 si se subió el precio (raro, pero lo soportamos)
   const nuevoPagado = esEdicion ? monto : (pagadoActual||0)+monto;
   const nuevoEstado=nuevoPagado>=totalEditado?'confirmado':'parcial';
@@ -6503,10 +6645,14 @@ async function confirmarPagoCorte(){
     if(descuento!==0) patchItem.precio_unitario = totalEditado;
     await dbPatch(`carrito_items?id=eq.${itemId}`,patchItem);
 
-    // 2. Buscar el carrito al que pertenece este item
-    const itemData = await dbGet(`carrito_items?id=eq.${itemId}&select=carrito_id`);
-    if(itemData.length){
-      const carritoId = itemData[0].carrito_id;
+    // 2. Carrito al que pertenece este item — ya lo tenemos si vino desde Cortes (ahorra una consulta)
+    let carritoIdFinal = carritoId;
+    if(!carritoIdFinal){
+      const itemData = await dbGet(`carrito_items?id=eq.${itemId}&select=carrito_id`);
+      if(itemData.length) carritoIdFinal = itemData[0].carrito_id;
+    }
+    if(carritoIdFinal){
+      const carritoId = carritoIdFinal;
 
       // 3. Recalcular total pagado del carrito sumando todos sus items confirmados
       const todosItems = await dbGet(`carrito_items?carrito_id=eq.${carritoId}&estado_bolsa=neq.eliminado&select=precio_unitario,estado_pago,monto_pagado`);
