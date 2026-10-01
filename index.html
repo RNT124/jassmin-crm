@@ -3300,11 +3300,38 @@ function actualizarBulkUrgentes(){
 async function bulkRegistrarDespacho(){
   const ids = [...document.querySelectorAll('.urg-check:checked')].map(c=>c.dataset.id);
   if(!ids.length) return;
-  const codigo = prompt(`Código de seguimiento courier para los ${ids.length} pedidos seleccionados (Shalom / Motorizado):`);
+
+  // Pre-ventas pendientes entre los seleccionados — mismo criterio que en Despacho
+  const pedidosSel = await dbGet(`pedidos?id=in.(${ids.join(',')})&select=id,carrito_id`);
+  const idsConPreventa = [];
+  for(const p of pedidosSel){
+    if(!p.carrito_id) continue;
+    const pend = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&preventa=eq.true&estado_bolsa=neq.eliminado&select=id`);
+    if(pend.length) idsConPreventa.push(p.id);
+  }
+
+  let idsFinal = ids;
+  if(idsConPreventa.length){
+    if(currentUser.rol==='admin'){
+      if(!confirm(`${idsConPreventa.length} de los pedidos seleccionados tienen prendas en pre-venta sin reponer. ¿Confirmas despacharlos de todas formas?\n\nSe registrarán como si hubieran ingresado y vuelto a salir, y quedará en el historial de Compras.`)) return;
+      toast('⏳ Resolviendo pre-ventas...');
+      for(const p of pedidosSel){
+        if(idsConPreventa.includes(p.id) && p.carrito_id){
+          try { await resolverPreventasCarrito(p.carrito_id); } catch(e){ console.error('No se pudo resolver pre-venta de', p.id, e); }
+        }
+      }
+    } else {
+      idsFinal = ids.filter(id=>!idsConPreventa.includes(id));
+      if(!idsFinal.length){ toast('🕒 Ninguno se puede despachar — todos tienen prendas en pre-venta sin reponer'); return; }
+      toast(`🕒 Se excluyeron ${idsConPreventa.length} pedido(s) con prendas en pre-venta sin reponer`);
+    }
+  }
+
+  const codigo = prompt(`Código de seguimiento courier para los ${idsFinal.length} pedidos seleccionados (Shalom / Motorizado):`);
   if(codigo===null) return; // canceló
   toast('⏳ Registrando despacho...');
   try {
-    for(const id of ids){
+    for(const id of idsFinal){
       await dbPatch(`pedidos?id=eq.${id}`, {estado:'en_camino', courier_codigo:codigo});
       await registrarHistorialPedido(id, 'empaquetado', 'en_camino', 'Despacho masivo desde Solicitudes urgentes');
       try {
@@ -3312,7 +3339,7 @@ async function bulkRegistrarDespacho(){
         if(pedRow[0]?.cliente_id) await dbPatch(`clientes?id=eq.${pedRow[0].cliente_id}`,{envio_urgente_en:null});
       } catch(e){}
     }
-    toast(`✓ ${ids.length} pedido(s) despachados`);
+    toast(`✓ ${idsFinal.length} pedido(s) despachados`);
     await loadUrgentes();
   } catch(e){ toast('Error en despacho masivo: '+e.message); }
 }
@@ -4208,6 +4235,34 @@ async function registrarPago(pedidoId, total, pagadoActual){
   } catch(e){ toast('Error: '+e.message); }
 }
 
+// Resuelve pre-ventas pendientes de un carrito como si hubieran ingresado y vuelto a salir:
+// sube +1 el stock de cada combinación (cierra la deuda), quita la marca de pre-venta,
+// y lo registra en el historial de Compras para que el reporte siga cuadrando.
+async function resolverPreventasCarrito(carritoId){
+  const pendientes = await dbGet(`carrito_items?carrito_id=eq.${carritoId}&preventa=eq.true&estado_bolsa=neq.eliminado&select=id,prenda_id,talla,color`);
+  if(!pendientes.length) return 0;
+  const hoy = new Date().toISOString().slice(0,10);
+  const prendasAfectadas = new Set();
+  for(const it of pendientes){
+    const stockRows = await dbGet(`prenda_stock?prenda_id=eq.${it.prenda_id}&talla=eq.${encodeURIComponent(it.talla)}&color=eq.${encodeURIComponent(it.color||'')}`);
+    if(stockRows.length){
+      await dbPatch(`prenda_stock?id=eq.${stockRows[0].id}`, {cantidad:(stockRows[0].cantidad||0)+1});
+    } else {
+      await dbPost('prenda_stock', {prenda_id:it.prenda_id, talla:it.talla, color:it.color||'', cantidad:1});
+    }
+    await dbPatch(`carrito_items?id=eq.${it.id}`, {preventa:false});
+    const prenda = DB.prendas.find(p=>p.id===it.prenda_id);
+    await dbPost('compras', {prenda_id:it.prenda_id, talla:it.talla, color:it.color||'', cantidad:1, costo_total:prenda?.costo||0, proveedor:'Resuelto al despachar — Admin', fecha:hoy});
+    prendasAfectadas.add(it.prenda_id);
+  }
+  for(const prendaId of prendasAfectadas){
+    const variantes = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&select=cantidad`);
+    const stockTotal = variantes.reduce((a,v)=>a+(v.cantidad||0),0);
+    await dbPatch(`prendas?id=eq.${prendaId}`,{stock:stockTotal});
+  }
+  return pendientes.length;
+}
+
 async function avanzarEstadoDirecto(id, estadoActual){
   const next=ESTADOS_NEXT[estadoActual];
   if(!next) return;
@@ -4222,13 +4277,21 @@ async function avanzarEstadoDirecto(id, estadoActual){
         closeModal('modal-pedido');
         return;
       }
-      // Bloquear si aún tiene prendas en pre-venta (no llegaron todavía)
+      // Bloquear si aún tiene prendas en pre-venta (no llegaron todavía) — salvo que sea Admin y confirme despachar igual
       if(ped.carrito_id){
         const pendientes = await dbGet(`carrito_items?carrito_id=eq.${ped.carrito_id}&preventa=eq.true&estado_bolsa=neq.eliminado&select=id`);
         if(pendientes.length){
-          toast('🕒 No se puede despachar — tiene '+pendientes.length+' prenda(s) en pre-venta sin reponer todavía');
-          closeModal('modal-pedido');
-          return;
+          if(currentUser.rol==='admin'){
+            if(!confirm(`Esta prenda sigue en pre-venta sin reponer (${pendientes.length} combinación${pendientes.length!==1?'es':''}). ¿Confirmas despacharla de todas formas?\n\nSe registrará como si hubiera ingresado y vuelto a salir, y quedará en el historial de Compras.`)){
+              closeModal('modal-pedido');
+              return;
+            }
+            await resolverPreventasCarrito(ped.carrito_id);
+          } else {
+            toast('🕒 No se puede despachar — tiene '+pendientes.length+' prenda(s) en pre-venta sin reponer todavía');
+            closeModal('modal-pedido');
+            return;
+          }
         }
       }
     }
@@ -4947,11 +5010,36 @@ function despachoSeleccionados(tipoEsperado){
 
 async function marcarDespachadosSiSeConfirma(ids){
   if(!ids.length) return;
-  if(!confirm(`¿Marcar estos ${ids.length} pedido(s) como despachados (En camino)?`)) return;
+
+  // Pre-ventas pendientes entre los seleccionados — mismo criterio que el despacho individual
+  const idsConPreventa = ids.filter(id=>{
+    const p = despachoActual.find(x=>x.id===id);
+    return p && p._preventaPendiente>0;
+  });
+
+  let idsFinal = ids;
+  if(idsConPreventa.length){
+    if(currentUser.rol==='admin'){
+      if(!confirm(`${idsConPreventa.length} de los pedidos seleccionados tienen prendas en pre-venta sin reponer. ¿Confirmas despacharlos de todas formas?\n\nSe registrarán como si hubieran ingresado y vuelto a salir, y quedará en el historial de Compras.`)) return;
+      toast('⏳ Resolviendo pre-ventas...');
+      for(const id of idsConPreventa){
+        const p = despachoActual.find(x=>x.id===id);
+        if(p?.carrito_id){
+          try { await resolverPreventasCarrito(p.carrito_id); } catch(e){ console.error('No se pudo resolver pre-venta de', id, e); }
+        }
+      }
+    } else {
+      idsFinal = ids.filter(id=>!idsConPreventa.includes(id));
+      if(!idsFinal.length){ toast('🕒 Ninguno se puede despachar — todos tienen prendas en pre-venta sin reponer'); return; }
+      toast(`🕒 Se excluyeron ${idsConPreventa.length} pedido(s) con prendas en pre-venta sin reponer`);
+    }
+  }
+
+  if(!confirm(`¿Marcar estos ${idsFinal.length} pedido(s) como despachados (En camino)?`)) return;
   const codigo = prompt('Código de seguimiento courier (déjalo vacío si no aplica):') || '';
   toast('⏳ Marcando como despachados...');
   try {
-    for(const id of ids){
+    for(const id of idsFinal){
       await dbPatch(`pedidos?id=eq.${id}`, {estado:'en_camino', courier_codigo:codigo||null});
       await registrarHistorialPedido(id, 'empaquetado', 'en_camino', 'Despacho masivo desde Despacho del día');
       try {
@@ -4959,7 +5047,7 @@ async function marcarDespachadosSiSeConfirma(ids){
         if(pedRow[0]?.cliente_id) await dbPatch(`clientes?id=eq.${pedRow[0].cliente_id}`,{envio_urgente_en:null});
       } catch(e){}
     }
-    toast(`✓ ${ids.length} pedido(s) marcados como despachados`);
+    toast(`✓ ${idsFinal.length} pedido(s) marcados como despachados`);
     await loadDespacho();
   } catch(e){ toast('Error marcando despachados: '+e.message); }
 }
