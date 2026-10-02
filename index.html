@@ -6440,19 +6440,22 @@ async function loadCortes(f){
     else if(f==='todos'){ desde=null; }
     else { desde=new Date(ahora.getFullYear(),ahora.getMonth(),1); }
 
-    const filtroFecha = desde ? `agregado_en=gte.${desde.toISOString()}&` : '';
-    const items=await dbGet(`carrito_items?${filtroFecha}estado_bolsa=neq.eliminado&select=*,prendas(nombre,precio),carritos(cliente_id,clientes(nombre,telefono))&order=agregado_en.desc`);
+    // Traemos TODO el historial (sin filtro de fecha) — el filtro de arriba solo decide
+    // qué clientas aparecen en la lista; el saldo de cada una siempre se calcula completo,
+    // para que nunca diga "Todo pagado" si en realidad debe algo de un mes anterior.
+    const todosItems = await dbGet(`carrito_items?estado_bolsa=neq.eliminado&select=*,prendas(nombre,precio),carritos(cliente_id,clientes(nombre,telefono))&order=agregado_en.desc`);
+    const itemsEnPeriodo = desde ? todosItems.filter(it=>new Date(it.agregado_en) >= desde) : todosItems;
 
-    // Total vendido y cobrado real (incluye abonos parciales, no solo prendas 100% confirmadas)
-    const totalVendido=items.reduce((a,it)=>a+(it.precio_unitario||0),0);
-    const totalPagado=items.reduce((a,it)=>a+(it.monto_pagado||0),0);
+    // Total vendido y cobrado real del período (incluye abonos parciales, no solo prendas 100% confirmadas)
+    const totalVendido=itemsEnPeriodo.reduce((a,it)=>a+(it.precio_unitario||0),0);
+    const totalPagado=itemsEnPeriodo.reduce((a,it)=>a+(it.monto_pagado||0),0);
     const pendiente=totalVendido-totalPagado;
-    const pagadosCount=items.filter(it=>it.estado_pago==='confirmado').length;
-    const pendientesCount=items.length-pagadosCount;
+    const pagadosCount=itemsEnPeriodo.filter(it=>it.estado_pago==='confirmado').length;
+    const pendientesCount=itemsEnPeriodo.length-pagadosCount;
 
     if(ocultarMontosCortes()){
       document.getElementById('cortes-metrics').innerHTML=`
-        <div class="metric"><div class="metric-val">${items.length}</div><div class="metric-lbl">Prendas registradas</div></div>
+        <div class="metric"><div class="metric-val">${itemsEnPeriodo.length}</div><div class="metric-lbl">Prendas registradas</div></div>
         <div class="metric" style="background:var(--green-light)"><div class="metric-val" style="color:var(--green)">${pagadosCount}</div><div class="metric-lbl">Pagadas</div></div>
         <div class="metric" style="background:var(--red-light)"><div class="metric-val" style="color:var(--red)">${pendientesCount}</div><div class="metric-lbl">Pendientes</div></div>`;
     } else {
@@ -6460,12 +6463,12 @@ async function loadCortes(f){
         <div class="metric"><div class="metric-val">S/ ${totalVendido.toFixed(0)}</div><div class="metric-lbl">Total vendido</div></div>
         <div class="metric" style="background:var(--green-light)"><div class="metric-val" style="color:var(--green)">S/ ${totalPagado.toFixed(0)}</div><div class="metric-lbl">Cobrado</div></div>
         <div class="metric" style="background:var(--red-light)"><div class="metric-val" style="color:var(--red)">S/ ${pendiente.toFixed(0)}</div><div class="metric-lbl">Pendiente</div></div>
-        <div class="metric"><div class="metric-val">${items.length}</div><div class="metric-lbl">Prendas registradas</div></div>`;
+        <div class="metric"><div class="metric-val">${itemsEnPeriodo.length}</div><div class="metric-lbl">Prendas registradas</div></div>`;
     }
 
-    DB_cortes=items;
+    DB_cortes=itemsEnPeriodo;
 
-    if(!items.length){
+    if(!itemsEnPeriodo.length){
       document.getElementById('cortes-lista').innerHTML=`
         <div class="card" style="text-align:center;padding:28px">
           <div style="font-size:28px;margin-bottom:8px">💰</div>
@@ -6474,17 +6477,27 @@ async function loadCortes(f){
       return;
     }
 
-    // Agrupar por clienta (mismo número de teléfono)
-    const grupos = {};
-    items.forEach(it=>{
+    // Agrupar TODO el historial por clienta (mismo número de teléfono) — para el saldo real
+    const gruposGlobal = {};
+    todosItems.forEach(it=>{
       const cl = it.carritos?.clientes;
       const key = cl?.telefono || `sin-tel-${cl?.nombre||it.id}`;
-      if(!grupos[key]) grupos[key] = { nombre: cl?.nombre||'Sin datos', telefono: cl?.telefono||'', items: [] };
-      grupos[key].items.push(it);
+      if(!gruposGlobal[key]) gruposGlobal[key] = { nombre: cl?.nombre||'Sin datos', telefono: cl?.telefono||'', items: [] };
+      gruposGlobal[key].items.push(it);
     });
-    DB_cortesPorCliente = grupos;
 
-    const listaClientes = Object.entries(grupos).map(([key,g])=>{
+    // Pero solo mostramos las clientas que tuvieron movimiento en el período elegido
+    const keysEnPeriodo = new Set();
+    itemsEnPeriodo.forEach(it=>{
+      const cl = it.carritos?.clientes;
+      keysEnPeriodo.add(cl?.telefono || `sin-tel-${cl?.nombre||it.id}`);
+    });
+
+    DB_cortesPorCliente = {};
+    keysEnPeriodo.forEach(key=>{ DB_cortesPorCliente[key] = gruposGlobal[key]; });
+
+    const listaClientes = [...keysEnPeriodo].map(key=>{
+      const g = gruposGlobal[key];
       const vendido = g.items.reduce((a,it)=>a+(it.precio_unitario||0),0);
       const pagado = g.items.reduce((a,it)=>a+(it.monto_pagado||0),0);
       return { key, ...g, vendido, pagado, falta: vendido-pagado };
