@@ -1155,8 +1155,9 @@ td.empty-state{padding:20px;text-align:center}
           <div class="tab" onclick="filterCortes('semana',this)">Esta semana</div>
           <div class="tab" onclick="filterCortes('todos',this)">Todos</div>
         </div>
-        <div style="margin-bottom:12px">
-          <input id="cortes-search" type="text" placeholder="🔍 Buscar por teléfono..." style="width:100%;max-width:280px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarCortes(this.value)">
+        <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input id="cortes-search" type="text" placeholder="🔍 Buscar por teléfono..." style="flex:1;min-width:200px;max-width:280px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarCortes(this.value)">
+          <button class="btn btn-sm" id="btn-cortes-pendientes" onclick="toggleCortesPendientes()">💰 Ver pendientes de pago</button>
         </div>
         <div id="cortes-lista"><div class="loading">Cargando...</div></div>
       </div>
@@ -6433,11 +6434,28 @@ function filterCortes(f,el){
   loadCortes(f);
 }
 
+let cortesSoloPendientes = false;
+
 function filtrarCortes(q){
   q=(q||'').toLowerCase().trim();
   document.querySelectorAll('#cortes-lista [data-tel]').forEach(card=>{
-    card.style.display=(!q||card.dataset.tel.includes(q))?'':'none';
+    const pasaTexto = !q || card.dataset.tel.includes(q);
+    const pasaPendiente = !cortesSoloPendientes || card.dataset.falta==='1';
+    card.style.display = (pasaTexto && pasaPendiente) ? '' : 'none';
   });
+}
+
+function toggleCortesPendientes(){
+  cortesSoloPendientes = !cortesSoloPendientes;
+  const btn = document.getElementById('btn-cortes-pendientes');
+  if(cortesSoloPendientes){
+    btn.classList.add('btn-primary');
+    btn.textContent = '✕ Ver todas';
+  } else {
+    btn.classList.remove('btn-primary');
+    btn.textContent = '💰 Ver pendientes de pago';
+  }
+  filtrarCortes(document.getElementById('cortes-search').value);
 }
 
 let DB_cortesPorCliente = {};
@@ -6539,7 +6557,7 @@ async function loadCortes(f){
         </tr>`;
       }).join('');
 
-      return `<div class="card mb-16" data-tel="${(g.telefono||'').toLowerCase()}">
+      return `<div class="card mb-16" data-tel="${(g.telefono||'').toLowerCase()}" data-falta="${g.falta>0?'1':'0'}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
           <div>
             <div style="font-weight:600;font-size:14px">${g.nombre}</div>
@@ -6565,6 +6583,8 @@ async function loadCortes(f){
         </details>
       </div>`;
     }).join('');
+
+    filtrarCortes(document.getElementById('cortes-search')?.value||'');
   } catch(e){ document.getElementById('cortes-lista').innerHTML=`<div style="color:var(--red);font-size:12px;padding:12px">Error: ${e.message}</div>`; }
 }
 
