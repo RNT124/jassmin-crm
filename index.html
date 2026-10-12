@@ -812,6 +812,11 @@ td.empty-state{padding:20px;text-align:center}
       Inventario
     </div>
 
+    <div class="sb-item" id="sb-item-brasil" onclick="nav('brasil',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>
+      Brasil
+    </div>
+
     <div class="sb-section" id="sb-admin-section">Administración</div>
     <div class="sb-item" id="sb-catalogo" onclick="nav('catalogo',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/></svg>
@@ -1285,6 +1290,39 @@ td.empty-state{padding:20px;text-align:center}
 
         <div class="mb-8" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Conteos anteriores</div>
         <div id="inventario-historial"><div class="loading">Cargando...</div></div>
+      </div>
+
+      <!-- ── BRASIL ── -->
+      <div id="pg-brasil" class="page">
+        <div class="tabs" style="margin-bottom:14px">
+          <div class="tab active" id="br-tab-registro" onclick="brTab('registro')">🔴 Registro live</div>
+          <div class="tab" id="br-tab-comprar" onclick="brTab('comprar')">🛒 Por comprar</div>
+          <div class="tab" id="br-tab-pedidos" onclick="brTab('pedidos')">📦 Pedidos</div>
+          <div class="tab" id="br-tab-resumen" onclick="brTab('resumen')">📊 Resumen</div>
+        </div>
+        <div id="br-view-registro">
+          <div class="card" style="margin-bottom:12px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px">1. Clienta</div>
+            <input id="br-tel" type="tel" placeholder="Busca por celular (mín. 4 dígitos)" oninput="brBuscarCliente(this.value)" style="width:100%">
+            <div id="br-cli-res" style="margin-top:8px"></div>
+            <div id="br-cli-sel" style="margin-top:8px"></div>
+          </div>
+          <div class="card" id="br-form-prod" style="display:none">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px">2. Producto vendido</div>
+            <input id="br-prod" list="br-prod-list" placeholder="Producto (escribe uno nuevo o elige uno anterior)" style="width:100%;margin-bottom:8px">
+            <datalist id="br-prod-list"></datalist>
+            <input id="br-var" placeholder="Talla / color / presentación (ej: M negro, 250 ml)" style="width:100%;margin-bottom:8px">
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <input id="br-precio" type="number" inputmode="decimal" placeholder="Precio venta S/" style="flex:1">
+              <input id="br-cant" type="number" inputmode="numeric" value="1" min="1" placeholder="Cant." style="width:80px">
+            </div>
+            <button class="btn btn-primary" onclick="brAgregarItem()">+ Agregar a la clienta</button>
+            <div id="br-items-clienta" style="margin-top:14px"></div>
+          </div>
+        </div>
+        <div id="br-view-comprar" style="display:none"></div>
+        <div id="br-view-pedidos" style="display:none"></div>
+        <div id="br-view-resumen" style="display:none"></div>
       </div>
 
       <!-- ── INVENTARIO — pantalla de conteo (página completa, con guardado de avance) ── -->
@@ -2015,6 +2053,7 @@ async function doLogin(){
   if(currentUser.rol!=='admin') document.getElementById('sb-catalogo').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-stock').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-config').style.display='none';
+  if(currentUser.rol!=='admin') document.getElementById('sb-item-brasil').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-admin-section').style.display='none';
   if(currentUser.rol==='trabajador') document.getElementById('sb-item-dashboard').style.display='none';
   if(currentUser.rol==='trabajador') document.getElementById('btn-nuevo-corte').style.display='none';
@@ -2057,7 +2096,7 @@ function nav(page, el){
   document.getElementById('pg-'+page).classList.add('active');
   if(el) el.classList.add('active');
   toggleSidebarMobile(false); // cerrar el menú en celular al navegar
-  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho',asistencia:'Control de Asistencia',inventario:'Inventario'};
+  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho',asistencia:'Control de Asistencia',inventario:'Inventario',brasil:'Brasil'};
   const subtitles={
     dashboard:'Resumen de tu negocio, hoy',
     live:'Busca a tu clienta y agrega las prendas que va llevando',
@@ -2072,7 +2111,8 @@ function nav(page, el){
     config:'Ajustes y acciones administrativas',
     despacho:'Pedidos listos para empaquetar y enviar hoy',
     asistencia: esTrabajador() ? 'Marca tu entrada y salida del día' : 'Historial de asistencia y cálculo de pago de tus trabajadoras',
-    inventario:'Cuenta tu mercadería física y compárala contra el sistema'
+    inventario:'Cuenta tu mercadería física y compárala contra el sistema',
+    brasil:'Ventas y compras hechas en Brasil — separadas del negocio normal'
   };
   document.getElementById('tb-title').textContent=titles[page]||page;
   document.getElementById('tb-subtitle').textContent=subtitles[page]||'';
@@ -2087,6 +2127,7 @@ function nav(page, el){
   if(page==='compras') loadCompras();
   if(page==='asistencia') loadAsistencia();
   if(page==='inventario') loadInventarioHistorial();
+  if(page==='brasil') brTab(brTabActual);
 }
 
 // ═══════════════════════════ INIT ═══════════════════════════
@@ -6848,6 +6889,321 @@ async function confirmarPagoCorte(){
   } catch(e){ toast('Error: '+e.message); }
 }
 function initials(n){ return n.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'; }
+// ═══════════════════════════ BRASIL (sección independiente) ═══════════════════════════
+const BR_TASA = 0.69;       // 1 R$ = 0.69 S/ (fijo)
+const BR_FLETE_UNIDAD = 10; // flete estimado S/ por unidad (editable aquí cuando se sepa el real)
+let brTabActual = 'registro';
+let brCliente = null;
+let brCopyData = {};
+const BR_ESTADOS = {por_comprar:'Por comprar', comprado:'Comprado', listo_lima:'Listo en Lima', despachado:'Despachado'};
+function brEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function brSoles(n){ return 'S/ '+(Math.round(n*100)/100).toFixed(2); }
+
+function brTab(t){
+  brTabActual = t;
+  ['registro','comprar','pedidos','resumen'].forEach(k=>{
+    document.getElementById('br-tab-'+k).classList.toggle('active', k===t);
+    document.getElementById('br-view-'+k).style.display = k===t ? '' : 'none';
+  });
+  if(t==='registro') brCargarProductos();
+  if(t==='comprar') brLoadComprar();
+  if(t==='pedidos') brLoadPedidos();
+  if(t==='resumen') brLoadResumen();
+}
+
+async function brCargarProductos(){
+  try {
+    const rows = await dbGet('brasil_items?select=producto&order=creado_en.desc&limit=1000');
+    const uniq = [...new Set(rows.map(r=>r.producto))];
+    document.getElementById('br-prod-list').innerHTML = uniq.map(p=>`<option value="${brEsc(p)}">`).join('');
+  } catch(e){ console.error(e); }
+}
+
+async function brBuscarCliente(val){
+  const clean = val.replace(/\D/g,'');
+  const res = document.getElementById('br-cli-res');
+  if(clean.length<4){ res.innerHTML=''; return; }
+  try {
+    const m = await dbGet(`clientes?telefono=like.${clean}*&limit=5`);
+    if(!m.length){
+      res.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">No encontrada — <strong>${clean}</strong></div><button class="btn btn-sm" onclick="brCrearCliente('${clean}')">+ Registrar nueva</button>`;
+    } else {
+      res.innerHTML = `<div class="pill-row">${m.map(c=>`<button class="btn btn-xs" onclick="brSelCliente('${c.id}')">${brEsc(c.nombre||'Sin nombre')} · ${brEsc(c.telefono)}</button>`).join('')}</div>`;
+    }
+  } catch(e){ res.innerHTML='<div style="font-size:12px;color:var(--red)">Error de conexión</div>'; }
+}
+
+async function brCrearCliente(tel){
+  const nombre = prompt('Nombre de la clienta (datos de envío los completas después en Clientas):');
+  if(nombre===null) return;
+  try {
+    const r = await dbPost('clientes', {telefono:tel, nombre:nombre.trim()||null});
+    toast('✓ Clienta creada');
+    await brSelCliente(r[0].id);
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+async function brSelCliente(id){
+  try {
+    const r = await dbGet(`clientes?id=eq.${id}&limit=1`);
+    brCliente = r[0];
+    document.getElementById('br-cli-res').innerHTML='';
+    document.getElementById('br-tel').value='';
+    const c = brCliente;
+    const sinDatos = !c.direccion;
+    document.getElementById('br-cli-sel').innerHTML = `<div style="background:var(--pink-light);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px"><strong>${brEsc(c.nombre||'Sin nombre')}</strong> · ${brEsc(c.telefono)}<div class="text-hint" style="font-size:11.5px;margin-top:2px">${sinDatos?'⚠️ Sin datos de envío aún (complétalos en Clientas)':brEsc((c.tipo_envio_preferido||'').startsWith('shalom')?'📦 Shalom — '+(c.direccion||''):'🏍️ '+(c.direccion||'')+(c.distrito?', '+c.distrito:''))}</div></div>`;
+    document.getElementById('br-form-prod').style.display='';
+    await brRenderItemsClienta();
+    brCargarProductos();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+async function brPedidoAbierto(clienteId){
+  const r = await dbGet(`brasil_pedidos?cliente_id=eq.${clienteId}&estado=neq.despachado&order=creado_en.desc&limit=1`);
+  return r[0]||null;
+}
+
+async function brRenderItemsClienta(){
+  const box = document.getElementById('br-items-clienta');
+  if(!brCliente){ box.innerHTML=''; return; }
+  try {
+    const ped = await brPedidoAbierto(brCliente.id);
+    if(!ped){ box.innerHTML='<div class="text-hint" style="font-size:12px">Aún no tiene productos en Brasil.</div>'; return; }
+    const items = await dbGet(`brasil_items?pedido_id=eq.${ped.id}&order=creado_en.asc`);
+    const total = items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
+    box.innerHTML = `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Llevando ahora</div>` +
+      items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${i.comprado?'<span class="badge badge-ok">comprado</span>':''}</span><span>${brSoles(i.precio_venta*i.cantidad)} ${i.comprado?'':`<button class="btn btn-xs" onclick="brEliminarItem('${i.id}')">✕</button>`}</span></div>`).join('') +
+      `<div style="text-align:right;font-weight:600;font-size:13px;margin-top:8px">Total: ${brSoles(total)}</div>`;
+  } catch(e){ box.innerHTML='<div style="color:var(--red);font-size:12px">Error cargando</div>'; }
+}
+
+async function brAgregarItem(){
+  if(!brCliente){ toast('Primero elige una clienta'); return; }
+  const producto = document.getElementById('br-prod').value.trim();
+  const variante = document.getElementById('br-var').value.trim();
+  const precio = parseFloat(document.getElementById('br-precio').value);
+  const cant = parseInt(document.getElementById('br-cant').value)||1;
+  if(!producto){ toast('Escribe el producto'); return; }
+  if(isNaN(precio) || precio<0){ toast('Pon el precio de venta'); return; }
+  try {
+    let ped = await brPedidoAbierto(brCliente.id);
+    if(!ped){
+      const r = await dbPost('brasil_pedidos', {cliente_id:brCliente.id, estado:'por_comprar'});
+      ped = r[0];
+    } else if(ped.estado==='comprado' || ped.estado==='listo_lima'){
+      await dbPatch(`brasil_pedidos?id=eq.${ped.id}`, {estado:'por_comprar'});
+      toast('ℹ️ El pedido volvió a "Por comprar" porque tiene un producto nuevo');
+    }
+    await dbPost('brasil_items', {pedido_id:ped.id, producto, variante:variante||null, cantidad:cant, precio_venta:precio});
+    document.getElementById('br-prod').value='';
+    document.getElementById('br-var').value='';
+    document.getElementById('br-precio').value='';
+    document.getElementById('br-cant').value='1';
+    toast('✓ Agregado');
+    await brRenderItemsClienta();
+    brCargarProductos();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+async function brEliminarItem(id){
+  if(!confirm('¿Quitar este producto?')) return;
+  try {
+    const it = await dbGet(`brasil_items?id=eq.${id}&select=pedido_id`);
+    await dbDelete(`brasil_items?id=eq.${id}`);
+    const resto = await dbGet(`brasil_items?pedido_id=eq.${it[0].pedido_id}&select=id&limit=1`);
+    if(!resto.length) await dbDelete(`brasil_pedidos?id=eq.${it[0].pedido_id}`);
+    await brRenderItemsClienta();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+// ── Por comprar ──
+let brGrupos = {};
+async function brLoadComprar(){
+  const box = document.getElementById('br-view-comprar');
+  box.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    const items = await dbGet('brasil_items?comprado=eq.false&order=creado_en.asc');
+    if(!items.length){ box.innerHTML='<div class="card" style="text-align:center;padding:30px;color:var(--text2)">✅ No tienes nada pendiente por comprar</div>'; return; }
+    const pedIds = [...new Set(items.map(i=>i.pedido_id))];
+    const peds = await dbGet(`brasil_pedidos?id=in.(${pedIds.join(',')})&select=id,cliente_id`);
+    const cliIds = [...new Set(peds.map(p=>p.cliente_id))];
+    const clis = await dbGet(`clientes?id=in.(${cliIds.join(',')})&select=id,nombre`);
+    const cliDe = {}; peds.forEach(p=>{ cliDe[p.id] = (clis.find(c=>c.id===p.cliente_id)||{}).nombre||'Sin nombre'; });
+    brGrupos = {};
+    items.forEach(i=>{
+      const k = (i.producto.trim().toLowerCase())+'|'+((i.variante||'').trim().toLowerCase());
+      if(!brGrupos[k]) brGrupos[k] = {producto:i.producto, variante:i.variante||'', items:[], qty:0, clientas:{}};
+      brGrupos[k].items.push(i);
+      brGrupos[k].qty += i.cantidad;
+      const n = cliDe[i.pedido_id]; brGrupos[k].clientas[n] = (brGrupos[k].clientas[n]||0)+i.cantidad;
+    });
+    const totalUnid = items.reduce((a,i)=>a+i.cantidad,0);
+    box.innerHTML = `<div class="text-muted text-sm mb-16">Faltan comprar <strong>${totalUnid}</strong> unidad(es) en <strong>${Object.keys(brGrupos).length}</strong> producto(s).</div>` +
+      Object.keys(brGrupos).map(k=>{
+        const g = brGrupos[k];
+        const kEnc = encodeURIComponent(k);
+        return `<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <div><div style="font-size:14px;font-weight:600">${brEsc(g.producto)}${g.variante?' · '+brEsc(g.variante):''}</div>
+          <div style="font-size:12px;color:var(--pink);font-weight:500;margin-top:2px">Faltan ${g.qty}</div>
+          <div class="text-hint" style="font-size:11.5px;margin-top:2px">${Object.entries(g.clientas).map(([n,q])=>brEsc(n)+' ('+q+')').join(', ')}</div></div>
+          <button class="btn btn-sm btn-primary" onclick="brComprarGrupo('${kEnc}')">✓ Ya compré</button></div>`;
+      }).join('');
+  } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+' — ¿corriste el SQL de Brasil en Supabase?</div>'; }
+}
+
+async function brComprarGrupo(kEnc){
+  const g = brGrupos[decodeURIComponent(kEnc)];
+  if(!g) return;
+  const qStr = prompt(`¿Cuántas unidades compraste de "${g.producto}${g.variante?' '+g.variante:''}"? (faltan ${g.qty})`, g.qty);
+  if(qStr===null) return;
+  let q = parseInt(qStr);
+  if(!q || q<1) return;
+  if(q>g.qty) q = g.qty;
+  const pStr = prompt('Precio por unidad en R$ (reales):');
+  if(pStr===null) return;
+  const precio = parseFloat(String(pStr).replace(',','.'));
+  if(isNaN(precio) || precio<0){ toast('Precio inválido'); return; }
+  toast(`💱 R$ ${precio.toFixed(2)} = ${brSoles(precio*BR_TASA)} por unidad`);
+  try {
+    let resta = q;
+    const pedidos = new Set();
+    for(const it of g.items){
+      if(resta<=0) break;
+      pedidos.add(it.pedido_id);
+      if(it.cantidad<=resta){
+        await dbPatch(`brasil_items?id=eq.${it.id}`, {comprado:true, costo_rl:precio});
+        resta -= it.cantidad;
+      } else {
+        await dbPatch(`brasil_items?id=eq.${it.id}`, {cantidad:it.cantidad-resta});
+        await dbPost('brasil_items', {pedido_id:it.pedido_id, producto:it.producto, variante:it.variante, cantidad:resta, precio_venta:it.precio_venta, comprado:true, costo_rl:precio});
+        resta = 0;
+      }
+    }
+    for(const pid of pedidos){
+      const pend = await dbGet(`brasil_items?pedido_id=eq.${pid}&comprado=eq.false&select=id&limit=1`);
+      if(!pend.length) await dbPatch(`brasil_pedidos?id=eq.${pid}&estado=eq.por_comprar`, {estado:'comprado'});
+    }
+    toast('✓ Compra registrada');
+    brLoadComprar();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+// ── Pedidos Brasil ──
+let brPedLista = [];
+let brFiltroDesp = false;
+async function brLoadPedidos(){
+  const box = document.getElementById('br-view-pedidos');
+  box.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    const peds = await dbGet(`brasil_pedidos?${brFiltroDesp?'':'estado=neq.despachado&'}order=creado_en.desc`);
+    const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <label style="font-size:12.5px"><input type="checkbox" ${brFiltroDesp?'checked':''} onchange="brFiltroDesp=this.checked;brLoadPedidos()"> Ver también despachados</label></div>`;
+    if(!peds.length){ box.innerHTML = head+'<div class="card" style="text-align:center;padding:30px;color:var(--text2)">No hay pedidos de Brasil</div>'; return; }
+    const items = await dbGet(`brasil_items?pedido_id=in.(${peds.map(p=>p.id).join(',')})&order=creado_en.asc`);
+    const clis = await dbGet(`clientes?id=in.(${[...new Set(peds.map(p=>p.cliente_id))].join(',')})&select=*`);
+    brPedLista = peds.map(p=>({...p, items:items.filter(i=>i.pedido_id===p.id), cli:clis.find(c=>c.id===p.cliente_id)||{}}));
+    const badgeCls = {por_comprar:'badge-warn', comprado:'badge-info', listo_lima:'badge-pink', despachado:'badge-ok'};
+    brCopyData = {};
+    const bulk = `<div id="br-bulk" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn btn-sm" onclick="brExcelMotorizado()">📄 Excel motorizado (seleccionados)</button>
+      <button class="btn btn-sm" onclick="brDespacharSeleccion()">🚚 Marcar despachados (seleccionados)</button></div>`;
+    box.innerHTML = head + bulk + brPedLista.map(p=>{
+      const c = p.cli;
+      const esShalom = (c.tipo_envio_preferido||'').startsWith('shalom');
+      const total = p.items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
+      brCopyData[p.id] = [`Nombre: ${c.nombre||'—'}`,`Teléfono: ${c.telefono||'—'}`,`DNI: ${c.dni||'—'}`,esShalom?'Envío: Shalom':'Envío: Motorizado',esShalom?`Agencia: ${c.direccion||'—'}`:`Dirección: ${c.direccion||'—'}`,esShalom?`Ciudad/Departamento: ${c.distrito||'—'}`:`Distrito: ${c.distrito||'—'}`].concat(!esShalom&&c.referencia?[`Referencia: ${c.referencia}`]:[]).join('\n');
+      const sel = p.estado==='listo_lima' ? `<input type="checkbox" class="br-sel" value="${p.id}" style="margin-right:6px">` : '';
+      let accion = '';
+      if(p.estado==='comprado') accion = `<button class="btn btn-sm" onclick="brSetEstado('${p.id}','listo_lima')">✓ Listo en Lima</button>`;
+      return `<div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:600">${sel}${brEsc(c.nombre||'Sin nombre')} <span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span></div>
+          <span class="badge ${badgeCls[p.estado]}">${BR_ESTADOS[p.estado]}</span></div>
+        <div class="text-hint" style="font-size:11.5px;margin:2px 0 6px">${esShalom?'📦 Shalom — ':'🏍️ '}${brEsc(c.direccion||'sin dirección')}${c.distrito?' ('+brEsc(c.distrito)+')':''}</div>
+        ${p.items.map(i=>`<div style="font-size:12.5px;padding:2px 0">${i.comprado?'✅':'⏳'} ${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} — ${brSoles(i.precio_venta*i.cantidad)}</div>`).join('')}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <label style="font-size:12.5px"><input type="checkbox" ${p.pagado?'checked':''} ${p.estado==='despachado'?'disabled':''} onchange="brTogglePagado('${p.id}',this.checked)"> 💰 Pagó · <strong>${brSoles(total)}</strong></label>
+          <div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brCopiar('${p.id}')">📋 Copiar datos</button>${accion}</div></div>
+      </div>`;
+    }).join('');
+  } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
+}
+
+function brCopiar(id){
+  navigator.clipboard.writeText(brCopyData[id]||'').then(()=>toast('✓ Datos copiados')).catch(()=>toast('No se pudo copiar'));
+}
+async function brSetEstado(id, estado){
+  try { await dbPatch(`brasil_pedidos?id=eq.${id}`, {estado}); brLoadPedidos(); } catch(e){ toast('Error: '+e.message); }
+}
+async function brTogglePagado(id, v){
+  try { await dbPatch(`brasil_pedidos?id=eq.${id}`, {pagado:v}); toast(v?'✓ Marcado como pagado':'Pago desmarcado'); } catch(e){ toast('Error: '+e.message); }
+}
+function brSeleccionados(){
+  const ids = [...document.querySelectorAll('.br-sel:checked')].map(x=>x.value);
+  return brPedLista.filter(p=>ids.includes(p.id));
+}
+function brExcelMotorizado(){
+  const lista = brSeleccionados();
+  if(!lista.length){ toast('Selecciona pedidos "Listo en Lima"'); return; }
+  if(lista.some(p=>(p.cli.tipo_envio_preferido||'').startsWith('shalom'))){ toast('⚠️ Hay clientas de Shalom seleccionadas — el Excel es solo para motorizado'); return; }
+  const hoy = new Date();
+  const datos = [
+    ['','','','','','','','','','',''],
+    ['DATOS DEL CLIENTE','','','','','','','','DATOS DEL PRODUCTO 1','',''],
+    ['FECHA ENTREGA','CLIENTE','DISTRITO','DIRECCIÓN DE ENTREGA','CELULAR','TIPO DE SERVICIO','COBRAR S/','','DESCRIPCION DEL PAQUETE','PESO (KG)','COMENTARIO']
+  ];
+  lista.forEach(p=>{ const c=p.cli;
+    datos.push([hoy, c.nombre||'', c.distrito||'', c.direccion||'', c.telefono?parseInt(c.telefono):'', 'entrega', 14, '', 'ROPA', '', '']); });
+  const ws = XLSX.utils.aoa_to_sheet(datos);
+  ws['!merges'] = [{s:{r:1,c:0}, e:{r:1,c:6}}, {s:{r:1,c:8}, e:{r:1,c:10}}];
+  ws['!cols'] = [{wch:12},{wch:22},{wch:18},{wch:38},{wch:12},{wch:14},{wch:10},{wch:3},{wch:16},{wch:10},{wch:24}];
+  for(let r=3; r<datos.length; r++){ const cell = ws[XLSX.utils.encode_cell({r, c:0})]; if(cell) cell.z = 'dd/mm/yyyy'; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Hoja 1');
+  XLSX.writeFile(wb, 'brasil-motorizado-'+hoy.toISOString().slice(0,10)+'.xlsx');
+  toast('✓ Excel descargado — '+lista.length+' pedido(s)');
+}
+async function brDespacharSeleccion(){
+  const lista = brSeleccionados();
+  if(!lista.length){ toast('Selecciona pedidos "Listo en Lima"'); return; }
+  const sinPago = lista.filter(p=>!p.pagado);
+  if(sinPago.length && !confirm(`⚠️ ${sinPago.length} pedido(s) NO están marcados como pagados. ¿Despachar igual?`)) return;
+  if(!confirm(`¿Marcar ${lista.length} pedido(s) como despachados?`)) return;
+  const codigo = prompt('Código de seguimiento (vacío si no aplica):') || '';
+  try {
+    for(const p of lista) await dbPatch(`brasil_pedidos?id=eq.${p.id}`, {estado:'despachado', despachado_en:new Date().toISOString(), courier_codigo:codigo||null});
+    toast('✓ Despachados'); brLoadPedidos();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+// ── Resumen ──
+async function brLoadResumen(){
+  const box = document.getElementById('br-view-resumen');
+  box.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    const [items, peds] = await Promise.all([dbGet('brasil_items?select=*&limit=5000'), dbGet('brasil_pedidos?select=id,pagado,estado&limit=5000')]);
+    const pedDe = {}; peds.forEach(p=>pedDe[p.id]=p);
+    let invRL=0, vendido=0, vendidoComprado=0, unidades=0, unidComp=0, cobrado=0, porCobrar=0;
+    items.forEach(i=>{
+      const v = i.precio_venta*i.cantidad; vendido += v; unidades += i.cantidad;
+      if(pedDe[i.pedido_id]?.pagado) cobrado += v; else porCobrar += v;
+      if(i.comprado){ invRL += (i.costo_rl||0)*i.cantidad; vendidoComprado += v; unidComp += i.cantidad; }
+    });
+    const invS = invRL*BR_TASA, flete = unidComp*BR_FLETE_UNIDAD;
+    const ganancia = vendidoComprado - invS - flete;
+    const m = (val,lbl,color)=>`<div class="metric"><div class="metric-val" style="${color?'color:'+color:''}">${val}</div><div class="metric-lbl">${lbl}</div></div>`;
+    box.innerHTML = `<div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
+      ${m('R$ '+invRL.toFixed(2),'Invertido (reales)')}
+      ${m(brSoles(invS),'Invertido (soles, 1 R$ = '+BR_TASA+')')}
+      ${m(brSoles(vendido),'Vendido total ('+unidades+' unid.)')}
+      ${m(brSoles(cobrado),'Ya cobrado')}
+      ${m(brSoles(porCobrar),'Por cobrar')}
+      ${m(brSoles(flete),'Flete estimado (S/ '+BR_FLETE_UNIDAD+' × '+unidComp+' unid.)')}
+      ${m(brSoles(ganancia),'Ganancia estimada','var(--green)')}</div>
+      <div class="text-hint" style="font-size:11.5px">La ganancia estimada solo cuenta lo ya comprado: venta − costo en soles − flete estimado. Cuando sepas el flete real se ajusta.</div>`;
+  } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
+}
+
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 
 function toast(msg, tipo='info'){
