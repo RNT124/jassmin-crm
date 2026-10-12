@@ -1309,8 +1309,9 @@ td.empty-state{padding:20px;text-align:center}
           </div>
           <div class="card" id="br-form-prod" style="display:none">
             <div style="font-size:12px;font-weight:600;margin-bottom:8px">2. Producto vendido</div>
-            <input id="br-prod" list="br-prod-list" placeholder="Producto (escribe uno nuevo o elige uno anterior)" style="width:100%;margin-bottom:8px">
+            <input id="br-prod" list="br-prod-list" oninput="brProdCambio()" onchange="brProdCambio()" placeholder="Producto (escribe uno nuevo o elige uno guardado)" style="width:100%;margin-bottom:8px" autocomplete="off">
             <datalist id="br-prod-list"></datalist>
+            <div id="br-var-chips" class="pill-row" style="margin-bottom:6px"></div>
             <input id="br-var" placeholder="Talla / color / presentación (ej: M negro, 250 ml)" style="width:100%;margin-bottom:8px">
             <div style="display:flex;gap:8px;margin-bottom:10px">
               <input id="br-precio" type="number" inputmode="decimal" placeholder="Precio venta S/" style="flex:1">
@@ -1318,6 +1319,10 @@ td.empty-state{padding:20px;text-align:center}
             </div>
             <button class="btn btn-primary" onclick="brAgregarItem()">+ Agregar a la clienta</button>
             <div id="br-items-clienta" style="margin-top:14px"></div>
+          </div>
+          <div class="card" style="margin-top:12px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px">📚 Mis productos de Brasil <span class="text-hint" style="font-weight:400">(se guardan solos al venderlos)</span></div>
+            <div id="br-catalogo"></div>
           </div>
         </div>
         <div id="br-view-comprar" style="display:none"></div>
@@ -6911,12 +6916,60 @@ function brTab(t){
   if(t==='resumen') brLoadResumen();
 }
 
+let brProductos = [];
 async function brCargarProductos(){
   try {
-    const rows = await dbGet('brasil_items?select=producto&order=creado_en.desc&limit=1000');
-    const uniq = [...new Set(rows.map(r=>r.producto))];
-    document.getElementById('br-prod-list').innerHTML = uniq.map(p=>`<option value="${brEsc(p)}">`).join('');
-  } catch(e){ console.error(e); }
+    brProductos = await dbGet('brasil_productos?order=nombre.asc&limit=1000');
+    document.getElementById('br-prod-list').innerHTML = brProductos.map(p=>`<option value="${brEsc(p.nombre)}">`).join('');
+    brRenderCatalogo();
+  } catch(e){ console.error(e); const c=document.getElementById('br-catalogo'); if(c) c.innerHTML='<div class="text-hint" style="font-size:12px;color:var(--red)">No se pudo cargar — ¿corriste el SQL de productos de Brasil?</div>'; }
+}
+function brProdActual(){
+  const n = document.getElementById('br-prod').value.trim().toLowerCase();
+  return brProductos.find(p=>p.nombre.trim().toLowerCase()===n) || null;
+}
+function brProdCambio(){
+  const pr = brProdActual();
+  const box = document.getElementById('br-var-chips');
+  if(!pr){ box.innerHTML=''; return; }
+  if(pr.precio_venta!=null) document.getElementById('br-precio').value = pr.precio_venta;
+  const vars = Array.isArray(pr.variantes)?pr.variantes:[];
+  box.innerHTML = vars.map(v=>`<button type="button" class="btn btn-xs" onclick="document.getElementById('br-var').value=decodeURIComponent('${encodeURIComponent(v)}')">${brEsc(v)}</button>`).join('');
+}
+function brRenderCatalogo(){
+  const c = document.getElementById('br-catalogo');
+  if(!c) return;
+  if(!brProductos.length){ c.innerHTML='<div class="text-hint" style="font-size:12px">Aún no hay productos. Se crean automáticamente al registrar la primera venta.</div>'; return; }
+  c.innerHTML = brProductos.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px;flex-wrap:wrap">
+    <div><strong>${brEsc(p.nombre)}</strong> · ${p.precio_venta!=null?brSoles(p.precio_venta):'—'}<div class="text-hint" style="font-size:11.5px">${(p.variantes||[]).map(brEsc).join(', ')||'sin variantes'}</div></div>
+    <div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brEditarProducto('${p.id}')">✏️ Editar</button><button class="btn btn-xs" onclick="brBorrarProducto('${p.id}')">🗑</button></div></div>`).join('');
+}
+async function brEditarProducto(id){
+  const p = brProductos.find(x=>x.id===id); if(!p) return;
+  const nombre = prompt('Nombre del producto:', p.nombre); if(nombre===null) return;
+  const precio = prompt('Precio de venta habitual S/:', p.precio_venta==null?'':p.precio_venta); if(precio===null) return;
+  const vars = prompt('Variantes separadas por coma (ej: M negro, 250 ml):', (p.variantes||[]).join(', ')); if(vars===null) return;
+  try {
+    await dbPatch(`brasil_productos?id=eq.${id}`, {nombre:nombre.trim()||p.nombre, precio_venta:precio===''?null:parseFloat(precio), variantes:vars.split(',').map(v=>v.trim()).filter(Boolean)});
+    toast('✓ Producto actualizado'); brCargarProductos();
+  } catch(e){ toast('Error: '+e.message); }
+}
+async function brBorrarProducto(id){
+  const p = brProductos.find(x=>x.id===id); if(!p) return;
+  if(!confirm(`¿Borrar "${p.nombre}" de tu lista de productos? Las ventas ya registradas no se tocan.`)) return;
+  try { await dbDelete(`brasil_productos?id=eq.${id}`); toast('✓ Producto borrado'); brCargarProductos(); } catch(e){ toast('Error: '+e.message); }
+}
+// Guarda el producto la primera vez; después actualiza precio y suma variantes nuevas
+async function brGuardarProducto(nombre, variante, precio){
+  const ex = brProductos.find(p=>p.nombre.trim().toLowerCase()===nombre.trim().toLowerCase());
+  if(!ex){
+    await dbPost('brasil_productos', {nombre, precio_venta:precio, variantes:variante?[variante]:[]});
+  } else {
+    const vars = Array.isArray(ex.variantes)?ex.variantes.slice():[];
+    const nueva = variante && !vars.some(v=>v.toLowerCase()===variante.toLowerCase());
+    if(nueva) vars.push(variante);
+    if(nueva || ex.precio_venta!==precio) await dbPatch(`brasil_productos?id=eq.${ex.id}`, {precio_venta:precio, variantes:vars});
+  }
 }
 
 async function brBuscarCliente(val){
@@ -6972,7 +7025,7 @@ async function brRenderItemsClienta(){
     const items = await dbGet(`brasil_items?pedido_id=eq.${ped.id}&order=creado_en.asc`);
     const total = items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
     box.innerHTML = `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Llevando ahora</div>` +
-      items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${i.comprado?'<span class="badge badge-ok">comprado</span>':''}</span><span>${brSoles(i.precio_venta*i.cantidad)} ${i.comprado?'':`<button class="btn btn-xs" onclick="brEliminarItem('${i.id}')">✕</button>`}</span></div>`).join('') +
+      items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${i.comprado?'<span class="badge badge-ok">comprado</span>':''}</span><span>${brSoles(i.precio_venta*i.cantidad)} <button class="btn btn-xs" onclick="brEditarPrecioItem('${i.id}',${i.precio_venta})">✏️</button> <button class="btn btn-xs" onclick="brEliminarItem('${i.id}',${i.comprado})">✕</button></span></div>`).join('') +
       `<div style="text-align:right;font-weight:600;font-size:13px;margin-top:8px">Total: ${brSoles(total)}</div>`;
   } catch(e){ box.innerHTML='<div style="color:var(--red);font-size:12px">Error cargando</div>'; }
 }
@@ -6994,7 +7047,11 @@ async function brAgregarItem(){
       await dbPatch(`brasil_pedidos?id=eq.${ped.id}`, {estado:'por_comprar'});
       toast('ℹ️ El pedido volvió a "Por comprar" porque tiene un producto nuevo');
     }
-    await dbPost('brasil_items', {pedido_id:ped.id, producto, variante:variante||null, cantidad:cant, precio_venta:precio});
+    const pr0 = brProdActual();
+    const nombreFinal = pr0 ? pr0.nombre : producto;
+    await dbPost('brasil_items', {pedido_id:ped.id, producto:nombreFinal, variante:variante||null, cantidad:cant, precio_venta:precio});
+    try { await brGuardarProducto(nombreFinal, variante, precio); } catch(e){ console.error(e); }
+    document.getElementById('br-var-chips').innerHTML='';
     document.getElementById('br-prod').value='';
     document.getElementById('br-var').value='';
     document.getElementById('br-precio').value='';
@@ -7005,8 +7062,14 @@ async function brAgregarItem(){
   } catch(e){ toast('Error: '+e.message); }
 }
 
-async function brEliminarItem(id){
-  if(!confirm('¿Quitar este producto?')) return;
+async function brEditarPrecioItem(id, actual){
+  const v = prompt('Nuevo precio de venta por unidad (S/):', actual); if(v===null) return;
+  const n = parseFloat(String(v).replace(',','.'));
+  if(isNaN(n)||n<0){ toast('Precio inválido'); return; }
+  try { await dbPatch(`brasil_items?id=eq.${id}`, {precio_venta:n}); toast('✓ Precio actualizado'); brRenderItemsClienta(); } catch(e){ toast('Error: '+e.message); }
+}
+async function brEliminarItem(id, comprado){
+  if(!confirm(comprado ? '⚠️ Este producto YA está comprado. Si lo quitas, baja lo invertido en el Resumen. ¿Quitarlo igual?' : '¿Quitar este producto?')) return;
   try {
     const it = await dbGet(`brasil_items?id=eq.${id}&select=pedido_id`);
     await dbDelete(`brasil_items?id=eq.${id}`);
@@ -7018,6 +7081,8 @@ async function brEliminarItem(id){
 
 // ── Por comprar ──
 let brGrupos = {};
+let brListaTexto = '';
+function brCopiarLista(){ navigator.clipboard.writeText(brListaTexto).then(()=>toast('✓ Lista copiada')).catch(()=>toast('No se pudo copiar')); }
 async function brLoadComprar(){
   const box = document.getElementById('br-view-comprar');
   box.innerHTML = '<div class="loading">Cargando...</div>';
@@ -7038,16 +7103,19 @@ async function brLoadComprar(){
       const n = cliDe[i.pedido_id]; brGrupos[k].clientas[n] = (brGrupos[k].clientas[n]||0)+i.cantidad;
     });
     const totalUnid = items.reduce((a,i)=>a+i.cantidad,0);
-    box.innerHTML = `<div class="text-muted text-sm mb-16">Faltan comprar <strong>${totalUnid}</strong> unidad(es) en <strong>${Object.keys(brGrupos).length}</strong> producto(s).</div>` +
-      Object.keys(brGrupos).map(k=>{
-        const g = brGrupos[k];
-        const kEnc = encodeURIComponent(k);
-        return `<div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <div><div style="font-size:14px;font-weight:600">${brEsc(g.producto)}${g.variante?' · '+brEsc(g.variante):''}</div>
-          <div style="font-size:12px;color:var(--pink);font-weight:500;margin-top:2px">Faltan ${g.qty}</div>
-          <div class="text-hint" style="font-size:11.5px;margin-top:2px">${Object.entries(g.clientas).map(([n,q])=>brEsc(n)+' ('+q+')').join(', ')}</div></div>
-          <button class="btn btn-sm btn-primary" onclick="brComprarGrupo('${kEnc}')">✓ Ya compré</button></div>`;
-      }).join('');
+    const porProd = {};
+    Object.keys(brGrupos).forEach(k=>{ const g=brGrupos[k]; const pk=g.producto.trim().toLowerCase(); if(!porProd[pk]) porProd[pk]={nombre:g.producto, qty:0, vars:[]}; porProd[pk].qty+=g.qty; porProd[pk].vars.push({k, g}); });
+    brListaTexto = 'Lista de compras Brasil:\n' + Object.values(porProd).map(pp=>`• ${pp.nombre}: ${pp.qty}` + (pp.vars.length>1||pp.vars[0].g.variante ? ' ('+pp.vars.map(v=>(v.g.variante||'único')+' ×'+v.g.qty).join(', ')+')' : '')).join('\n') + `\nTotal: ${totalUnid} unidades`;
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <div class="text-muted text-sm">Faltan comprar <strong>${totalUnid}</strong> unidad(es) en <strong>${Object.keys(porProd).length}</strong> producto(s).</div>
+      <button class="btn btn-sm" onclick="brCopiarLista()">📋 Copiar lista</button></div>` +
+      Object.values(porProd).map(pp=>`<div class="card" style="margin-bottom:10px">
+        <div style="font-size:15px;font-weight:600">${brEsc(pp.nombre)} <span style="color:var(--pink)">— comprar ${pp.qty}</span></div>
+        ${pp.vars.map(({k,g})=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:0.5px solid var(--border);margin-top:8px;flex-wrap:wrap">
+          <div><div style="font-size:13px"><strong>${brEsc(g.variante||'Único')}</strong> × ${g.qty}</div>
+          <div class="text-hint" style="font-size:11.5px">${Object.entries(g.clientas).map(([n,q])=>brEsc(n)+' ('+q+')').join(', ')}</div></div>
+          <button class="btn btn-sm btn-primary" onclick="brComprarGrupo('${encodeURIComponent(k)}')">✓ Ya compré</button></div>`).join('')}
+      </div>`).join('');
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+' — ¿corriste el SQL de Brasil en Supabase?</div>'; }
 }
 
@@ -7123,12 +7191,18 @@ async function brLoadPedidos(){
         ${p.items.map(i=>`<div style="font-size:12.5px;padding:2px 0">${i.comprado?'✅':'⏳'} ${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} — ${brSoles(i.precio_venta*i.cantidad)}</div>`).join('')}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
           <label style="font-size:12.5px"><input type="checkbox" ${p.pagado?'checked':''} ${p.estado==='despachado'?'disabled':''} onchange="brTogglePagado('${p.id}',this.checked)"> 💰 Pagó · <strong>${brSoles(total)}</strong></label>
-          <div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brCopiar('${p.id}')">📋 Copiar datos</button>${accion}</div></div>
+          <div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brCopiar('${p.id}')">📋 Copiar datos</button>${accion}${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brBorrarPedido('${p.id}')">🗑</button>`}</div></div>
       </div>`;
     }).join('');
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
 
+async function brBorrarPedido(id){
+  const p = brPedLista.find(x=>x.id===id); if(!p) return;
+  const comp = p.items.filter(i=>i.comprado).length;
+  if(!confirm(`¿Borrar el pedido completo de ${p.cli.nombre||'esta clienta'} (${p.items.length} producto(s))?`+(comp?`\n⚠️ ${comp} ya están comprados: bajará lo invertido en el Resumen.`:''))) return;
+  try { await dbDelete(`brasil_pedidos?id=eq.${id}`); toast('✓ Pedido borrado'); brLoadPedidos(); } catch(e){ toast('Error: '+e.message); }
+}
 function brCopiar(id){
   navigator.clipboard.writeText(brCopyData[id]||'').then(()=>toast('✓ Datos copiados')).catch(()=>toast('No se pudo copiar'));
 }
