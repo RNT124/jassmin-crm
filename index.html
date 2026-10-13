@@ -1308,7 +1308,9 @@ td.empty-state{padding:20px;text-align:center}
             <div id="br-cli-sel" style="margin-top:8px"></div>
           </div>
           <div class="card" id="br-form-prod" style="display:none">
-            <div style="font-size:12px;font-weight:600;margin-bottom:8px">2. Producto vendido</div>
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px">2. Canal de venta</div>
+            <div id="br-canal-chips" class="pill-row" style="margin-bottom:12px"></div>
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px">3. Producto vendido</div>
             <input id="br-prod" list="br-prod-list" oninput="brProdCambio()" onchange="brProdCambio()" placeholder="Producto (escribe uno nuevo o elige uno guardado)" style="width:100%;margin-bottom:8px" autocomplete="off">
             <datalist id="br-prod-list"></datalist>
             <div id="br-var-chips" class="pill-row" style="margin-bottom:6px"></div>
@@ -6910,18 +6912,27 @@ function brTab(t){
     document.getElementById('br-tab-'+k).classList.toggle('active', k===t);
     document.getElementById('br-view-'+k).style.display = k===t ? '' : 'none';
   });
-  if(t==='registro') brCargarProductos();
+  if(t==='registro'){ brRenderCanales(); brCargarProductos(); }
   if(t==='comprar') brLoadComprar();
   if(t==='pedidos') brLoadPedidos();
   if(t==='resumen') brLoadResumen();
 }
 
+const BR_CANALES = ['jassmin.pe','Caipi','Jassmin personal'];
+let brCanal = '';
+try { brCanal = localStorage.getItem('br_canal')||''; } catch(e){}
+function brSetCanal(c){ brCanal = c; try{ localStorage.setItem('br_canal', c); }catch(e){} brRenderCanales(); }
+function brRenderCanales(){
+  const box = document.getElementById('br-canal-chips'); if(!box) return;
+  box.innerHTML = BR_CANALES.map(c=>`<button type="button" class="btn btn-sm ${c===brCanal?'btn-primary':''}" onclick="brSetCanal('${c}')">${c}</button>`).join('');
+}
+function brCanalBadge(c){ return `<span class="badge ${c?'badge-info':'badge-gray'}">${brEsc(c||'sin canal')}</span>`; }
 let brProductos = [];
 async function brCargarProductos(){
   try {
     brProductos = await dbGet('brasil_productos?order=nombre.asc&limit=1000');
     document.getElementById('br-prod-list').innerHTML = brProductos.map(p=>`<option value="${brEsc(p.nombre)}">`).join('');
-    brRenderCatalogo();
+    brRenderCatalogo(); brRenderCanales();
   } catch(e){ console.error(e); const c=document.getElementById('br-catalogo'); if(c) c.innerHTML='<div class="text-hint" style="font-size:12px;color:var(--red)">No se pudo cargar — ¿corriste el SQL de productos de Brasil?</div>'; }
 }
 function brProdActual(){
@@ -7025,7 +7036,7 @@ async function brRenderItemsClienta(){
     const items = await dbGet(`brasil_items?pedido_id=eq.${ped.id}&order=creado_en.asc`);
     const total = items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
     box.innerHTML = `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Llevando ahora</div>` +
-      items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${i.comprado?'<span class="badge badge-ok">comprado</span>':''}</span><span>${brSoles(i.precio_venta*i.cantidad)} <button class="btn btn-xs" onclick="brEditarPrecioItem('${i.id}',${i.precio_venta})">✏️</button> <button class="btn btn-xs" onclick="brEliminarItem('${i.id}',${i.comprado})">✕</button></span></div>`).join('') +
+      items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${brCanalBadge(i.canal)} ${i.comprado?'<span class="badge badge-ok">comprado</span>':''}</span><span>${brSoles(i.precio_venta*i.cantidad)} <button class="btn btn-xs" onclick="brEditarPrecioItem('${i.id}',${i.precio_venta})">✏️</button> <button class="btn btn-xs" onclick="brEliminarItem('${i.id}',${i.comprado})">✕</button></span></div>`).join('') +
       `<div style="text-align:right;font-weight:600;font-size:13px;margin-top:8px">Total: ${brSoles(total)}</div>`;
   } catch(e){ box.innerHTML='<div style="color:var(--red);font-size:12px">Error cargando</div>'; }
 }
@@ -7036,6 +7047,7 @@ async function brAgregarItem(){
   const variante = document.getElementById('br-var').value.trim();
   const precio = parseFloat(document.getElementById('br-precio').value);
   const cant = parseInt(document.getElementById('br-cant').value)||1;
+  if(!brCanal){ toast('Elige el canal de venta'); return; }
   if(!producto){ toast('Escribe el producto'); return; }
   if(isNaN(precio) || precio<0){ toast('Pon el precio de venta'); return; }
   try {
@@ -7049,7 +7061,7 @@ async function brAgregarItem(){
     }
     const pr0 = brProdActual();
     const nombreFinal = pr0 ? pr0.nombre : producto;
-    await dbPost('brasil_items', {pedido_id:ped.id, producto:nombreFinal, variante:variante||null, cantidad:cant, precio_venta:precio});
+    await dbPost('brasil_items', {pedido_id:ped.id, producto:nombreFinal, variante:variante||null, cantidad:cant, precio_venta:precio, canal:brCanal});
     try { await brGuardarProducto(nombreFinal, variante, precio); } catch(e){ console.error(e); }
     document.getElementById('br-var-chips').innerHTML='';
     document.getElementById('br-prod').value='';
@@ -7143,7 +7155,7 @@ async function brComprarGrupo(kEnc){
         resta -= it.cantidad;
       } else {
         await dbPatch(`brasil_items?id=eq.${it.id}`, {cantidad:it.cantidad-resta});
-        await dbPost('brasil_items', {pedido_id:it.pedido_id, producto:it.producto, variante:it.variante, cantidad:resta, precio_venta:it.precio_venta, comprado:true, costo_rl:precio});
+        await dbPost('brasil_items', {pedido_id:it.pedido_id, producto:it.producto, variante:it.variante, cantidad:resta, precio_venta:it.precio_venta, canal:it.canal||null, comprado:true, costo_rl:precio});
         resta = 0;
       }
     }
@@ -7188,7 +7200,7 @@ async function brLoadPedidos(){
           <div style="font-size:14px;font-weight:600">${sel}${brEsc(c.nombre||'Sin nombre')} <span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span></div>
           <span class="badge ${badgeCls[p.estado]}">${BR_ESTADOS[p.estado]}</span></div>
         <div class="text-hint" style="font-size:11.5px;margin:2px 0 6px">${esShalom?'📦 Shalom — ':'🏍️ '}${brEsc(c.direccion||'sin dirección')}${c.distrito?' ('+brEsc(c.distrito)+')':''}</div>
-        ${p.items.map(i=>`<div style="font-size:12.5px;padding:2px 0">${i.comprado?'✅':'⏳'} ${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} — ${brSoles(i.precio_venta*i.cantidad)}</div>`).join('')}
+        ${p.items.map(i=>`<div style="font-size:12.5px;padding:2px 0">${i.comprado?'✅':'⏳'} ${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${brCanalBadge(i.canal)} — ${brSoles(i.precio_venta*i.cantidad)}</div>`).join('')}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
           <label style="font-size:12.5px"><input type="checkbox" ${p.pagado?'checked':''} ${p.estado==='despachado'?'disabled':''} onchange="brTogglePagado('${p.id}',this.checked)"> 💰 Pagó · <strong>${brSoles(total)}</strong></label>
           <div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brCopiar('${p.id}')">📋 Copiar datos</button>${accion}${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brBorrarPedido('${p.id}')">🗑</button>`}</div></div>
@@ -7258,8 +7270,10 @@ async function brLoadResumen(){
     const [items, peds] = await Promise.all([dbGet('brasil_items?select=*&limit=5000'), dbGet('brasil_pedidos?select=id,pagado,estado&limit=5000')]);
     const pedDe = {}; peds.forEach(p=>pedDe[p.id]=p);
     let invRL=0, vendido=0, vendidoComprado=0, unidades=0, unidComp=0, cobrado=0, porCobrar=0;
+    const porCanal = {};
     items.forEach(i=>{
       const v = i.precio_venta*i.cantidad; vendido += v; unidades += i.cantidad;
+      const cn = i.canal||'Sin canal'; if(!porCanal[cn]) porCanal[cn]={u:0,v:0}; porCanal[cn].u += i.cantidad; porCanal[cn].v += v;
       if(pedDe[i.pedido_id]?.pagado) cobrado += v; else porCobrar += v;
       if(i.comprado){ invRL += (i.costo_rl||0)*i.cantidad; vendidoComprado += v; unidComp += i.cantidad; }
     });
@@ -7274,6 +7288,8 @@ async function brLoadResumen(){
       ${m(brSoles(porCobrar),'Por cobrar')}
       ${m(brSoles(flete),'Flete estimado (S/ '+BR_FLETE_UNIDAD+' × '+unidComp+' unid.)')}
       ${m(brSoles(ganancia),'Ganancia estimada','var(--green)')}</div>
+      <div class="card" style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;margin-bottom:8px">Ventas por canal</div>
+        ${Object.entries(porCanal).sort((a,b)=>b[1].v-a[1].v).map(([n,c])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${brCanalBadge(n==='Sin canal'?'':n)}</span><span>${c.u} unid. · <strong>${brSoles(c.v)}</strong></span></div>`).join('')}</div>
       <div class="text-hint" style="font-size:11.5px">La ganancia estimada solo cuenta lo ya comprado: venta − costo en soles − flete estimado. Cuando sepas el flete real se ajusta.</div>`;
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
