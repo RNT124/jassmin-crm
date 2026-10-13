@@ -1303,7 +1303,7 @@ td.empty-state{padding:20px;text-align:center}
         <div id="br-view-registro">
           <div class="card" style="margin-bottom:12px">
             <div style="font-size:12px;font-weight:600;margin-bottom:8px">1. Clienta</div>
-            <input id="br-tel" type="tel" placeholder="Busca por celular (mín. 4 dígitos)" oninput="brBuscarCliente(this.value)" style="width:100%">
+            <input id="br-tel" type="tel" placeholder="Busca por celular, nombre o usuario de WhatsApp" oninput="brBuscarCliente(this.value)" style="width:100%">
             <div id="br-cli-res" style="margin-top:8px"></div>
             <div id="br-cli-sel" style="margin-top:8px"></div>
           </div>
@@ -6984,17 +6984,42 @@ async function brGuardarProducto(nombre, variante, precio){
 }
 
 async function brBuscarCliente(val){
+  const texto = val.trim().replace(/[,()*%]/g,'');
   const clean = val.replace(/\D/g,'');
   const res = document.getElementById('br-cli-res');
-  if(clean.length<4){ res.innerHTML=''; return; }
+  const soloNumeros = /^[\d\s+\-]+$/.test(val.trim());
+  if((soloNumeros && clean.length<4) || (!soloNumeros && texto.length<2)){ res.innerHTML=''; return; }
   try {
-    const m = await dbGet(`clientes?telefono=like.${clean}*&limit=5`);
-    if(!m.length){
-      res.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">No encontrada — <strong>${clean}</strong></div><button class="btn btn-sm" onclick="brCrearCliente('${clean}')">+ Registrar nueva</button>`;
+    let m, us = [];
+    if(soloNumeros){
+      m = await dbGet(`clientes?telefono=like.${clean}*&limit=5`);
     } else {
-      res.innerHTML = `<div class="pill-row">${m.map(c=>`<button class="btn btn-xs" onclick="brSelCliente('${c.id}')">${brEsc(c.nombre||'Sin nombre')} · ${brEsc(c.telefono)}</button>`).join('')}</div>`;
+      const q = encodeURIComponent(texto);
+      m = await dbGet(`clientes?nombre=ilike.*${q}*&limit=6`);
+      const pu = await dbGet(`brasil_pedidos?cliente_id=is.null&usuario_wa=ilike.*${q}*&select=usuario_wa&limit=20`);
+      us = [...new Set(pu.map(x=>x.usuario_wa))].slice(0,5);
     }
+    let html = '';
+    if(m.length || us.length){
+      html += `<div class="pill-row">${m.map(c=>`<button class="btn btn-xs" onclick="brSelCliente('${c.id}')">${brEsc(c.nombre||'Sin nombre')} · ${brEsc(c.telefono)}</button>`).join('')}${us.map(u=>`<button class="btn btn-xs" onclick="brSelUsuario('${encodeURIComponent(u)}')">👤 ${brEsc(u)} · sin celular</button>`).join('')}</div>`;
+    } else {
+      html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">No encontrada — <strong>${brEsc(val.trim())}</strong></div>`;
+    }
+    if(soloNumeros) html += `<div style="margin-top:6px"><button class="btn btn-sm" onclick="brCrearCliente('${clean}')">+ Registrar nueva con este celular</button></div>`;
+    else if(!us.some(u=>u.toLowerCase()===texto.toLowerCase())) html += `<div style="margin-top:6px"><button class="btn btn-sm" onclick="brSelUsuario('${encodeURIComponent(texto)}')">+ Usar «${brEsc(texto)}» como usuario de WhatsApp (sin celular)</button></div>`;
+    res.innerHTML = html;
   } catch(e){ res.innerHTML='<div style="font-size:12px;color:var(--red)">Error de conexión</div>'; }
+}
+
+function brSelUsuario(uEnc){
+  const u = decodeURIComponent(uEnc);
+  brCliente = {id:null, usuario_wa:u, nombre:u};
+  document.getElementById('br-cli-res').innerHTML='';
+  document.getElementById('br-tel').value='';
+  document.getElementById('br-cli-sel').innerHTML = `<div style="background:var(--pink-light);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px"><strong>👤 ${brEsc(u)}</strong> <span class="badge badge-warn">sin celular</span><div class="text-hint" style="font-size:11.5px;margin-top:2px">Usuario de WhatsApp. El celular y los datos de envío los agregas después, desde Pedidos.</div></div>`;
+  document.getElementById('br-form-prod').style.display='';
+  brRenderItemsClienta();
+  brCargarProductos();
 }
 
 async function brCrearCliente(tel){
@@ -7022,8 +7047,9 @@ async function brSelCliente(id){
   } catch(e){ toast('Error: '+e.message); }
 }
 
-async function brPedidoAbierto(clienteId){
-  const r = await dbGet(`brasil_pedidos?cliente_id=eq.${clienteId}&estado=neq.despachado&order=creado_en.desc&limit=1`);
+async function brPedidoAbierto(cli){
+  const filtro = cli.id ? `cliente_id=eq.${cli.id}` : `cliente_id=is.null&usuario_wa=eq.${encodeURIComponent(cli.usuario_wa)}`;
+  const r = await dbGet(`brasil_pedidos?${filtro}&estado=neq.despachado&order=creado_en.desc&limit=1`);
   return r[0]||null;
 }
 
@@ -7031,7 +7057,7 @@ async function brRenderItemsClienta(){
   const box = document.getElementById('br-items-clienta');
   if(!brCliente){ box.innerHTML=''; return; }
   try {
-    const ped = await brPedidoAbierto(brCliente.id);
+    const ped = await brPedidoAbierto(brCliente);
     if(!ped){ box.innerHTML='<div class="text-hint" style="font-size:12px">Aún no tiene productos en Brasil.</div>'; return; }
     const items = await dbGet(`brasil_items?pedido_id=eq.${ped.id}&order=creado_en.asc`);
     const total = items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
@@ -7051,9 +7077,9 @@ async function brAgregarItem(){
   if(!producto){ toast('Escribe el producto'); return; }
   if(isNaN(precio) || precio<0){ toast('Pon el precio de venta'); return; }
   try {
-    let ped = await brPedidoAbierto(brCliente.id);
+    let ped = await brPedidoAbierto(brCliente);
     if(!ped){
-      const r = await dbPost('brasil_pedidos', {cliente_id:brCliente.id, estado:'por_comprar'});
+      const r = await dbPost('brasil_pedidos', {cliente_id:brCliente.id||null, usuario_wa:brCliente.id?null:brCliente.usuario_wa, estado:'por_comprar'});
       ped = r[0];
     } else if(ped.estado==='comprado' || ped.estado==='listo_lima'){
       await dbPatch(`brasil_pedidos?id=eq.${ped.id}`, {estado:'por_comprar'});
@@ -7102,10 +7128,10 @@ async function brLoadComprar(){
     const items = await dbGet('brasil_items?comprado=eq.false&order=creado_en.asc');
     if(!items.length){ box.innerHTML='<div class="card" style="text-align:center;padding:30px;color:var(--text2)">✅ No tienes nada pendiente por comprar</div>'; return; }
     const pedIds = [...new Set(items.map(i=>i.pedido_id))];
-    const peds = await dbGet(`brasil_pedidos?id=in.(${pedIds.join(',')})&select=id,cliente_id`);
-    const cliIds = [...new Set(peds.map(p=>p.cliente_id))];
-    const clis = await dbGet(`clientes?id=in.(${cliIds.join(',')})&select=id,nombre`);
-    const cliDe = {}; peds.forEach(p=>{ cliDe[p.id] = (clis.find(c=>c.id===p.cliente_id)||{}).nombre||'Sin nombre'; });
+    const peds = await dbGet(`brasil_pedidos?id=in.(${pedIds.join(',')})&select=id,cliente_id,usuario_wa`);
+    const cliIds = [...new Set(peds.map(p=>p.cliente_id).filter(Boolean))];
+    const clis = cliIds.length ? await dbGet(`clientes?id=in.(${cliIds.join(',')})&select=id,nombre`) : [];
+    const cliDe = {}; peds.forEach(p=>{ cliDe[p.id] = p.cliente_id ? ((clis.find(c=>c.id===p.cliente_id)||{}).nombre||'Sin nombre') : (p.usuario_wa||'Sin nombre'); });
     brGrupos = {};
     items.forEach(i=>{
       const k = (i.producto.trim().toLowerCase())+'|'+((i.variante||'').trim().toLowerCase());
@@ -7180,8 +7206,9 @@ async function brLoadPedidos(){
       <label style="font-size:12.5px"><input type="checkbox" ${brFiltroDesp?'checked':''} onchange="brFiltroDesp=this.checked;brLoadPedidos()"> Ver también despachados</label></div>`;
     if(!peds.length){ box.innerHTML = head+'<div class="card" style="text-align:center;padding:30px;color:var(--text2)">No hay pedidos de Brasil</div>'; return; }
     const items = await dbGet(`brasil_items?pedido_id=in.(${peds.map(p=>p.id).join(',')})&order=creado_en.asc`);
-    const clis = await dbGet(`clientes?id=in.(${[...new Set(peds.map(p=>p.cliente_id))].join(',')})&select=*`);
-    brPedLista = peds.map(p=>({...p, items:items.filter(i=>i.pedido_id===p.id), cli:clis.find(c=>c.id===p.cliente_id)||{}}));
+    const idsC = [...new Set(peds.map(p=>p.cliente_id).filter(Boolean))];
+    const clis = idsC.length ? await dbGet(`clientes?id=in.(${idsC.join(',')})&select=*`) : [];
+    brPedLista = peds.map(p=>({...p, items:items.filter(i=>i.pedido_id===p.id), cli: p.cliente_id ? (clis.find(c=>c.id===p.cliente_id)||{}) : {nombre:p.usuario_wa, sinCelular:true}}));
     const badgeCls = {por_comprar:'badge-warn', comprado:'badge-info', listo_lima:'badge-pink', despachado:'badge-ok'};
     brCopyData = {};
     const bulk = `<div id="br-bulk" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -7197,13 +7224,13 @@ async function brLoadPedidos(){
       if(p.estado==='comprado') accion = `<button class="btn btn-sm" onclick="brSetEstado('${p.id}','listo_lima')">✓ Listo en Lima</button>`;
       return `<div class="card" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
-          <div style="font-size:14px;font-weight:600">${sel}${brEsc(c.nombre||'Sin nombre')} <span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span></div>
+          <div style="font-size:14px;font-weight:600">${sel}${c.sinCelular?'👤 ':''}${brEsc(c.nombre||'Sin nombre')} ${c.sinCelular?'<span class="badge badge-warn">sin celular</span>':`<span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span>`}</div>
           <span class="badge ${badgeCls[p.estado]}">${BR_ESTADOS[p.estado]}</span></div>
         <div class="text-hint" style="font-size:11.5px;margin:2px 0 6px">${esShalom?'📦 Shalom — ':'🏍️ '}${brEsc(c.direccion||'sin dirección')}${c.distrito?' ('+brEsc(c.distrito)+')':''}</div>
         ${p.items.map(i=>`<div style="font-size:12.5px;padding:2px 0">${i.comprado?'✅':'⏳'} ${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${brCanalBadge(i.canal)} — ${brSoles(i.precio_venta*i.cantidad)}</div>`).join('')}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
           <label style="font-size:12.5px"><input type="checkbox" ${p.pagado?'checked':''} ${p.estado==='despachado'?'disabled':''} onchange="brTogglePagado('${p.id}',this.checked)"> 💰 Pagó · <strong>${brSoles(total)}</strong></label>
-          <div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brCopiar('${p.id}')">📋 Copiar datos</button>${accion}${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brBorrarPedido('${p.id}')">🗑</button>`}</div></div>
+          <div style="display:flex;gap:6px">${c.sinCelular?`<button class="btn btn-xs" onclick="brVincularCelular('${p.id}')">📱 Agregar celular</button>`:`<button class="btn btn-xs" onclick="brCopiar('${p.id}')">📋 Copiar datos</button>`}${accion}${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brBorrarPedido('${p.id}')">🗑</button>`}</div></div>
       </div>`;
     }).join('');
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
@@ -7214,6 +7241,18 @@ async function brBorrarPedido(id){
   const comp = p.items.filter(i=>i.comprado).length;
   if(!confirm(`¿Borrar el pedido completo de ${p.cli.nombre||'esta clienta'} (${p.items.length} producto(s))?`+(comp?`\n⚠️ ${comp} ya están comprados: bajará lo invertido en el Resumen.`:''))) return;
   try { await dbDelete(`brasil_pedidos?id=eq.${id}`); toast('✓ Pedido borrado'); brLoadPedidos(); } catch(e){ toast('Error: '+e.message); }
+}
+async function brVincularCelular(id){
+  const p = brPedLista.find(x=>x.id===id); if(!p) return;
+  const tel = (prompt(`Celular de ${p.usuario_wa} (9 dígitos):`)||'').replace(/\D/g,'');
+  if(!tel) return;
+  try {
+    let cl = await dbGet(`clientes?telefono=eq.${tel}&limit=1`);
+    if(!cl.length) cl = await dbPost('clientes', {telefono:tel, nombre:p.usuario_wa});
+    else if(!confirm(`Ese celular ya existe como "${cl[0].nombre||'Sin nombre'}". ¿Unir este pedido a esa clienta?`)) return;
+    await dbPatch(`brasil_pedidos?id=eq.${id}`, {cliente_id:cl[0].id, usuario_wa:null});
+    toast('✓ Celular agregado — completa sus datos de envío en Clientas'); brLoadPedidos();
+  } catch(e){ toast('Error: '+e.message); }
 }
 function brCopiar(id){
   navigator.clipboard.writeText(brCopyData[id]||'').then(()=>toast('✓ Datos copiados')).catch(()=>toast('No se pudo copiar'));
@@ -7231,6 +7270,7 @@ function brSeleccionados(){
 function brExcelMotorizado(){
   const lista = brSeleccionados();
   if(!lista.length){ toast('Selecciona pedidos "Listo en Lima"'); return; }
+  if(lista.some(p=>p.cli.sinCelular)){ toast('⚠️ Hay clientas sin celular — agrégalo primero con "📱 Agregar celular"'); return; }
   if(lista.some(p=>(p.cli.tipo_envio_preferido||'').startsWith('shalom'))){ toast('⚠️ Hay clientas de Shalom seleccionadas — el Excel es solo para motorizado'); return; }
   const hoy = new Date();
   const datos = [
@@ -7252,6 +7292,7 @@ function brExcelMotorizado(){
 async function brDespacharSeleccion(){
   const lista = brSeleccionados();
   if(!lista.length){ toast('Selecciona pedidos "Listo en Lima"'); return; }
+  if(lista.some(p=>p.cli.sinCelular)){ toast('⚠️ Hay clientas sin celular — agrégalo primero con "📱 Agregar celular"'); return; }
   const sinPago = lista.filter(p=>!p.pagado);
   if(sinPago.length && !confirm(`⚠️ ${sinPago.length} pedido(s) NO están marcados como pagados. ¿Despachar igual?`)) return;
   if(!confirm(`¿Marcar ${lista.length} pedido(s) como despachados?`)) return;
