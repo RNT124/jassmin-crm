@@ -1496,6 +1496,25 @@ td.empty-state{padding:20px;text-align:center}
 </div>
 
 <!-- Modal: ver pedido + confirmar pago -->
+<div class="modal-overlay" id="modal-br-item">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title">Editar producto</div>
+    <input type="hidden" id="bri-id">
+    <div class="form-row"><label class="form-label">Producto</label><input id="bri-prod" style="width:100%"></div>
+    <div class="form-row"><label class="form-label">Variante (talla / color / ml)</label><input id="bri-var" style="width:100%"></div>
+    <div style="display:flex;gap:8px">
+      <div class="form-row" style="flex:1"><label class="form-label">Precio venta S/ (unidad)</label><input id="bri-precio" type="number" inputmode="decimal" style="width:100%"></div>
+      <div class="form-row" style="width:90px"><label class="form-label">Cantidad</label><input id="bri-cant" type="number" inputmode="numeric" min="1" style="width:100%"></div>
+    </div>
+    <div class="form-row"><label class="form-label">Canal de venta</label><select id="bri-canal" style="width:100%"></select></div>
+    <div id="bri-aviso" class="text-hint" style="font-size:11.5px;margin-top:4px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-br-item')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="brGuardarEdicionItem()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-pedido">
   <div class="modal" style="max-width:500px">
     <div class="modal-title" id="mp-title">Pedido #JAS-0041</div>
@@ -7227,7 +7246,7 @@ async function brLoadPedidos(){
           <div style="font-size:14px;font-weight:600">${sel}${c.sinCelular?'👤 ':''}${brEsc(c.nombre||'Sin nombre')} ${c.sinCelular?'<span class="badge badge-warn">sin celular</span>':`<span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span>`}</div>
           <span class="badge ${badgeCls[p.estado]}">${BR_ESTADOS[p.estado]}</span></div>
         <div class="text-hint" style="font-size:11.5px;margin:2px 0 6px">${esShalom?'📦 Shalom — ':'🏍️ '}${brEsc(c.direccion||'sin dirección')}${c.distrito?' ('+brEsc(c.distrito)+')':''}</div>
-        ${p.items.map(i=>`<div style="font-size:12.5px;padding:2px 0">${i.comprado?'✅':'⏳'} ${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${brCanalBadge(i.canal)} — ${brSoles(i.precio_venta*i.cantidad)}</div>`).join('')}
+        ${p.items.map(i=>`<div style="font-size:12.5px;padding:2px 0">${i.comprado?'✅':'⏳'} ${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${brCanalBadge(i.canal)} — ${brSoles(i.precio_venta*i.cantidad)} ${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brAbrirEditarItem('${i.id}')">✏️</button>`}</div>`).join('')}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
           <label style="font-size:12.5px"><input type="checkbox" ${p.pagado?'checked':''} ${p.estado==='despachado'?'disabled':''} onchange="brTogglePagado('${p.id}',this.checked)"> 💰 Pagó · <strong>${brSoles(total)}</strong></label>
           <div style="display:flex;gap:6px">${c.sinCelular?`<button class="btn btn-xs" onclick="brVincularCelular('${p.id}')">📱 Agregar celular</button>`:`<button class="btn btn-xs" onclick="brCopiar('${p.id}')">📋 Copiar datos</button>`}${accion}${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brBorrarPedido('${p.id}')">🗑</button>`}</div></div>
@@ -7252,6 +7271,34 @@ async function brVincularCelular(id){
     else if(!confirm(`Ese celular ya existe como "${cl[0].nombre||'Sin nombre'}". ¿Unir este pedido a esa clienta?`)) return;
     await dbPatch(`brasil_pedidos?id=eq.${id}`, {cliente_id:cl[0].id, usuario_wa:null});
     toast('✓ Celular agregado — completa sus datos de envío en Clientas'); brLoadPedidos();
+  } catch(e){ toast('Error: '+e.message); }
+}
+function brAbrirEditarItem(id){
+  let it = null;
+  for(const p of brPedLista){ const f = p.items.find(x=>x.id===id); if(f){ it=f; break; } }
+  if(!it) return;
+  document.getElementById('bri-id').value = id;
+  document.getElementById('bri-prod').value = it.producto;
+  document.getElementById('bri-var').value = it.variante||'';
+  document.getElementById('bri-precio').value = it.precio_venta;
+  document.getElementById('bri-cant').value = it.cantidad;
+  const canales = BR_CANALES.slice(); if(it.canal && !canales.includes(it.canal)) canales.push(it.canal);
+  document.getElementById('bri-canal').innerHTML = (it.canal?'':'<option value="">— sin canal —</option>') + canales.map(c=>`<option value="${brEsc(c)}" ${c===it.canal?'selected':''}>${brEsc(c)}</option>`).join('');
+  document.getElementById('bri-aviso').textContent = it.comprado ? '⚠️ Este producto ya está comprado: si cambias la cantidad, revisa lo invertido en el Resumen.' : '';
+  document.getElementById('modal-br-item').classList.add('open');
+}
+async function brGuardarEdicionItem(){
+  const id = document.getElementById('bri-id').value;
+  const producto = document.getElementById('bri-prod').value.trim();
+  const precio = parseFloat(document.getElementById('bri-precio').value);
+  const cant = parseInt(document.getElementById('bri-cant').value);
+  if(!producto){ toast('Pon el nombre del producto'); return; }
+  if(isNaN(precio)||precio<0){ toast('Precio inválido'); return; }
+  if(!cant||cant<1){ toast('Cantidad inválida'); return; }
+  try {
+    await dbPatch(`brasil_items?id=eq.${id}`, {producto, variante:document.getElementById('bri-var').value.trim()||null, precio_venta:precio, cantidad:cant, canal:document.getElementById('bri-canal').value||null});
+    closeModal('modal-br-item'); toast('✓ Producto actualizado');
+    brLoadPedidos(); brRenderItemsClienta();
   } catch(e){ toast('Error: '+e.message); }
 }
 function brCopiar(id){
