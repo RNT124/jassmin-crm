@@ -1297,6 +1297,7 @@ td.empty-state{padding:20px;text-align:center}
         <div class="tabs" style="margin-bottom:14px">
           <div class="tab active" id="br-tab-registro" onclick="brTab('registro')">🔴 Registro live</div>
           <div class="tab" id="br-tab-comprar" onclick="brTab('comprar')">🛒 Por comprar</div>
+          <div class="tab" id="br-tab-compras" onclick="brTab('compras')">🧾 Compras</div>
           <div class="tab" id="br-tab-pedidos" onclick="brTab('pedidos')">📦 Pedidos</div>
           <div class="tab" id="br-tab-resumen" onclick="brTab('resumen')">📊 Resumen</div>
         </div>
@@ -1328,6 +1329,7 @@ td.empty-state{padding:20px;text-align:center}
           </div>
         </div>
         <div id="br-view-comprar" style="display:none"></div>
+        <div id="br-view-compras" style="display:none"></div>
         <div id="br-view-pedidos" style="display:none"></div>
         <div id="br-view-resumen" style="display:none"></div>
       </div>
@@ -1496,6 +1498,26 @@ td.empty-state{padding:20px;text-align:center}
 </div>
 
 <!-- Modal: ver pedido + confirmar pago -->
+<div class="modal-overlay" id="modal-br-compra">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">Registrar compra</div>
+    <div class="form-row"><label class="form-label">Fecha de la compra</label><input id="brc-fecha" type="date" style="width:100%"></div>
+    <input id="brc-prod" list="br-prod-list" oninput="brCompraProdCambio()" onchange="brCompraProdCambio()" placeholder="Producto (elígelo de tu lista)" style="width:100%;margin-bottom:6px" autocomplete="off">
+    <div id="brc-chips" class="pill-row" style="margin-bottom:6px"></div>
+    <input id="brc-var" placeholder="Talla / color / presentación" style="width:100%;margin-bottom:6px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input id="brc-cant" type="number" inputmode="numeric" min="1" placeholder="Cantidad" style="width:100px">
+      <input id="brc-costo" type="number" inputmode="decimal" placeholder="Precio R$ por unidad" style="flex:1">
+      <button class="btn btn-sm" onclick="brAgregarLineaCompra()">+ Agregar</button>
+    </div>
+    <div id="brc-lineas" style="margin-top:8px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-br-compra')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="brGuardarCompra()">Guardar compra</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-br-item">
   <div class="modal" style="max-width:440px">
     <div class="modal-title">Editar producto</div>
@@ -6927,12 +6949,13 @@ function brSoles(n){ return 'S/ '+(Math.round(n*100)/100).toFixed(2); }
 
 function brTab(t){
   brTabActual = t;
-  ['registro','comprar','pedidos','resumen'].forEach(k=>{
+  ['registro','comprar','compras','pedidos','resumen'].forEach(k=>{
     document.getElementById('br-tab-'+k).classList.toggle('active', k===t);
     document.getElementById('br-view-'+k).style.display = k===t ? '' : 'none';
   });
   if(t==='registro'){ brRenderCanales(); brCargarProductos(); }
   if(t==='comprar') brLoadComprar();
+  if(t==='compras') brLoadCompras();
   if(t==='pedidos') brLoadPedidos();
   if(t==='resumen') brLoadResumen();
 }
@@ -6950,6 +6973,7 @@ let brProductos = [];
 async function brCargarProductos(){
   try {
     brProductos = await dbGet('brasil_productos?order=nombre.asc&limit=1000');
+    try { await brCalcularAsignacion(); } catch(e){ console.error('compras Brasil', e); }
     document.getElementById('br-prod-list').innerHTML = brProductos.map(p=>`<option value="${brEsc(p.nombre)}">`).join('');
     brRenderCatalogo(); brRenderCanales();
   } catch(e){ console.error(e); const c=document.getElementById('br-catalogo'); if(c) c.innerHTML='<div class="text-hint" style="font-size:12px;color:var(--red)">No se pudo cargar — ¿corriste el SQL de productos de Brasil?</div>'; }
@@ -6969,18 +6993,30 @@ function brProdCambio(){
 function brRenderCatalogo(){
   const c = document.getElementById('br-catalogo');
   if(!c) return;
-  if(!brProductos.length){ c.innerHTML='<div class="text-hint" style="font-size:12px">Aún no hay productos. Se crean automáticamente al registrar la primera venta.</div>'; return; }
-  c.innerHTML = brProductos.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px;flex-wrap:wrap">
-    <div><strong>${brEsc(p.nombre)}</strong> · ${p.precio_venta!=null?brSoles(p.precio_venta):'—'}<div class="text-hint" style="font-size:11.5px">${(p.variantes||[]).map(brEsc).join(', ')||'sin variantes'}</div></div>
-    <div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brEditarProducto('${p.id}')">✏️ Editar</button><button class="btn btn-xs" onclick="brBorrarProducto('${p.id}')">🗑</button></div></div>`).join('');
+  if(!brProductos.length){ c.innerHTML='<div class="text-hint" style="font-size:12px">Aún no hay productos. Se crean automáticamente al registrar la primera venta o compra.</div>'; return; }
+  c.innerHTML = brProductos.map(p=>{
+    const pk = p.nombre.trim().toLowerCase();
+    const keys = new Map();
+    (p.variantes||[]).forEach(v=>keys.set(brKey(p.nombre,v), v));
+    Object.entries(brAsig.stock||{}).forEach(([k,sv])=>{ if(sv.nombre.trim().toLowerCase()===pk) keys.set(k, sv.variante); });
+    const lineas = [...keys.entries()].map(([k,v])=>{
+      const sv = (brAsig.stock||{})[k] || {vendidas:0,compradas:0,falta:0,sobra:0};
+      const est = sv.falta>0 ? `<strong style="color:var(--pink)">FALTAN ${sv.falta}</strong>` : sv.sobra>0 ? `<strong style="color:var(--blue-dark)">SOBRAN ${sv.sobra}</strong>` : (sv.vendidas||sv.compradas ? '<span style="color:var(--green)">✓ completo</span>' : '');
+      return `<div style="font-size:12px;margin-top:2px">${brEsc(v||'Único')} → Vendidas ${sv.vendidas} · Compradas ${sv.compradas} ${est}</div>`;
+    }).join('') || '<div class="text-hint" style="font-size:11.5px">sin variantes</div>';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px;flex-wrap:wrap">
+    <div><strong>${brEsc(p.nombre)}</strong> · ${p.precio_venta!=null?brSoles(p.precio_venta):'—'} ${p.costo_rl!=null?`<span class="text-hint">· costo R$ ${Number(p.costo_rl).toFixed(2)} (${brSoles(p.costo_rl*BR_TASA)})</span>`:''}${lineas}</div>
+    <div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brEditarProducto('${p.id}')">✏️ Editar</button><button class="btn btn-xs" onclick="brBorrarProducto('${p.id}')">🗑</button></div></div>`;
+  }).join('');
 }
 async function brEditarProducto(id){
   const p = brProductos.find(x=>x.id===id); if(!p) return;
   const nombre = prompt('Nombre del producto:', p.nombre); if(nombre===null) return;
   const precio = prompt('Precio de venta habitual S/:', p.precio_venta==null?'':p.precio_venta); if(precio===null) return;
+  const costo = prompt('Costo habitual en R$ (reales) por unidad:', p.costo_rl==null?'':p.costo_rl); if(costo===null) return;
   const vars = prompt('Variantes separadas por coma (ej: M negro, 250 ml):', (p.variantes||[]).join(', ')); if(vars===null) return;
   try {
-    await dbPatch(`brasil_productos?id=eq.${id}`, {nombre:nombre.trim()||p.nombre, precio_venta:precio===''?null:parseFloat(precio), variantes:vars.split(',').map(v=>v.trim()).filter(Boolean)});
+    await dbPatch(`brasil_productos?id=eq.${id}`, {nombre:nombre.trim()||p.nombre, precio_venta:precio===''?null:parseFloat(precio), costo_rl:costo===''?null:parseFloat(String(costo).replace(',','.')), variantes:vars.split(',').map(v=>v.trim()).filter(Boolean)});
     toast('✓ Producto actualizado'); brCargarProductos();
   } catch(e){ toast('Error: '+e.message); }
 }
@@ -7078,10 +7114,11 @@ async function brRenderItemsClienta(){
   try {
     const ped = await brPedidoAbierto(brCliente);
     if(!ped){ box.innerHTML='<div class="text-hint" style="font-size:12px">Aún no tiene productos en Brasil.</div>'; return; }
+    await brCalcularAsignacion().catch(()=>{});
     const items = await dbGet(`brasil_items?pedido_id=eq.${ped.id}&order=creado_en.asc`);
     const total = items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
     box.innerHTML = `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Llevando ahora</div>` +
-      items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${brCanalBadge(i.canal)} ${i.comprado?'<span class="badge badge-ok">comprado</span>':''}</span><span>${brSoles(i.precio_venta*i.cantidad)} <button class="btn btn-xs" onclick="brEditarPrecioItem('${i.id}',${i.precio_venta})">✏️</button> <button class="btn btn-xs" onclick="brEliminarItem('${i.id}',${i.comprado})">✕</button></span></div>`).join('') +
+      items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${brCanalBadge(i.canal)} ${brBadgeItem(i)}</span><span>${brSoles(i.precio_venta*i.cantidad)} <button class="btn btn-xs" onclick="brEditarPrecioItem('${i.id}',${i.precio_venta})">✏️</button> <button class="btn btn-xs" onclick="brEliminarItem('${i.id}')">✕</button></span></div>`).join('') +
       `<div style="text-align:right;font-weight:600;font-size:13px;margin-top:8px">Total: ${brSoles(total)}</div>`;
   } catch(e){ box.innerHTML='<div style="color:var(--red);font-size:12px">Error cargando</div>'; }
 }
@@ -7114,6 +7151,7 @@ async function brAgregarItem(){
     document.getElementById('br-precio').value='';
     document.getElementById('br-cant').value='1';
     toast('✓ Agregado');
+    await brSincronizarEstados();
     await brRenderItemsClienta();
     brCargarProductos();
   } catch(e){ toast('Error: '+e.message); }
@@ -7125,92 +7163,238 @@ async function brEditarPrecioItem(id, actual){
   if(isNaN(n)||n<0){ toast('Precio inválido'); return; }
   try { await dbPatch(`brasil_items?id=eq.${id}`, {precio_venta:n}); toast('✓ Precio actualizado'); brRenderItemsClienta(); } catch(e){ toast('Error: '+e.message); }
 }
-async function brEliminarItem(id, comprado){
-  if(!confirm(comprado ? '⚠️ Este producto YA está comprado. Si lo quitas, baja lo invertido en el Resumen. ¿Quitarlo igual?' : '¿Quitar este producto?')) return;
+async function brEliminarItem(id){
+  if(!confirm('¿Quitar este producto? (el stock que tenía asignado queda libre para otras ventas)')) return;
   try {
     const it = await dbGet(`brasil_items?id=eq.${id}&select=pedido_id`);
     await dbDelete(`brasil_items?id=eq.${id}`);
     const resto = await dbGet(`brasil_items?pedido_id=eq.${it[0].pedido_id}&select=id&limit=1`);
     if(!resto.length) await dbDelete(`brasil_pedidos?id=eq.${it[0].pedido_id}`);
+    await brSincronizarEstados();
     await brRenderItemsClienta();
   } catch(e){ toast('Error: '+e.message); }
 }
 
-// ── Por comprar ──
-let brGrupos = {};
+// ── Núcleo: asignación de compras a ventas (compra más antigua → venta más antigua) ──
+function brKey(prod, vari){ return (prod||'').trim().toLowerCase()+'|'+(vari||'').trim().toLowerCase(); }
+let brAsig = {items:{}, stock:{}, compras:[], lista:[]};
+async function brCalcularAsignacion(){
+  const [items, compras] = await Promise.all([
+    dbGet('brasil_items?select=*&order=creado_en.asc&limit=5000'),
+    dbGet('brasil_compras?select=*&order=fecha.asc,creado_en.asc&limit=5000')
+  ]);
+  const stock = {}, lotes = {};
+  const ini = (k,n,v)=>{ if(!stock[k]) stock[k] = {nombre:n, variante:v||'', vendidas:0, compradas:0, falta:0, sobra:0, valorSobraRL:0}; };
+  compras.forEach(c=>{
+    const k = brKey(c.producto,c.variante); ini(k,c.producto,c.variante);
+    stock[k].compradas += c.cantidad;
+    (lotes[k] = lotes[k]||[]).push({q:c.cantidad, costo:Number(c.costo_rl)||0});
+  });
+  const asigItems = {};
+  items.forEach(i=>{
+    const k = brKey(i.producto,i.variante); ini(k,i.producto,i.variante);
+    stock[k].vendidas += i.cantidad;
+    let need = i.cantidad, cub = 0, costoTot = 0;
+    const ls = lotes[k]||[];
+    for(const l of ls){ if(need<=0) break; if(l.q<=0) continue; const t = Math.min(l.q, need); l.q -= t; need -= t; cub += t; costoTot += t*l.costo; }
+    asigItems[i.id] = {cubierto:cub, costoRL:costoTot};
+  });
+  Object.keys(stock).forEach(k=>{
+    const s = stock[k];
+    s.falta = Math.max(0, s.vendidas - s.compradas);
+    s.sobra = Math.max(0, s.compradas - s.vendidas);
+    s.valorSobraRL = (lotes[k]||[]).reduce((a,l)=>a+l.q*l.costo,0);
+  });
+  brAsig = {items:asigItems, stock, compras, lista:items};
+  return brAsig;
+}
+function brEstadoItem(i){
+  const a = brAsig.items[i.id]; const cub = a?a.cubierto:0;
+  if(cub>=i.cantidad) return 'completo';
+  return cub>0 ? 'parcial' : 'pendiente';
+}
+function brBadgeItem(i){
+  const e = brEstadoItem(i), cub = (brAsig.items[i.id]||{}).cubierto||0;
+  if(e==='completo') return '<span class="badge badge-ok">✓ asignado</span>';
+  if(e==='parcial') return `<span class="badge badge-warn">${cub}/${i.cantidad} asignado</span>`;
+  return '<span class="badge badge-gray">⏳ por comprar</span>';
+}
+// Los pedidos pasan solos entre "Por comprar" y "Comprado" según el stock asignado
+async function brSincronizarEstados(){
+  try {
+    await brCalcularAsignacion();
+    const peds = await dbGet('brasil_pedidos?estado=in.(por_comprar,comprado)&select=id,estado');
+    for(const p of peds){
+      const its = brAsig.lista.filter(i=>i.pedido_id===p.id);
+      if(!its.length) continue;
+      const todo = its.every(i=>brEstadoItem(i)==='completo');
+      if(todo && p.estado==='por_comprar') await dbPatch(`brasil_pedidos?id=eq.${p.id}`, {estado:'comprado'});
+      if(!todo && p.estado==='comprado') await dbPatch(`brasil_pedidos?id=eq.${p.id}`, {estado:'por_comprar'});
+    }
+  } catch(e){ console.error('sync Brasil', e); }
+}
+
+// ── Compras ──
+let brCompraLineas = [];
+function brUltimoCostoRL(nombre, variante){
+  const k = brKey(nombre,variante);
+  const cs = (brAsig.compras||[]).filter(c=>brKey(c.producto,c.variante)===k);
+  if(cs.length) return cs[cs.length-1].costo_rl;
+  const pr = brProductos.find(p=>p.nombre.trim().toLowerCase()===(nombre||'').trim().toLowerCase());
+  return pr && pr.costo_rl!=null ? pr.costo_rl : '';
+}
+function brFechaHoy(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function brFechaCorta(f){ const [y,m,d]=String(f).split('-'); return d+'-'+m; }
+async function brAbrirCompra(prefKeyEnc){
+  if(!brProductos.length) await brCargarProductos();
+  brCompraLineas = [];
+  document.getElementById('brc-fecha').value = brFechaHoy();
+  ['brc-prod','brc-var','brc-cant','brc-costo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('brc-chips').innerHTML='';
+  if(prefKeyEnc){
+    const s = brAsig.stock[decodeURIComponent(prefKeyEnc)];
+    if(s){
+      document.getElementById('brc-prod').value = s.nombre;
+      document.getElementById('brc-var').value = s.variante;
+      document.getElementById('brc-cant').value = s.falta||1;
+      document.getElementById('brc-costo').value = brUltimoCostoRL(s.nombre,s.variante);
+    }
+  }
+  brRenderLineasCompra();
+  document.getElementById('modal-br-compra').classList.add('open');
+}
+function brCompraProdCambio(){
+  const n = document.getElementById('brc-prod').value.trim().toLowerCase();
+  const pr = brProductos.find(p=>p.nombre.trim().toLowerCase()===n);
+  const chips = document.getElementById('brc-chips');
+  if(!pr){ chips.innerHTML=''; return; }
+  const c = brUltimoCostoRL(pr.nombre,'');
+  if(c!=='' && !document.getElementById('brc-costo').value) document.getElementById('brc-costo').value = c;
+  chips.innerHTML = (pr.variantes||[]).map(v=>`<button type="button" class="btn btn-xs" onclick="document.getElementById('brc-var').value=decodeURIComponent('${encodeURIComponent(v)}');var c=brUltimoCostoRL(document.getElementById('brc-prod').value,decodeURIComponent('${encodeURIComponent(v)}'));if(c!=='')document.getElementById('brc-costo').value=c">${brEsc(v)}</button>`).join('');
+}
+function brAgregarLineaCompra(){
+  const pr0 = document.getElementById('brc-prod').value.trim();
+  const ex = brProductos.find(p=>p.nombre.trim().toLowerCase()===pr0.toLowerCase());
+  const producto = ex ? ex.nombre : pr0;
+  const variante = document.getElementById('brc-var').value.trim();
+  const cant = parseInt(document.getElementById('brc-cant').value);
+  const costo = parseFloat(String(document.getElementById('brc-costo').value).replace(',','.'));
+  if(!producto){ toast('Elige el producto'); return; }
+  if(!cant||cant<1){ toast('Pon la cantidad'); return; }
+  if(isNaN(costo)||costo<0){ toast('Pon el precio en R$'); return; }
+  brCompraLineas.push({producto, variante, cantidad:cant, costo_rl:costo});
+  ['brc-prod','brc-var','brc-cant','brc-costo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('brc-chips').innerHTML='';
+  brRenderLineasCompra();
+}
+function brQuitarLineaCompra(n){ brCompraLineas.splice(n,1); brRenderLineasCompra(); }
+function brRenderLineasCompra(){
+  const box = document.getElementById('brc-lineas');
+  if(!brCompraLineas.length){ box.innerHTML='<div class="text-hint" style="font-size:12px">Aún no agregaste líneas a esta compra.</div>'; return; }
+  const tot = brCompraLineas.reduce((a,l)=>a+l.cantidad*l.costo_rl,0);
+  box.innerHTML = brCompraLineas.map((l,n)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border);font-size:12.5px"><span>${l.cantidad}× ${brEsc(l.producto)}${l.variante?' · '+brEsc(l.variante):''} — R$ ${l.costo_rl.toFixed(2)} c/u</span><button class="btn btn-xs" onclick="brQuitarLineaCompra(${n})">✕</button></div>`).join('') +
+    `<div style="text-align:right;font-weight:600;font-size:12.5px;margin-top:6px">Total: R$ ${tot.toFixed(2)} = ${brSoles(tot*BR_TASA)}</div>`;
+}
+async function brGuardarCompra(){
+  // si quedó una línea a medio escribir, la agrega
+  if(document.getElementById('brc-prod').value.trim() && document.getElementById('brc-cant').value) brAgregarLineaCompra();
+  if(!brCompraLineas.length){ toast('Agrega al menos un producto'); return; }
+  const fecha = document.getElementById('brc-fecha').value || brFechaHoy();
+  try {
+    await dbPost('brasil_compras', brCompraLineas.map(l=>({fecha, producto:l.producto, variante:l.variante||null, cantidad:l.cantidad, costo_rl:l.costo_rl})));
+    for(const l of brCompraLineas){ try { await brGuardarProductoDesdeCompra(l.producto, l.variante, l.costo_rl); } catch(e){ console.error(e); } }
+    closeModal('modal-br-compra');
+    toast(`✓ Compra registrada (${brCompraLineas.length} línea${brCompraLineas.length!==1?'s':''})`);
+    brCompraLineas = [];
+    await brSincronizarEstados();
+    await brCargarProductos();
+    brTab(brTabActual);
+  } catch(e){ toast('Error: '+e.message+' — ¿corriste el SQL de compras?'); }
+}
+async function brGuardarProductoDesdeCompra(nombre, variante, costo){
+  const ex = brProductos.find(p=>p.nombre.trim().toLowerCase()===nombre.trim().toLowerCase());
+  if(!ex){ await dbPost('brasil_productos', {nombre, precio_venta:null, costo_rl:costo, variantes:variante?[variante]:[]}); return; }
+  const vars = Array.isArray(ex.variantes)?ex.variantes.slice():[];
+  const nueva = variante && !vars.some(v=>v.toLowerCase()===variante.toLowerCase());
+  if(nueva) vars.push(variante);
+  await dbPatch(`brasil_productos?id=eq.${ex.id}`, {variantes:vars, costo_rl:costo});
+}
+async function brLoadCompras(){
+  const box = document.getElementById('br-view-compras');
+  box.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    await brCalcularAsignacion();
+    if(!brProductos.length) await brCargarProductos();
+    const cs = brAsig.compras.slice().sort((a,b)=> (a.fecha<b.fecha?1:a.fecha>b.fecha?-1: (a.creado_en<b.creado_en?1:-1)));
+    const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap"><div class="text-muted text-sm">Cada compra que registres se asigna sola a las ventas pendientes, de la más antigua a la más nueva.</div><button class="btn btn-sm btn-primary" onclick="brAbrirCompra()">+ Registrar compra</button></div>`;
+    if(!cs.length){ box.innerHTML = head+'<div class="card" style="text-align:center;padding:30px;color:var(--text2)">Aún no registraste compras</div>'; return; }
+    const porDia = {};
+    cs.forEach(c=>{ (porDia[c.fecha] = porDia[c.fecha]||[]).push(c); });
+    box.innerHTML = head + Object.keys(porDia).sort().reverse().map(f=>{
+      const lin = porDia[f]; const tot = lin.reduce((a,c)=>a+c.cantidad*Number(c.costo_rl||0),0);
+      return `<div class="card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;margin-bottom:6px"><span>📅 ${brFechaCorta(f)} · compraste:</span><span>R$ ${tot.toFixed(2)} · ${brSoles(tot*BR_TASA)}</span></div>
+      ${lin.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;border-top:0.5px solid var(--border);font-size:13px;flex-wrap:wrap"><span>${c.cantidad}× ${brEsc(c.producto)}${c.variante?' · '+brEsc(c.variante):''} <span class="text-hint">— R$ ${Number(c.costo_rl||0).toFixed(2)} c/u</span></span><span style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brEditarCompra('${c.id}')">✏️</button><button class="btn btn-xs" onclick="brBorrarCompra('${c.id}')">🗑</button></span></div>`).join('')}</div>`;
+    }).join('');
+  } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+' — ¿corriste el SQL de compras de Brasil?</div>'; }
+}
+async function brEditarCompra(id){
+  const c = brAsig.compras.find(x=>x.id===id); if(!c) return;
+  const q = prompt(`Cantidad de "${c.producto}${c.variante?' '+c.variante:''}":`, c.cantidad); if(q===null) return;
+  const p = prompt('Precio por unidad en R$:', c.costo_rl); if(p===null) return;
+  const qn = parseInt(q), pn = parseFloat(String(p).replace(',','.'));
+  if(!qn||qn<1||isNaN(pn)||pn<0){ toast('Datos inválidos'); return; }
+  try { await dbPatch(`brasil_compras?id=eq.${id}`, {cantidad:qn, costo_rl:pn}); toast('✓ Compra actualizada'); await brSincronizarEstados(); brLoadCompras(); } catch(e){ toast('Error: '+e.message); }
+}
+async function brBorrarCompra(id){
+  const c = brAsig.compras.find(x=>x.id===id); if(!c) return;
+  if(!confirm(`¿Borrar esta compra (${c.cantidad}× ${c.producto})? Los pedidos que dependían de ese stock volverán a "Por comprar".`)) return;
+  try { await dbDelete(`brasil_compras?id=eq.${id}`); toast('✓ Compra borrada'); await brSincronizarEstados(); brLoadCompras(); } catch(e){ toast('Error: '+e.message); }
+}
+
+// ── Por comprar (lo que falta = vendido − comprado) ──
 let brListaTexto = '';
 function brCopiarLista(){ navigator.clipboard.writeText(brListaTexto).then(()=>toast('✓ Lista copiada')).catch(()=>toast('No se pudo copiar')); }
 async function brLoadComprar(){
   const box = document.getElementById('br-view-comprar');
   box.innerHTML = '<div class="loading">Cargando...</div>';
   try {
-    const items = await dbGet('brasil_items?comprado=eq.false&order=creado_en.asc');
-    if(!items.length){ box.innerHTML='<div class="card" style="text-align:center;padding:30px;color:var(--text2)">✅ No tienes nada pendiente por comprar</div>'; return; }
-    const pedIds = [...new Set(items.map(i=>i.pedido_id))];
+    await brSincronizarEstados();
+    const faltas = Object.entries(brAsig.stock).filter(([k,s])=>s.falta>0);
+    const sobras = Object.entries(brAsig.stock).filter(([k,s])=>s.sobra>0);
+    let sobraHtml = '';
+    if(sobras.length){
+      sobraHtml = `<div class="card" style="margin-top:14px"><div style="font-size:12px;font-weight:600;margin-bottom:6px">📦 Stock en mano (comprado y aún sin vender)</div>` +
+        sobras.map(([k,s])=>`<div style="font-size:13px;padding:3px 0">${s.sobra}× ${brEsc(s.nombre)}${s.variante?' · '+brEsc(s.variante):''}</div>`).join('') + `</div>`;
+    }
+    if(!faltas.length){ box.innerHTML='<div class="card" style="text-align:center;padding:30px;color:var(--text2)">✅ No tienes nada pendiente por comprar</div>'+sobraHtml; return; }
+    // clientas con unidades sin cubrir, por producto+variante
+    const pend = brAsig.lista.filter(i=>brEstadoItem(i)!=='completo');
+    const pedIds = [...new Set(pend.map(i=>i.pedido_id))];
     const peds = await dbGet(`brasil_pedidos?id=in.(${pedIds.join(',')})&select=id,cliente_id,usuario_wa`);
     const cliIds = [...new Set(peds.map(p=>p.cliente_id).filter(Boolean))];
     const clis = cliIds.length ? await dbGet(`clientes?id=in.(${cliIds.join(',')})&select=id,nombre`) : [];
-    const cliDe = {}; peds.forEach(p=>{ cliDe[p.id] = p.cliente_id ? ((clis.find(c=>c.id===p.cliente_id)||{}).nombre||'Sin nombre') : (p.usuario_wa||'Sin nombre'); });
-    brGrupos = {};
-    items.forEach(i=>{
-      const k = (i.producto.trim().toLowerCase())+'|'+((i.variante||'').trim().toLowerCase());
-      if(!brGrupos[k]) brGrupos[k] = {producto:i.producto, variante:i.variante||'', items:[], qty:0, clientas:{}};
-      brGrupos[k].items.push(i);
-      brGrupos[k].qty += i.cantidad;
-      const n = cliDe[i.pedido_id]; brGrupos[k].clientas[n] = (brGrupos[k].clientas[n]||0)+i.cantidad;
+    const nomDe = {}; peds.forEach(p=>{ nomDe[p.id] = p.cliente_id ? ((clis.find(c=>c.id===p.cliente_id)||{}).nombre||'Sin nombre') : (p.usuario_wa||'Sin nombre'); });
+    const clientasDe = {};
+    pend.forEach(i=>{
+      const k = brKey(i.producto,i.variante);
+      const u = i.cantidad - ((brAsig.items[i.id]||{}).cubierto||0);
+      const n = nomDe[i.pedido_id]; (clientasDe[k] = clientasDe[k]||{}); clientasDe[k][n] = (clientasDe[k][n]||0)+u;
     });
-    const totalUnid = items.reduce((a,i)=>a+i.cantidad,0);
     const porProd = {};
-    Object.keys(brGrupos).forEach(k=>{ const g=brGrupos[k]; const pk=g.producto.trim().toLowerCase(); if(!porProd[pk]) porProd[pk]={nombre:g.producto, qty:0, vars:[]}; porProd[pk].qty+=g.qty; porProd[pk].vars.push({k, g}); });
-    brListaTexto = 'Lista de compras Brasil:\n' + Object.values(porProd).map(pp=>`• ${pp.nombre}: ${pp.qty}` + (pp.vars.length>1||pp.vars[0].g.variante ? ' ('+pp.vars.map(v=>(v.g.variante||'único')+' ×'+v.g.qty).join(', ')+')' : '')).join('\n') + `\nTotal: ${totalUnid} unidades`;
+    faltas.forEach(([k,s])=>{ const pk = s.nombre.trim().toLowerCase(); if(!porProd[pk]) porProd[pk]={nombre:s.nombre, qty:0, vars:[]}; porProd[pk].qty += s.falta; porProd[pk].vars.push({k,s}); });
+    const totalUnid = faltas.reduce((a,[k,s])=>a+s.falta,0);
+    brListaTexto = 'Lista de compras Brasil:\n' + Object.values(porProd).map(pp=>`• ${pp.nombre}: ${pp.qty}` + (pp.vars.length>1||pp.vars[0].s.variante ? ' ('+pp.vars.map(v=>(v.s.variante||'único')+' ×'+v.s.falta).join(', ')+')' : '')).join('\n') + `\nTotal: ${totalUnid} unidades`;
     box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <div class="text-muted text-sm">Faltan comprar <strong>${totalUnid}</strong> unidad(es) en <strong>${Object.keys(porProd).length}</strong> producto(s).</div>
-      <button class="btn btn-sm" onclick="brCopiarLista()">📋 Copiar lista</button></div>` +
+      <div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="brCopiarLista()">📋 Copiar lista</button><button class="btn btn-sm btn-primary" onclick="brAbrirCompra()">+ Registrar compra</button></div></div>` +
       Object.values(porProd).map(pp=>`<div class="card" style="margin-bottom:10px">
         <div style="font-size:15px;font-weight:600">${brEsc(pp.nombre)} <span style="color:var(--pink)">— comprar ${pp.qty}</span></div>
-        ${pp.vars.map(({k,g})=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:0.5px solid var(--border);margin-top:8px;flex-wrap:wrap">
-          <div><div style="font-size:13px"><strong>${brEsc(g.variante||'Único')}</strong> × ${g.qty}</div>
-          <div class="text-hint" style="font-size:11.5px">${Object.entries(g.clientas).map(([n,q])=>brEsc(n)+' ('+q+')').join(', ')}</div></div>
-          <button class="btn btn-sm btn-primary" onclick="brComprarGrupo('${encodeURIComponent(k)}')">✓ Ya compré</button></div>`).join('')}
-      </div>`).join('');
-  } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+' — ¿corriste el SQL de Brasil en Supabase?</div>'; }
-}
-
-async function brComprarGrupo(kEnc){
-  const g = brGrupos[decodeURIComponent(kEnc)];
-  if(!g) return;
-  const qStr = prompt(`¿Cuántas unidades compraste de "${g.producto}${g.variante?' '+g.variante:''}"? (faltan ${g.qty})`, g.qty);
-  if(qStr===null) return;
-  let q = parseInt(qStr);
-  if(!q || q<1) return;
-  if(q>g.qty) q = g.qty;
-  const pStr = prompt('Precio por unidad en R$ (reales):');
-  if(pStr===null) return;
-  const precio = parseFloat(String(pStr).replace(',','.'));
-  if(isNaN(precio) || precio<0){ toast('Precio inválido'); return; }
-  toast(`💱 R$ ${precio.toFixed(2)} = ${brSoles(precio*BR_TASA)} por unidad`);
-  try {
-    let resta = q;
-    const pedidos = new Set();
-    for(const it of g.items){
-      if(resta<=0) break;
-      pedidos.add(it.pedido_id);
-      if(it.cantidad<=resta){
-        await dbPatch(`brasil_items?id=eq.${it.id}`, {comprado:true, costo_rl:precio});
-        resta -= it.cantidad;
-      } else {
-        await dbPatch(`brasil_items?id=eq.${it.id}`, {cantidad:it.cantidad-resta});
-        await dbPost('brasil_items', {pedido_id:it.pedido_id, producto:it.producto, variante:it.variante, cantidad:resta, precio_venta:it.precio_venta, canal:it.canal||null, comprado:true, costo_rl:precio});
-        resta = 0;
-      }
-    }
-    for(const pid of pedidos){
-      const pend = await dbGet(`brasil_items?pedido_id=eq.${pid}&comprado=eq.false&select=id&limit=1`);
-      if(!pend.length) await dbPatch(`brasil_pedidos?id=eq.${pid}&estado=eq.por_comprar`, {estado:'comprado'});
-    }
-    toast('✓ Compra registrada');
-    brLoadComprar();
-  } catch(e){ toast('Error: '+e.message); }
+        ${pp.vars.map(({k,s})=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:0.5px solid var(--border);margin-top:8px;flex-wrap:wrap">
+          <div><div style="font-size:13px"><strong>${brEsc(s.variante||'Único')}</strong> · faltan ${s.falta} <span class="text-hint">(vendidas ${s.vendidas} · compradas ${s.compradas})</span></div>
+          <div class="text-hint" style="font-size:11.5px">${Object.entries(clientasDe[k]||{}).map(([n,q])=>brEsc(n)+' ('+q+')').join(', ')}</div></div>
+          <button class="btn btn-sm btn-primary" onclick="brAbrirCompra('${encodeURIComponent(k)}')">✓ Registrar compra</button></div>`).join('')}
+      </div>`).join('') + sobraHtml;
+  } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+' — ¿corriste el SQL de compras de Brasil?</div>'; }
 }
 
 // ── Pedidos Brasil ──
@@ -7220,6 +7404,7 @@ async function brLoadPedidos(){
   const box = document.getElementById('br-view-pedidos');
   box.innerHTML = '<div class="loading">Cargando...</div>';
   try {
+    await brSincronizarEstados();
     const peds = await dbGet(`brasil_pedidos?${brFiltroDesp?'':'estado=neq.despachado&'}order=creado_en.desc`);
     const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
       <label style="font-size:12.5px"><input type="checkbox" ${brFiltroDesp?'checked':''} onchange="brFiltroDesp=this.checked;brLoadPedidos()"> Ver también despachados</label></div>`;
@@ -7246,7 +7431,7 @@ async function brLoadPedidos(){
           <div style="font-size:14px;font-weight:600">${sel}${c.sinCelular?'👤 ':''}${brEsc(c.nombre||'Sin nombre')} ${c.sinCelular?'<span class="badge badge-warn">sin celular</span>':`<span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span>`}</div>
           <span class="badge ${badgeCls[p.estado]}">${BR_ESTADOS[p.estado]}</span></div>
         <div class="text-hint" style="font-size:11.5px;margin:2px 0 6px">${esShalom?'📦 Shalom — ':'🏍️ '}${brEsc(c.direccion||'sin dirección')}${c.distrito?' ('+brEsc(c.distrito)+')':''}</div>
-        ${p.items.map(i=>`<div style="font-size:12.5px;padding:2px 0">${i.comprado?'✅':'⏳'} ${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${brCanalBadge(i.canal)} — ${brSoles(i.precio_venta*i.cantidad)} ${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brAbrirEditarItem('${i.id}')">✏️</button>`}</div>`).join('')}
+        ${p.items.map(i=>`<div style="font-size:12.5px;padding:2px 0">${brBadgeItem(i)} ${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${brCanalBadge(i.canal)} — ${brSoles(i.precio_venta*i.cantidad)} ${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brAbrirEditarItem('${i.id}')">✏️</button>`}</div>`).join('')}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
           <label style="font-size:12.5px"><input type="checkbox" ${p.pagado?'checked':''} ${p.estado==='despachado'?'disabled':''} onchange="brTogglePagado('${p.id}',this.checked)"> 💰 Pagó · <strong>${brSoles(total)}</strong></label>
           <div style="display:flex;gap:6px">${c.sinCelular?`<button class="btn btn-xs" onclick="brVincularCelular('${p.id}')">📱 Agregar celular</button>`:`<button class="btn btn-xs" onclick="brCopiar('${p.id}')">📋 Copiar datos</button>`}${accion}${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brBorrarPedido('${p.id}')">🗑</button>`}</div></div>
@@ -7257,8 +7442,7 @@ async function brLoadPedidos(){
 
 async function brBorrarPedido(id){
   const p = brPedLista.find(x=>x.id===id); if(!p) return;
-  const comp = p.items.filter(i=>i.comprado).length;
-  if(!confirm(`¿Borrar el pedido completo de ${p.cli.nombre||'esta clienta'} (${p.items.length} producto(s))?`+(comp?`\n⚠️ ${comp} ya están comprados: bajará lo invertido en el Resumen.`:''))) return;
+  if(!confirm(`¿Borrar el pedido completo de ${p.cli.nombre||'esta clienta'} (${p.items.length} producto(s))? Las compras registradas no se borran: ese stock queda libre para otras ventas.`)) return;
   try { await dbDelete(`brasil_pedidos?id=eq.${id}`); toast('✓ Pedido borrado'); brLoadPedidos(); } catch(e){ toast('Error: '+e.message); }
 }
 async function brVincularCelular(id){
@@ -7284,7 +7468,7 @@ function brAbrirEditarItem(id){
   document.getElementById('bri-cant').value = it.cantidad;
   const canales = BR_CANALES.slice(); if(it.canal && !canales.includes(it.canal)) canales.push(it.canal);
   document.getElementById('bri-canal').innerHTML = (it.canal?'':'<option value="">— sin canal —</option>') + canales.map(c=>`<option value="${brEsc(c)}" ${c===it.canal?'selected':''}>${brEsc(c)}</option>`).join('');
-  document.getElementById('bri-aviso').textContent = it.comprado ? '⚠️ Este producto ya está comprado: si cambias la cantidad, revisa lo invertido en el Resumen.' : '';
+  document.getElementById('bri-aviso').textContent = 'Si cambias el producto, la variante o la cantidad, el stock asignado se recalcula solo.';
   document.getElementById('modal-br-item').classList.add('open');
 }
 async function brGuardarEdicionItem(){
@@ -7298,6 +7482,7 @@ async function brGuardarEdicionItem(){
   try {
     await dbPatch(`brasil_items?id=eq.${id}`, {producto, variante:document.getElementById('bri-var').value.trim()||null, precio_venta:precio, cantidad:cant, canal:document.getElementById('bri-canal').value||null});
     closeModal('modal-br-item'); toast('✓ Producto actualizado');
+    await brSincronizarEstados();
     brLoadPedidos(); brRenderItemsClienta();
   } catch(e){ toast('Error: '+e.message); }
 }
@@ -7355,30 +7540,40 @@ async function brLoadResumen(){
   const box = document.getElementById('br-view-resumen');
   box.innerHTML = '<div class="loading">Cargando...</div>';
   try {
-    const [items, peds] = await Promise.all([dbGet('brasil_items?select=*&limit=5000'), dbGet('brasil_pedidos?select=id,pagado,estado&limit=5000')]);
+    await brCalcularAsignacion();
+    const peds = await dbGet('brasil_pedidos?select=id,pagado&limit=5000');
     const pedDe = {}; peds.forEach(p=>pedDe[p.id]=p);
-    let invRL=0, vendido=0, vendidoComprado=0, unidades=0, unidComp=0, cobrado=0, porCobrar=0;
+    const items = brAsig.lista;
+    let vendido=0, unidades=0, cobrado=0, porCobrar=0, unidCub=0, ventaCub=0, costoCubRL=0;
     const porCanal = {};
     items.forEach(i=>{
       const v = i.precio_venta*i.cantidad; vendido += v; unidades += i.cantidad;
-      const cn = i.canal||'Sin canal'; if(!porCanal[cn]) porCanal[cn]={u:0,v:0}; porCanal[cn].u += i.cantidad; porCanal[cn].v += v;
       if(pedDe[i.pedido_id]?.pagado) cobrado += v; else porCobrar += v;
-      if(i.comprado){ invRL += (i.costo_rl||0)*i.cantidad; vendidoComprado += v; unidComp += i.cantidad; }
+      const cn = i.canal||'Sin canal'; if(!porCanal[cn]) porCanal[cn]={u:0,v:0}; porCanal[cn].u += i.cantidad; porCanal[cn].v += v;
+      const a = brAsig.items[i.id]||{cubierto:0,costoRL:0};
+      unidCub += a.cubierto; ventaCub += i.precio_venta*a.cubierto; costoCubRL += a.costoRL;
     });
-    const invS = invRL*BR_TASA, flete = unidComp*BR_FLETE_UNIDAD;
-    const ganancia = vendidoComprado - invS - flete;
+    const invRL = brAsig.compras.reduce((a,c)=>a+c.cantidad*Number(c.costo_rl||0),0);
+    const invS = invRL*BR_TASA;
+    const sobraU = Object.values(brAsig.stock).reduce((a,s)=>a+s.sobra,0);
+    const sobraS = Object.values(brAsig.stock).reduce((a,s)=>a+s.valorSobraRL,0)*BR_TASA;
+    const faltaU = Object.values(brAsig.stock).reduce((a,s)=>a+s.falta,0);
+    const flete = unidCub*BR_FLETE_UNIDAD;
+    const ganancia = ventaCub - costoCubRL*BR_TASA - flete;
     const m = (val,lbl,color)=>`<div class="metric"><div class="metric-val" style="${color?'color:'+color:''}">${val}</div><div class="metric-lbl">${lbl}</div></div>`;
     box.innerHTML = `<div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
-      ${m('R$ '+invRL.toFixed(2),'Invertido (reales)')}
+      ${m('R$ '+invRL.toFixed(2),'Invertido en compras (reales)')}
       ${m(brSoles(invS),'Invertido (soles, 1 R$ = '+BR_TASA+')')}
       ${m(brSoles(vendido),'Vendido total ('+unidades+' unid.)')}
       ${m(brSoles(cobrado),'Ya cobrado')}
       ${m(brSoles(porCobrar),'Por cobrar')}
-      ${m(brSoles(flete),'Flete estimado (S/ '+BR_FLETE_UNIDAD+' × '+unidComp+' unid.)')}
+      ${m(faltaU+' unid.','Faltan por comprar',faltaU?'var(--pink)':'')}
+      ${m(sobraU+' unid. · '+brSoles(sobraS),'Mercadería en mano (sin vender)')}
+      ${m(brSoles(flete),'Flete estimado (S/ '+BR_FLETE_UNIDAD+' × '+unidCub+' unid.)')}
       ${m(brSoles(ganancia),'Ganancia estimada','var(--green)')}</div>
       <div class="card" style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;margin-bottom:8px">Ventas por canal</div>
         ${Object.entries(porCanal).sort((a,b)=>b[1].v-a[1].v).map(([n,c])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${brCanalBadge(n==='Sin canal'?'':n)}</span><span>${c.u} unid. · <strong>${brSoles(c.v)}</strong></span></div>`).join('')}</div>
-      <div class="text-hint" style="font-size:11.5px">La ganancia estimada solo cuenta lo ya comprado: venta − costo en soles − flete estimado. Cuando sepas el flete real se ajusta.</div>`;
+      <div class="text-hint" style="font-size:11.5px">La ganancia estimada solo cuenta las ventas que ya tienen stock asignado: venta − costo de la compra asignada (en soles) − flete estimado.</div>`;
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
 
