@@ -6988,6 +6988,8 @@ function brProdCambio(){
   if(!pr){ box.innerHTML=''; return; }
   if(pr.precio_venta!=null) document.getElementById('br-precio').value = pr.precio_venta;
   const vars = Array.isArray(pr.variantes)?pr.variantes:[];
+  // Si el producto tiene una sola variante guardada, se llena sola
+  if(vars.length===1 && !document.getElementById('br-var').value.trim()) document.getElementById('br-var').value = vars[0];
   box.innerHTML = vars.map(v=>`<button type="button" class="btn btn-xs" onclick="document.getElementById('br-var').value=decodeURIComponent('${encodeURIComponent(v)}')">${brEsc(v)}</button>`).join('');
 }
 function brRenderCatalogo(){
@@ -7126,7 +7128,9 @@ async function brRenderItemsClienta(){
 async function brAgregarItem(){
   if(!brCliente){ toast('Primero elige una clienta'); return; }
   const producto = document.getElementById('br-prod').value.trim();
-  const variante = document.getElementById('br-var').value.trim();
+  let variante = document.getElementById('br-var').value.trim();
+  const prVar = brProdActual();
+  if(!variante && prVar && Array.isArray(prVar.variantes) && prVar.variantes.length===1) variante = prVar.variantes[0];
   const precio = parseFloat(document.getElementById('br-precio').value);
   const cant = parseInt(document.getElementById('br-cant').value)||1;
   if(!brCanal){ toast('Elige el canal de venta'); return; }
