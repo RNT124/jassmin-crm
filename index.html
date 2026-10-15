@@ -120,6 +120,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .badge-ok{background:var(--green-light);color:var(--green)}
 .badge-info{background:var(--blue-light);color:var(--blue-dark)}
 .badge-pink{background:var(--pink-light);color:var(--pink-dark)}
+.br-oculto{display:none!important}
 .badge-gray{background:var(--gray-light);color:var(--gray)}
 .badge-danger{background:var(--red-light);color:var(--red)}
 
@@ -1300,6 +1301,9 @@ td.empty-state{padding:20px;text-align:center}
           <div class="tab" id="br-tab-compras" onclick="brTab('compras')">🧾 Compras</div>
           <div class="tab" id="br-tab-pedidos" onclick="brTab('pedidos')">📦 Pedidos</div>
           <div class="tab" id="br-tab-resumen" onclick="brTab('resumen')">📊 Resumen</div>
+        </div>
+        <div id="br-buscar-wrap" style="display:none;margin-bottom:12px;position:relative">
+          <input id="br-buscar" type="search" placeholder="🔍 Buscar por celular o usuario de WhatsApp (o producto)" oninput="brFiltrar(this.value)" style="width:100%" autocomplete="off">
         </div>
         <div id="br-view-registro">
           <div class="card" style="margin-bottom:12px">
@@ -6947,12 +6951,42 @@ const BR_ESTADOS = {por_comprar:'Por comprar', comprado:'Comprado', listo_lima:'
 function brEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function brSoles(n){ return 'S/ '+(Math.round(n*100)/100).toFixed(2); }
 
+let brQ = '';
+function brNorm(s){ return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function brFiltrar(v){ brQ = v||''; brAplicarFiltro(); }
+function brAplicarFiltro(){
+  const view = document.getElementById('br-view-'+brTabActual); if(!view) return;
+  const toks = brNorm(brQ).split(/\s+/).filter(Boolean).map(t=>{
+    if(/^[\d+\-()]+$/.test(t)){ let d=t.replace(/\D/g,''); if(d.length>9 && d.indexOf('51')===0) d=d.slice(2); return d; }
+    return t; }).filter(Boolean);
+  view.querySelectorAll('.br-fil-row').forEach(el=>{
+    const q = el.dataset.q||'';
+    el.classList.toggle('br-oculto', !toks.every(t=>q.includes(t)));
+  });
+  view.querySelectorAll('.br-fil-grp').forEach(g=>{
+    const rows = g.querySelectorAll('.br-fil-row');
+    const hay = !rows.length || [...rows].some(r=>!r.classList.contains('br-oculto'));
+    g.classList.toggle('br-oculto', !hay);
+  });
+  const old = document.getElementById('br-sin-res'); if(old) old.remove();
+  if(toks.length){
+    const algo = [...view.querySelectorAll('.br-fil-row')].some(r=>!r.classList.contains('br-oculto'));
+    if(!algo && view.querySelector('.br-fil-row')){
+      const d = document.createElement('div'); d.id='br-sin-res'; d.className='card'; d.style.cssText='text-align:center;padding:24px;color:var(--text2)';
+      d.textContent = 'Sin resultados para "'+brQ+'"'; view.appendChild(d);
+    }
+  }
+}
 function brTab(t){
   brTabActual = t;
   ['registro','comprar','compras','pedidos','resumen'].forEach(k=>{
     document.getElementById('br-tab-'+k).classList.toggle('active', k===t);
     document.getElementById('br-view-'+k).style.display = k===t ? '' : 'none';
   });
+  const bw = document.getElementById('br-buscar-wrap');
+  if(bw) bw.style.display = (t==='comprar'||t==='compras'||t==='pedidos') ? '' : 'none';
+  const bi = document.getElementById('br-buscar');
+  if(bi){ bi.value = brQ; bi.placeholder = t==='compras' ? '🔍 Buscar compra por producto, variante o fecha' : t==='comprar' ? '🔍 Buscar por celular, usuario de WhatsApp o producto' : '🔍 Buscar por celular, usuario de WhatsApp o producto'; }
   if(t==='registro'){ brRenderCanales(); brCargarProductos(); }
   if(t==='comprar') brLoadComprar();
   if(t==='compras') brLoadCompras();
@@ -7336,9 +7370,10 @@ async function brLoadCompras(){
     cs.forEach(c=>{ (porDia[c.fecha] = porDia[c.fecha]||[]).push(c); });
     box.innerHTML = head + Object.keys(porDia).sort().reverse().map(f=>{
       const lin = porDia[f]; const tot = lin.reduce((a,c)=>a+c.cantidad*Number(c.costo_rl||0),0);
-      return `<div class="card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;margin-bottom:6px"><span>📅 ${brFechaCorta(f)} · compraste:</span><span>R$ ${tot.toFixed(2)} · ${brSoles(tot*BR_TASA)}</span></div>
-      ${lin.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;border-top:0.5px solid var(--border);font-size:13px;flex-wrap:wrap"><span>${c.cantidad}× ${brEsc(c.producto)}${c.variante?' · '+brEsc(c.variante):''} <span class="text-hint">— R$ ${Number(c.costo_rl||0).toFixed(2)} c/u</span></span><span style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brEditarCompra('${c.id}')">✏️</button><button class="btn btn-xs" onclick="brBorrarCompra('${c.id}')">🗑</button></span></div>`).join('')}</div>`;
+      return `<div class="card br-fil-grp" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;margin-bottom:6px"><span>📅 ${brFechaCorta(f)} · compraste:</span><span>R$ ${tot.toFixed(2)} · ${brSoles(tot*BR_TASA)}</span></div>
+      ${lin.map(c=>`<div class="br-fil-row" data-q="${brEsc(brNorm(c.producto+' '+(c.variante||'')+' '+f+' '+brFechaCorta(f)))}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;border-top:0.5px solid var(--border);font-size:13px;flex-wrap:wrap"><span>${c.cantidad}× ${brEsc(c.producto)}${c.variante?' · '+brEsc(c.variante):''} <span class="text-hint">— R$ ${Number(c.costo_rl||0).toFixed(2)} c/u</span></span><span style="display:flex;gap:6px"><button class="btn btn-xs" onclick="brEditarCompra('${c.id}')">✏️</button><button class="btn btn-xs" onclick="brBorrarCompra('${c.id}')">🗑</button></span></div>`).join('')}</div>`;
     }).join('');
+    brAplicarFiltro();
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+' — ¿corriste el SQL de compras de Brasil?</div>'; }
 }
 async function brEditarCompra(id){
@@ -7367,8 +7402,8 @@ async function brLoadComprar(){
     const sobras = Object.entries(brAsig.stock).filter(([k,s])=>s.sobra>0);
     let sobraHtml = '';
     if(sobras.length){
-      sobraHtml = `<div class="card" style="margin-top:14px"><div style="font-size:12px;font-weight:600;margin-bottom:6px">📦 Stock en mano (comprado y aún sin vender)</div>` +
-        sobras.map(([k,s])=>`<div style="font-size:13px;padding:3px 0">${s.sobra}× ${brEsc(s.nombre)}${s.variante?' · '+brEsc(s.variante):''}</div>`).join('') + `</div>`;
+      sobraHtml = `<div class="card br-fil-grp" style="margin-top:14px"><div style="font-size:12px;font-weight:600;margin-bottom:6px">📦 Stock en mano (comprado y aún sin vender)</div>` +
+        sobras.map(([k,s])=>`<div class="br-fil-row" data-q="${brEsc(brNorm(s.nombre+' '+(s.variante||'')))}" style="font-size:13px;padding:3px 0">${s.sobra}× ${brEsc(s.nombre)}${s.variante?' · '+brEsc(s.variante):''}</div>`).join('') + `</div>`;
     }
     if(!faltas.length){ box.innerHTML='<div class="card" style="text-align:center;padding:30px;color:var(--text2)">✅ No tienes nada pendiente por comprar</div>'+sobraHtml; return; }
     // clientas con unidades sin cubrir, por producto+variante
@@ -7376,11 +7411,12 @@ async function brLoadComprar(){
     const pedIds = [...new Set(pend.map(i=>i.pedido_id))];
     const peds = await dbGet(`brasil_pedidos?id=in.(${pedIds.join(',')})&select=id,cliente_id,usuario_wa`);
     const cliIds = [...new Set(peds.map(p=>p.cliente_id).filter(Boolean))];
-    const clis = cliIds.length ? await dbGet(`clientes?id=in.(${cliIds.join(',')})&select=id,nombre`) : [];
-    const nomDe = {}; peds.forEach(p=>{ nomDe[p.id] = p.cliente_id ? ((clis.find(c=>c.id===p.cliente_id)||{}).nombre||'Sin nombre') : (p.usuario_wa||'Sin nombre'); });
-    const clientasDe = {};
+    const clis = cliIds.length ? await dbGet(`clientes?id=in.(${cliIds.join(',')})&select=id,nombre,telefono`) : [];
+    const nomDe = {}, telDe = {}; peds.forEach(p=>{ const cl = p.cliente_id ? (clis.find(c=>c.id===p.cliente_id)||{}) : {}; nomDe[p.id] = p.cliente_id ? (cl.nombre||'Sin nombre') : (p.usuario_wa||'Sin nombre'); telDe[p.id] = (cl.telefono||'')+' '+(p.usuario_wa||''); });
+    const clientasDe = {}, buscaDe = {};
     pend.forEach(i=>{
       const k = brKey(i.producto,i.variante);
+      buscaDe[k] = (buscaDe[k]||'')+' '+nomDe[i.pedido_id]+' '+telDe[i.pedido_id];
       const u = i.cantidad - ((brAsig.items[i.id]||{}).cubierto||0);
       const n = nomDe[i.pedido_id]; (clientasDe[k] = clientasDe[k]||{}); clientasDe[k][n] = (clientasDe[k][n]||0)+u;
     });
@@ -7391,13 +7427,14 @@ async function brLoadComprar(){
     box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <div class="text-muted text-sm">Faltan comprar <strong>${totalUnid}</strong> unidad(es) en <strong>${Object.keys(porProd).length}</strong> producto(s).</div>
       <div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="brCopiarLista()">📋 Copiar lista</button><button class="btn btn-sm btn-primary" onclick="brAbrirCompra()">+ Registrar compra</button></div></div>` +
-      Object.values(porProd).map(pp=>`<div class="card" style="margin-bottom:10px">
+      Object.values(porProd).map(pp=>`<div class="card br-fil-grp" style="margin-bottom:10px">
         <div style="font-size:15px;font-weight:600">${brEsc(pp.nombre)} <span style="color:var(--pink)">— comprar ${pp.qty}</span></div>
-        ${pp.vars.map(({k,s})=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:0.5px solid var(--border);margin-top:8px;flex-wrap:wrap">
+        ${pp.vars.map(({k,s})=>`<div class="br-fil-row" data-q="${brEsc(brNorm(pp.nombre+' '+(s.variante||'')+' '+(buscaDe[k]||'')))}" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:0.5px solid var(--border);margin-top:8px;flex-wrap:wrap">
           <div><div style="font-size:13px"><strong>${brEsc(s.variante||'Único')}</strong> · faltan ${s.falta} <span class="text-hint">(vendidas ${s.vendidas} · compradas ${s.compradas})</span></div>
           <div class="text-hint" style="font-size:11.5px">${Object.entries(clientasDe[k]||{}).map(([n,q])=>brEsc(n)+' ('+q+')').join(', ')}</div></div>
           <button class="btn btn-sm btn-primary" onclick="brAbrirCompra('${encodeURIComponent(k)}')">✓ Registrar compra</button></div>`).join('')}
       </div>`).join('') + sobraHtml;
+    brAplicarFiltro();
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+' — ¿corriste el SQL de compras de Brasil?</div>'; }
 }
 
@@ -7430,7 +7467,8 @@ async function brLoadPedidos(){
       const sel = p.estado==='listo_lima' ? `<input type="checkbox" class="br-sel" value="${p.id}" style="margin-right:6px">` : '';
       let accion = '';
       if(p.estado==='comprado') accion = `<button class="btn btn-sm" onclick="brSetEstado('${p.id}','listo_lima')">✓ Listo en Lima</button>`;
-      return `<div class="card" style="margin-bottom:10px">
+      const qPed = brNorm([c.nombre, c.telefono, p.usuario_wa, c.dni, c.distrito, BR_ESTADOS[p.estado]].concat(p.items.map(i=>i.producto+' '+(i.variante||'')+' '+(i.canal||''))).join(' '));
+      return `<div class="card br-fil-row" data-q="${brEsc(qPed)}" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
           <div style="font-size:14px;font-weight:600">${sel}${c.sinCelular?'👤 ':''}${brEsc(c.nombre||'Sin nombre')} ${c.sinCelular?'<span class="badge badge-warn">sin celular</span>':`<span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span>`}</div>
           <span class="badge ${badgeCls[p.estado]}">${BR_ESTADOS[p.estado]}</span></div>
@@ -7441,6 +7479,7 @@ async function brLoadPedidos(){
           <div style="display:flex;gap:6px">${c.sinCelular?`<button class="btn btn-xs" onclick="brVincularCelular('${p.id}')">📱 Agregar celular</button>`:`<button class="btn btn-xs" onclick="brCopiar('${p.id}')">📋 Copiar datos</button>`}${accion}${p.estado==='despachado'?'':`<button class="btn btn-xs" onclick="brBorrarPedido('${p.id}')">🗑</button>`}</div></div>
       </div>`;
     }).join('');
+    brAplicarFiltro();
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
 
