@@ -7727,16 +7727,19 @@ async function brLoadResumen(){
         : vacio('Aún no registraste gastos. Mientras tanto la ganancia usa un flete estimado de S/ '+BR_FLETE_UNIDAD+' por unidad.'));
     brResDet.env = brResDet.gas; brResDet.imp = brResDet.gas;
     const tipoAplic = (s) => gastosS>0 ? s*(costoCubS/Math.max(invS,0.0001)) : 0;
-    brResDet.gan = titulo('📈 Cómo se calcula la ganancia neta') +
+    brResDet.gan = titulo('📈 Cómo se calcula la ganancia referencial') +
       fila('Ventas ya cubiertas con compra <span class="text-hint">('+unidCub+' unid.)</span>', brSoles(ventaCub)) +
       fila('− Costo de esa mercadería', '− '+brSoles(costoCubS)) +
       fila('<strong>= Ganancia bruta</strong>', '<strong>'+brSoles(gananciaBruta)+'</strong>') +
       (gastosS>0 ? (envS>0 ? fila('− Envíos <span class="text-hint">(parte de lo vendido)</span>', '− '+brSoles(tipoAplic(envS))) : '') + (impS>0 ? fila('− Impuestos <span class="text-hint">(parte de lo vendido)</span>', '− '+brSoles(tipoAplic(impS))) : '') + (otrS>0 ? fila('− Otros gastos', '− '+brSoles(tipoAplic(otrS))) : '')
         : fila('− Flete estimado <span class="text-hint">(S/ '+BR_FLETE_UNIDAD+' × '+unidCub+' unid.)</span>', '− '+brSoles(gastoAplicado))) +
-      fila('<strong>= Ganancia neta</strong>', '<strong style="color:var(--green)">'+brSoles(ganancia)+'</strong>') +
+      fila('<strong>= Ganancia referencial</strong>', '<strong style="color:var(--green)">'+brSoles(ganancia)+'</strong>') +
       (gastosS>0 ? `<div class="text-hint" style="font-size:11.5px;margin-top:8px">Registraste ${brSoles(gastosS)} en gastos. Se reparten entre todos los productos en proporción a lo que costaron (más costo = más parte del gasto): ${brSoles(gastoAplicado)} corresponden a lo ya vendido y ${brSoles(gastosS-gastoAplicado)} a la mercadería que aún tienes en mano.</div>`
         : `<div class="text-hint" style="font-size:11.5px;margin-top:8px">Cuando registres tus gastos reales de envío e impuestos, reemplazan al flete estimado.</div>`);
 
+    brResDet.bru = titulo('🧮 Ganancia bruta = precio de venta − precio de compra') + '<div class="text-hint" style="font-size:12px;margin-bottom:6px">Sin envíos, impuestos ni flete. Solo ventas que ya tienen compra asignada.</div>' +
+      (Object.values(porProd).filter(P=>P.uCub>0).sort((a,b)=>(b.vCub-b.costoS)-(a.vCub-a.costoS)).map(P=>fila(brEsc(P.nombre)+' <span class="text-hint">· '+P.uCub+' unid. · venta '+brSoles(P.vCub)+' − compra '+brSoles(P.costoS)+'</span>','<strong>'+brSoles(P.vCub-P.costoS)+'</strong>')).join('') || vacio('Aún no hay ventas con compra asignada')) +
+      fila('<strong>Total ganancia bruta</strong>','<strong style="color:var(--green)">'+brSoles(gananciaBruta)+'</strong>');
     // ── Rankings y canales ──
     const maxU = Math.max(1, ...prodsOrd.map(P=>P.u));
     const topVend = prodsOrd.slice().sort((a,b)=>b.u-a.u||b.v-a.v).slice(0,10);
@@ -7765,7 +7768,8 @@ async function brLoadResumen(){
       ${m('sobra',sobraU+' unid. · '+brSoles(sobraS),'Mercadería en mano (sin vender)')}
       ${m('env',brSoles(envS),'Envíos registrados')}
       ${m('imp',brSoles(impS),'Impuestos registrados'+(otrS>0?' (+ '+brSoles(otrS)+' otros)':''))}
-      ${m('gan',brSoles(ganancia),'Ganancia neta'+(gastosS>0?'':' (flete estimado)'),'var(--green)')}</div>
+      ${m('bru',brSoles(gananciaBruta),'Ganancia bruta (venta − compra, sin gastos)','var(--green)')}
+      ${m('gan',brSoles(ganancia),'Ganancia referencial'+(gastosS>0?' (con tus gastos)':' (con flete estimado)'),'var(--green)')}</div>
       <div class="card" id="br-res-det" style="display:none;margin-bottom:14px"></div>
       <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">🏆 Productos más vendidos <span class="text-hint" style="font-weight:400">· toca uno para ver variantes</span></div>${rankVend||vacio('Aún no hay ventas')}</div>
       <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">💰 Productos con más ganancia <span class="text-hint" style="font-weight:400">· después de costo y gastos</span></div>${rankGan||vacio('Aún no hay ventas con compra asignada')}</div>
