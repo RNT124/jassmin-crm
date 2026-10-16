@@ -1522,6 +1522,24 @@ td.empty-state{padding:20px;text-align:center}
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-br-gasto">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title" id="brg-titulo">Registrar gasto</div>
+    <input type="hidden" id="brg-id">
+    <div class="form-row"><label class="form-label">Fecha</label><input id="brg-fecha" type="date" style="width:100%"></div>
+    <div class="form-row"><label class="form-label">Tipo de gasto</label>
+      <select id="brg-tipo" class="f5-select" style="margin-bottom:0"><option>Envío Brasil→Lima</option><option>Impuestos / aduana</option><option>Flete local</option><option>Otro</option></select></div>
+    <div class="form-row"><label class="form-label">Monto</label>
+      <div style="display:flex;gap:8px"><input id="brg-monto" type="number" inputmode="decimal" placeholder="Monto" style="flex:1">
+      <select id="brg-moneda" class="f5-select" style="width:90px;margin-bottom:0"><option>R$</option><option>S/</option></select></div></div>
+    <div class="form-row"><label class="form-label">Nota (opcional)</label><input id="brg-nota" placeholder="Ej: courier, tracking, pedido del 14-10" style="width:100%"></div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-br-gasto')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="brGuardarGasto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-br-item">
   <div class="modal" style="max-width:440px">
     <div class="modal-title">Editar producto</div>
@@ -7579,44 +7597,181 @@ async function brDespacharSeleccion(){
 }
 
 // ── Resumen ──
+// ── Gastos Brasil (envíos / impuestos) ──
+const BR_TIPOS_GASTO = ['Envío Brasil→Lima','Impuestos / aduana','Flete local','Otro'];
+let brGastos = [];
+let brResDet = {};
+let brResAbierto = '';
+function brGastoS(g){ return Number(g.monto||0) * (g.moneda==='R$' ? BR_TASA : 1); }
+function brAbrirGasto(id){
+  const g = id ? brGastos.find(x=>x.id===id) : null;
+  document.getElementById('brg-id').value = g ? g.id : '';
+  document.getElementById('brg-fecha').value = g ? g.fecha : brFechaHoy();
+  document.getElementById('brg-tipo').value = g ? g.tipo : BR_TIPOS_GASTO[0];
+  document.getElementById('brg-monto').value = g ? g.monto : '';
+  document.getElementById('brg-moneda').value = g ? g.moneda : 'R$';
+  document.getElementById('brg-nota').value = g ? (g.nota||'') : '';
+  document.getElementById('brg-titulo').textContent = g ? 'Editar gasto' : 'Registrar gasto';
+  document.getElementById('modal-br-gasto').classList.add('open');
+}
+async function brGuardarGasto(){
+  const id = document.getElementById('brg-id').value;
+  const monto = parseFloat(String(document.getElementById('brg-monto').value).replace(',','.'));
+  if(!monto || monto<=0){ toast('Escribe el monto'); return; }
+  const d = { fecha: document.getElementById('brg-fecha').value || brFechaHoy(), tipo: document.getElementById('brg-tipo').value,
+    monto, moneda: document.getElementById('brg-moneda').value, nota: document.getElementById('brg-nota').value.trim() || null };
+  try {
+    if(id) await dbPatch(`brasil_gastos?id=eq.${id}`, d); else await dbPost('brasil_gastos', [d]);
+    closeModal('modal-br-gasto'); toast('✓ Gasto guardado');
+    brResAbierto = 'gas'; brLoadResumen();
+  } catch(e){ toast('Error: '+e.message+' — ¿corriste el SQL de gastos de Brasil?'); }
+}
+async function brBorrarGasto(id){
+  const g = brGastos.find(x=>x.id===id); if(!g) return;
+  if(!confirm(`¿Borrar este gasto (${g.tipo} · ${g.moneda} ${Number(g.monto).toFixed(2)})?`)) return;
+  try { await dbDelete(`brasil_gastos?id=eq.${id}`); toast('✓ Gasto borrado'); brResAbierto='gas'; brLoadResumen(); } catch(e){ toast('Error: '+e.message); }
+}
+function brResAbrir(k){
+  const det = document.getElementById('br-res-det'); if(!det) return;
+  document.querySelectorAll('#br-view-resumen .br-click').forEach(el=>el.classList.remove('act'));
+  if(brResAbierto===k){ brResAbierto=''; det.style.display='none'; return; }
+  brResAbierto = k;
+  det.innerHTML = brResDet[k] || ''; det.style.display = '';
+  document.querySelectorAll('#br-view-resumen .br-click[data-k="'+k+'"]').forEach(el=>el.classList.add('act'));
+  det.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// ── Resumen ──
 async function brLoadResumen(){
   const box = document.getElementById('br-view-resumen');
   box.innerHTML = '<div class="loading">Cargando...</div>';
   try {
     await brCalcularAsignacion();
-    const peds = await dbGet('brasil_pedidos?select=id,pagado&limit=5000');
+    const [peds, gastos, clisAll] = await Promise.all([
+      dbGet('brasil_pedidos?select=id,pagado,usuario_wa,cliente_id&limit=5000'),
+      dbGet('brasil_gastos?select=*&order=fecha.desc,creado_en.desc&limit=2000').catch(()=>null),
+      dbGet('clientes?select=id,nombre,telefono&limit=10000').catch(()=>[])]);
+    const tablaGastos = gastos !== null; brGastos = gastos || [];
     const pedDe = {}; peds.forEach(p=>pedDe[p.id]=p);
+    const cliDe = {}; clisAll.forEach(c=>cliDe[c.id]=c);
+    const nomPed = p => { if(!p) return 'Sin nombre'; const c = p.cliente_id ? cliDe[p.cliente_id] : null; return c ? ((c.nombre||'Sin nombre')+(c.telefono?' · '+c.telefono:'')) : (p.usuario_wa||'Sin nombre'); };
     const items = brAsig.lista;
-    let vendido=0, unidades=0, cobrado=0, porCobrar=0, unidCub=0, ventaCub=0, costoCubRL=0;
-    const porCanal = {};
-    items.forEach(i=>{
-      const v = i.precio_venta*i.cantidad; vendido += v; unidades += i.cantidad;
-      if(pedDe[i.pedido_id]?.pagado) cobrado += v; else porCobrar += v;
-      const cn = i.canal||'Sin canal'; if(!porCanal[cn]) porCanal[cn]={u:0,v:0}; porCanal[cn].u += i.cantidad; porCanal[cn].v += v;
-      const a = brAsig.items[i.id]||{cubierto:0,costoRL:0};
-      unidCub += a.cubierto; ventaCub += i.precio_venta*a.cubierto; costoCubRL += a.costoRL;
-    });
     const invRL = brAsig.compras.reduce((a,c)=>a+c.cantidad*Number(c.costo_rl||0),0);
     const invS = invRL*BR_TASA;
+    const gastosS = brGastos.reduce((a,g)=>a+brGastoS(g),0);
+    const factor = (gastosS>0 && invS>0) ? gastosS/invS : 0;   // S/ de gasto por cada S/ de costo
+    const gastoDe = (costoS, uCub) => gastosS>0 ? costoS*factor : uCub*BR_FLETE_UNIDAD;
+    let vendido=0, unidades=0, cobrado=0, porCobrar=0, unidCub=0, ventaCub=0, costoCubS=0;
+    const porProd = {}, porCanal = {}, porPed = {};
+    items.forEach(i=>{
+      const v = i.precio_venta*i.cantidad; vendido += v; unidades += i.cantidad;
+      const pd = pedDe[i.pedido_id]; const pag = !!(pd && pd.pagado);
+      if(pag) cobrado += v; else porCobrar += v;
+      const a = brAsig.items[i.id]||{cubierto:0,costoRL:0};
+      const costoS = a.costoRL*BR_TASA, vCub = i.precio_venta*a.cubierto;
+      unidCub += a.cubierto; ventaCub += vCub; costoCubS += costoS;
+      const pk = (i.producto||'').trim().toLowerCase();
+      const P = porProd[pk] = porProd[pk] || {nombre:i.producto, u:0, v:0, uCub:0, vCub:0, costoS:0, vars:{}};
+      P.u += i.cantidad; P.v += v; P.uCub += a.cubierto; P.vCub += vCub; P.costoS += costoS;
+      const vk = (i.variante||'').trim() || 'Único';
+      const V = P.vars[vk] = P.vars[vk] || {u:0, v:0, uCub:0, vCub:0, costoS:0};
+      V.u += i.cantidad; V.v += v; V.uCub += a.cubierto; V.vCub += vCub; V.costoS += costoS;
+      const cn = i.canal||'Sin canal';
+      const C = porCanal[cn] = porCanal[cn] || {u:0, v:0, vCub:0, costoS:0, uCub:0, prods:{}};
+      C.u += i.cantidad; C.v += v; C.vCub += vCub; C.costoS += costoS; C.uCub += a.cubierto;
+      const CP = C.prods[pk] = C.prods[pk] || {nombre:i.producto, u:0, v:0}; CP.u += i.cantidad; CP.v += v;
+      const PD = porPed[i.pedido_id] = porPed[i.pedido_id] || {total:0, u:0, pagado:pag, nombre:nomPed(pd)};
+      PD.total += v; PD.u += i.cantidad;
+    });
+    Object.values(porProd).forEach(P=>{ P.gasto = gastoDe(P.costoS, P.uCub); P.gan = P.vCub - P.costoS - P.gasto; Object.values(P.vars).forEach(V=>{ V.gasto = gastoDe(V.costoS, V.uCub); V.gan = V.vCub - V.costoS - V.gasto; }); });
+    Object.values(porCanal).forEach(C=>{ C.gasto = gastoDe(C.costoS, C.uCub); C.gan = C.vCub - C.costoS - C.gasto; });
+    const gastoAplicado = gastoDe(costoCubS, unidCub);
+    const gananciaBruta = ventaCub - costoCubS;
+    const ganancia = gananciaBruta - gastoAplicado;
     const sobraU = Object.values(brAsig.stock).reduce((a,s)=>a+s.sobra,0);
     const sobraS = Object.values(brAsig.stock).reduce((a,s)=>a+s.valorSobraRL,0)*BR_TASA;
     const faltaU = Object.values(brAsig.stock).reduce((a,s)=>a+s.falta,0);
-    const flete = unidCub*BR_FLETE_UNIDAD;
-    const ganancia = ventaCub - costoCubRL*BR_TASA - flete;
-    const m = (val,lbl,color)=>`<div class="metric"><div class="metric-val" style="${color?'color:'+color:''}">${val}</div><div class="metric-lbl">${lbl}</div></div>`;
-    box.innerHTML = `<div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
-      ${m('R$ '+invRL.toFixed(2),'Invertido en compras (reales)')}
-      ${m(brSoles(invS),'Invertido (soles, 1 R$ = '+BR_TASA+')')}
-      ${m(brSoles(vendido),'Vendido total ('+unidades+' unid.)')}
-      ${m(brSoles(cobrado),'Ya cobrado')}
-      ${m(brSoles(porCobrar),'Por cobrar')}
-      ${m(faltaU+' unid.','Faltan por comprar',faltaU?'var(--pink)':'')}
-      ${m(sobraU+' unid. · '+brSoles(sobraS),'Mercadería en mano (sin vender)')}
-      ${m(brSoles(flete),'Flete estimado (S/ '+BR_FLETE_UNIDAD+' × '+unidCub+' unid.)')}
-      ${m(brSoles(ganancia),'Ganancia estimada','var(--green)')}</div>
-      <div class="card" style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;margin-bottom:8px">Ventas por canal</div>
-        ${Object.entries(porCanal).sort((a,b)=>b[1].v-a[1].v).map(([n,c])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${brCanalBadge(n==='Sin canal'?'':n)}</span><span>${c.u} unid. · <strong>${brSoles(c.v)}</strong></span></div>`).join('')}</div>
-      <div class="text-hint" style="font-size:11.5px">La ganancia estimada solo cuenta las ventas que ya tienen stock asignado: venta − costo de la compra asignada (en soles) − flete estimado.</div>`;
+    const sumTipo = fn => brGastos.filter(fn).reduce((a,g)=>a+brGastoS(g),0);
+    const envS = sumTipo(g=>g.tipo==='Envío Brasil→Lima'||g.tipo==='Flete local');
+    const impS = sumTipo(g=>g.tipo==='Impuestos / aduana');
+    const otrS = gastosS - envS - impS;
+    const fechaCorta = f => brFechaCorta(f);
+    const fila = (izq, der, extra) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px;flex-wrap:wrap"><span>${izq}</span><span style="text-align:right">${der}</span></div>${extra||''}`;
+    const titulo = t => `<div style="font-size:13px;font-weight:600;margin-bottom:6px">${t}</div>`;
+    const vacio = t => `<div class="text-hint" style="font-size:12.5px;padding:6px 0">${t}</div>`;
+
+    // ── Detalles de cada tarjeta ──
+    const porDia = {}; brAsig.compras.forEach(c=>{ (porDia[c.fecha] = porDia[c.fecha]||[]).push(c); });
+    brResDet.inv = titulo('🧾 Todo lo que compraste') + (Object.keys(porDia).sort().reverse().map(f=>{
+      const lin = porDia[f]; const tot = lin.reduce((a,c)=>a+c.cantidad*Number(c.costo_rl||0),0);
+      return `<div style="margin:8px 0 2px;font-size:12.5px;font-weight:600">📅 ${fechaCorta(f)} — R$ ${tot.toFixed(2)} · ${brSoles(tot*BR_TASA)}</div>` +
+        lin.map(c=>`<div style="font-size:12.5px;padding:2px 0 2px 8px">${c.cantidad}× ${brEsc(c.producto)}${c.variante?' · '+brEsc(c.variante):''} <span class="text-hint">— R$ ${Number(c.costo_rl||0).toFixed(2)} c/u = R$ ${(c.cantidad*Number(c.costo_rl||0)).toFixed(2)}</span></div>`).join('');
+    }).join('') || vacio('Aún no registraste compras')) + `<div style="margin-top:8px;font-size:13px"><strong>Total: R$ ${invRL.toFixed(2)} = ${brSoles(invS)}</strong></div>`;
+    brResDet.inv2 = brResDet.inv;
+    const prodsOrd = Object.values(porProd).sort((a,b)=>b.v-a.v);
+    brResDet.ven = titulo('🛍️ Vendido por producto') + prodsOrd.map(P=>fila(brEsc(P.nombre)+' <span class="text-hint">· '+Object.entries(P.vars).map(([k,V])=>k+' ×'+V.u).join(', ')+'</span>', P.u+' unid. · <strong>'+brSoles(P.v)+'</strong>')).join('');
+    const lstPed = pag => Object.values(porPed).filter(p=>p.pagado===pag).sort((a,b)=>b.total-a.total);
+    const detPed = (pag, tit) => { const l = lstPed(pag); return titulo(tit+' ('+l.length+' clienta'+(l.length!==1?'s':'')+')') + (l.map(p=>fila(brEsc(p.nombre)+' <span class="text-hint">· '+p.u+' unid.</span>','<strong>'+brSoles(p.total)+'</strong>')).join('') || vacio('Nada por aquí')); };
+    brResDet.cob = detPed(true, '💰 Ya cobrado');
+    brResDet.porc = detPed(false, '⏳ Por cobrar');
+    const faltas = Object.values(brAsig.stock).filter(s=>s.falta>0).sort((a,b)=>b.falta-a.falta);
+    brResDet.falta = titulo('🛒 Falta comprar') + (faltas.map(s=>fila(brEsc(s.nombre)+(s.variante?' · '+brEsc(s.variante):''), '<strong style="color:var(--pink)">'+s.falta+' unid.</strong>')).join('') || vacio('✅ Nada pendiente')) + '<div class="text-hint" style="font-size:11.5px;margin-top:6px">Para copiar la lista ve a la pestaña “Por comprar”.</div>';
+    const sobras = Object.values(brAsig.stock).filter(s=>s.sobra>0).sort((a,b)=>b.valorSobraRL-a.valorSobraRL);
+    brResDet.sobra = titulo('📦 Mercadería en mano (comprada y sin vender)') + (sobras.map(s=>fila(s.sobra+'× '+brEsc(s.nombre)+(s.variante?' · '+brEsc(s.variante):''), brSoles(s.valorSobraRL*BR_TASA))).join('') || vacio('No tienes sobrantes'));
+    const tiposTxt = BR_TIPOS_GASTO.map(t=>{ const s = sumTipo(g=>g.tipo===t); return s>0 ? fila(brEsc(t),'<strong>'+brSoles(s)+'</strong>') : ''; }).join('');
+    brResDet.gas = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">${titulo('🚚 Gastos de envíos e impuestos').replace('margin-bottom:6px','margin:0')}<button class="btn btn-sm btn-primary" onclick="brAbrirGasto()">+ Registrar gasto</button></div>` +
+      (!tablaGastos ? '<div style="color:var(--red);font-size:12.5px;margin-bottom:6px">No encuentro la tabla de gastos: corre el SQL de gastos de Brasil en Supabase.</div>' : '') +
+      (brGastos.length ? tiposTxt + fila('<strong>Total gastos</strong>','<strong>'+brSoles(gastosS)+'</strong>') +
+        '<div style="margin-top:10px;font-size:12px;font-weight:600">Detalle por fecha</div>' +
+        brGastos.map(g=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:12.5px;flex-wrap:wrap"><span>📅 ${fechaCorta(g.fecha)} · ${brEsc(g.tipo)}${g.nota?' <span class="text-hint">— '+brEsc(g.nota)+'</span>':''}</span><span style="display:flex;gap:6px;align-items:center"><strong>${g.moneda} ${Number(g.monto).toFixed(2)}</strong>${g.moneda==='R$'?'<span class="text-hint">('+brSoles(brGastoS(g))+')</span>':''}<button class="btn btn-xs" onclick="brAbrirGasto('${g.id}')">✏️</button><button class="btn btn-xs" onclick="brBorrarGasto('${g.id}')">🗑</button></span></div>`).join('')
+        : vacio('Aún no registraste gastos. Mientras tanto la ganancia usa un flete estimado de S/ '+BR_FLETE_UNIDAD+' por unidad.'));
+    brResDet.env = brResDet.gas; brResDet.imp = brResDet.gas;
+    const tipoAplic = (s) => gastosS>0 ? s*(costoCubS/Math.max(invS,0.0001)) : 0;
+    brResDet.gan = titulo('📈 Cómo se calcula la ganancia neta') +
+      fila('Ventas ya cubiertas con compra <span class="text-hint">('+unidCub+' unid.)</span>', brSoles(ventaCub)) +
+      fila('− Costo de esa mercadería', '− '+brSoles(costoCubS)) +
+      fila('<strong>= Ganancia bruta</strong>', '<strong>'+brSoles(gananciaBruta)+'</strong>') +
+      (gastosS>0 ? (envS>0 ? fila('− Envíos <span class="text-hint">(parte de lo vendido)</span>', '− '+brSoles(tipoAplic(envS))) : '') + (impS>0 ? fila('− Impuestos <span class="text-hint">(parte de lo vendido)</span>', '− '+brSoles(tipoAplic(impS))) : '') + (otrS>0 ? fila('− Otros gastos', '− '+brSoles(tipoAplic(otrS))) : '')
+        : fila('− Flete estimado <span class="text-hint">(S/ '+BR_FLETE_UNIDAD+' × '+unidCub+' unid.)</span>', '− '+brSoles(gastoAplicado))) +
+      fila('<strong>= Ganancia neta</strong>', '<strong style="color:var(--green)">'+brSoles(ganancia)+'</strong>') +
+      (gastosS>0 ? `<div class="text-hint" style="font-size:11.5px;margin-top:8px">Registraste ${brSoles(gastosS)} en gastos. Se reparten entre todos los productos en proporción a lo que costaron (más costo = más parte del gasto): ${brSoles(gastoAplicado)} corresponden a lo ya vendido y ${brSoles(gastosS-gastoAplicado)} a la mercadería que aún tienes en mano.</div>`
+        : `<div class="text-hint" style="font-size:11.5px;margin-top:8px">Cuando registres tus gastos reales de envío e impuestos, reemplazan al flete estimado.</div>`);
+
+    // ── Rankings y canales ──
+    const maxU = Math.max(1, ...prodsOrd.map(P=>P.u));
+    const topVend = prodsOrd.slice().sort((a,b)=>b.u-a.u||b.v-a.v).slice(0,10);
+    const topGan = prodsOrd.filter(P=>P.uCub>0).sort((a,b)=>b.gan-a.gan).slice(0,10);
+    const maxG = Math.max(1, ...topGan.map(P=>Math.abs(P.gan)));
+    const barra = (pct, color) => `<div style="height:6px;background:var(--gray-light);border-radius:4px;margin-top:4px"><div style="height:6px;width:${Math.max(2,Math.min(100,pct))}%;background:${color};border-radius:4px"></div></div>`;
+    const detVars = (P, modo) => `<div style="padding:4px 0 8px 12px">` + Object.entries(P.vars).sort((a,b)=>b[1].u-a[1].u).map(([k,V])=> modo==='u'
+      ? `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>${brEsc(k)}</span><span>${V.u} unid. · ${brSoles(V.v)}</span></div>`
+      : `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>${brEsc(k)} <span class="text-hint">(${V.uCub} unid.)</span></span><span>${V.uCub? brSoles(V.gan) : '—'}</span></div>`).join('') + `</div>`;
+    const rankVend = topVend.map((P,n)=>`<details style="border-bottom:0.5px solid var(--border);padding:6px 0"><summary style="cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:8px;list-style:none"><span>${n+1}. ${brEsc(P.nombre)}</span><span><strong>${P.u} unid.</strong> · ${brSoles(P.v)}</span></summary>${barra(P.u/maxU*100,'var(--pink)')}${detVars(P,'u')}</details>`).join('');
+    const rankGan = topGan.map((P,n)=>{ const mg = P.vCub>0 ? Math.round(P.gan/P.vCub*100) : 0; return `<details style="border-bottom:0.5px solid var(--border);padding:6px 0"><summary style="cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:8px;list-style:none"><span>${n+1}. ${brEsc(P.nombre)}</span><span><strong style="color:${P.gan>=0?'var(--green)':'var(--red)'}">${brSoles(P.gan)}</strong> · ${mg}%</span></summary>${barra(Math.abs(P.gan)/maxG*100,'var(--green)')}
+      <div class="text-hint" style="font-size:11.5px;padding:4px 0 2px 12px">Venta ${brSoles(P.vCub)} − costo ${brSoles(P.costoS)} − gastos ${brSoles(P.gasto)} (${P.uCub} unid. con compra)</div>${detVars(P,'g')}</details>`; }).join('');
+    const canales = Object.entries(porCanal).sort((a,b)=>b[1].v-a[1].v).map(([n,C])=>`<details style="border-bottom:0.5px solid var(--border);padding:6px 0"><summary style="cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:8px;list-style:none;align-items:center"><span>${brCanalBadge(n==='Sin canal'?'':n)}</span><span>${C.u} unid. · <strong>${brSoles(C.v)}</strong>${C.uCub?' · <span style="color:var(--green)">gan. '+brSoles(C.gan)+'</span>':''}</span></summary>
+      <div style="padding:4px 0 8px 12px">${Object.values(C.prods).sort((a,b)=>b.v-a.v).map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>${brEsc(p.nombre)}</span><span>${p.u} unid. · ${brSoles(p.v)}</span></div>`).join('')}</div></details>`).join('');
+
+    const m = (key,val,lbl,color)=>`<div class="metric br-click" data-k="${key}" onclick="brResAbrir('${key}')"><div class="metric-val" style="${color?'color:'+color:''}">${val}</div><div class="metric-lbl">${lbl}</div><div style="font-size:10px;color:var(--text2);margin-top:6px;opacity:.7">ver detalle ›</div></div>`;
+    box.innerHTML = `<style>.br-click{cursor:pointer;transition:box-shadow .15s}.br-click:hover{box-shadow:0 0 0 1px var(--pink)}.br-click.act{box-shadow:0 0 0 2px var(--pink)}#br-view-resumen summary::-webkit-details-marker{display:none}</style>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><div class="text-muted text-sm">Toca cualquier tarjeta para ver el detalle.</div><button class="btn btn-sm btn-primary" onclick="brAbrirGasto()">+ Registrar gasto</button></div>
+      <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
+      ${m('inv','R$ '+invRL.toFixed(2),'Invertido en compras (reales)')}
+      ${m('inv2',brSoles(invS),'Invertido (soles, 1 R$ = '+BR_TASA+')')}
+      ${m('ven',brSoles(vendido),'Vendido total ('+unidades+' unid.)')}
+      ${m('cob',brSoles(cobrado),'Ya cobrado')}
+      ${m('porc',brSoles(porCobrar),'Por cobrar')}
+      ${m('falta',faltaU+' unid.','Faltan por comprar',faltaU?'var(--pink)':'')}
+      ${m('sobra',sobraU+' unid. · '+brSoles(sobraS),'Mercadería en mano (sin vender)')}
+      ${m('env',brSoles(envS),'Envíos registrados')}
+      ${m('imp',brSoles(impS),'Impuestos registrados'+(otrS>0?' (+ '+brSoles(otrS)+' otros)':''))}
+      ${m('gan',brSoles(ganancia),'Ganancia neta'+(gastosS>0?'':' (flete estimado)'),'var(--green)')}</div>
+      <div class="card" id="br-res-det" style="display:none;margin-bottom:14px"></div>
+      <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">🏆 Productos más vendidos <span class="text-hint" style="font-weight:400">· toca uno para ver variantes</span></div>${rankVend||vacio('Aún no hay ventas')}</div>
+      <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">💰 Productos con más ganancia <span class="text-hint" style="font-weight:400">· después de costo y gastos</span></div>${rankGan||vacio('Aún no hay ventas con compra asignada')}</div>
+      <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">Ventas por canal <span class="text-hint" style="font-weight:400">· toca uno para ver sus productos</span></div>${canales}</div>
+      <div class="text-hint" style="font-size:11.5px">La ganancia solo cuenta las ventas que ya tienen compra asignada: venta − costo (en soles) − parte proporcional de tus gastos de envío e impuestos.</div>`;
+    if(brResAbierto && brResDet[brResAbierto]){ const k = brResAbierto; brResAbierto=''; brResAbrir(k); }
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
 
