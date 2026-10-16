@@ -6961,7 +6961,6 @@ async function confirmarPagoCorte(){
 function initials(n){ return n.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'; }
 // ═══════════════════════════ BRASIL (sección independiente) ═══════════════════════════
 const BR_TASA = 0.69;       // 1 R$ = 0.69 S/ (fijo)
-const BR_FLETE_UNIDAD = 10; // flete estimado S/ por unidad (editable aquí cuando se sepa el real)
 let brTabActual = 'registro';
 let brCliente = null;
 let brCopyData = {};
@@ -7660,7 +7659,7 @@ async function brLoadResumen(){
     const invS = invRL*BR_TASA;
     const gastosS = brGastos.reduce((a,g)=>a+brGastoS(g),0);
     const factor = (gastosS>0 && invS>0) ? gastosS/invS : 0;   // S/ de gasto por cada S/ de costo
-    const gastoDe = (costoS, uCub) => gastosS>0 ? costoS*factor : uCub*BR_FLETE_UNIDAD;
+    const gastoDe = (costoS, uCub) => costoS*factor;   // solo gastos reales registrados, repartidos según el costo
     let vendido=0, unidades=0, cobrado=0, porCobrar=0, unidCub=0, ventaCub=0, costoCubS=0;
     const porProd = {}, porCanal = {}, porPed = {};
     items.forEach(i=>{
@@ -7724,7 +7723,7 @@ async function brLoadResumen(){
       (brGastos.length ? tiposTxt + fila('<strong>Total gastos</strong>','<strong>'+brSoles(gastosS)+'</strong>') +
         '<div style="margin-top:10px;font-size:12px;font-weight:600">Detalle por fecha</div>' +
         brGastos.map(g=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:12.5px;flex-wrap:wrap"><span>📅 ${fechaCorta(g.fecha)} · ${brEsc(g.tipo)}${g.nota?' <span class="text-hint">— '+brEsc(g.nota)+'</span>':''}</span><span style="display:flex;gap:6px;align-items:center"><strong>${g.moneda} ${Number(g.monto).toFixed(2)}</strong>${g.moneda==='R$'?'<span class="text-hint">('+brSoles(brGastoS(g))+')</span>':''}<button class="btn btn-xs" onclick="brAbrirGasto('${g.id}')">✏️</button><button class="btn btn-xs" onclick="brBorrarGasto('${g.id}')">🗑</button></span></div>`).join('')
-        : vacio('Aún no registraste gastos. Mientras tanto la ganancia usa un flete estimado de S/ '+BR_FLETE_UNIDAD+' por unidad.'));
+        : vacio('Aún no registraste gastos. Mientras no registres ninguno, la ganancia referencial es igual a la bruta.'));
     brResDet.env = brResDet.gas; brResDet.imp = brResDet.gas;
     const tipoAplic = (s) => gastosS>0 ? s*(costoCubS/Math.max(invS,0.0001)) : 0;
     brResDet.gan = titulo('📈 Cómo se calcula la ganancia referencial') +
@@ -7732,10 +7731,10 @@ async function brLoadResumen(){
       fila('− Costo de esa mercadería', '− '+brSoles(costoCubS)) +
       fila('<strong>= Ganancia bruta</strong>', '<strong>'+brSoles(gananciaBruta)+'</strong>') +
       (gastosS>0 ? (envS>0 ? fila('− Envíos <span class="text-hint">(parte de lo vendido)</span>', '− '+brSoles(tipoAplic(envS))) : '') + (impS>0 ? fila('− Impuestos <span class="text-hint">(parte de lo vendido)</span>', '− '+brSoles(tipoAplic(impS))) : '') + (otrS>0 ? fila('− Otros gastos', '− '+brSoles(tipoAplic(otrS))) : '')
-        : fila('− Flete estimado <span class="text-hint">(S/ '+BR_FLETE_UNIDAD+' × '+unidCub+' unid.)</span>', '− '+brSoles(gastoAplicado))) +
+        : fila('− Gastos registrados <span class="text-hint">(ninguno todavía)</span>', '− '+brSoles(0))) +
       fila('<strong>= Ganancia referencial</strong>', '<strong style="color:var(--green)">'+brSoles(ganancia)+'</strong>') +
       (gastosS>0 ? `<div class="text-hint" style="font-size:11.5px;margin-top:8px">Registraste ${brSoles(gastosS)} en gastos. Se reparten entre todos los productos en proporción a lo que costaron (más costo = más parte del gasto): ${brSoles(gastoAplicado)} corresponden a lo ya vendido y ${brSoles(gastosS-gastoAplicado)} a la mercadería que aún tienes en mano.</div>`
-        : `<div class="text-hint" style="font-size:11.5px;margin-top:8px">Cuando registres tus gastos reales de envío e impuestos, reemplazan al flete estimado.</div>`);
+        : `<div class="text-hint" style="font-size:11.5px;margin-top:8px">Cuando registres tus gastos reales de envío e impuestos, se descuentan aquí. Mientras no haya ninguno, esta ganancia es igual a la bruta.</div>`);
 
     brResDet.bru = titulo('🧮 Ganancia bruta = precio de venta − precio de compra') + '<div class="text-hint" style="font-size:12px;margin-bottom:6px">Sin envíos, impuestos ni flete. Solo ventas que ya tienen compra asignada.</div>' +
       (Object.values(porProd).filter(P=>P.uCub>0).sort((a,b)=>(b.vCub-b.costoS)-(a.vCub-a.costoS)).map(P=>fila(brEsc(P.nombre)+' <span class="text-hint">· '+P.uCub+' unid. · venta '+brSoles(P.vCub)+' − compra '+brSoles(P.costoS)+'</span>','<strong>'+brSoles(P.vCub-P.costoS)+'</strong>')).join('') || vacio('Aún no hay ventas con compra asignada')) +
@@ -7769,7 +7768,7 @@ async function brLoadResumen(){
       ${m('env',brSoles(envS),'Envíos registrados')}
       ${m('imp',brSoles(impS),'Impuestos registrados'+(otrS>0?' (+ '+brSoles(otrS)+' otros)':''))}
       ${m('bru',brSoles(gananciaBruta),'Ganancia bruta (venta − compra, sin gastos)','var(--green)')}
-      ${m('gan',brSoles(ganancia),'Ganancia referencial'+(gastosS>0?' (con tus gastos)':' (con flete estimado)'),'var(--green)')}</div>
+      ${m('gan',brSoles(ganancia),(gastosS>0?'Ganancia referencial (bruta − tus gastos)':'Ganancia referencial (sin gastos registrados)'),'var(--green)')}</div>
       <div class="card" id="br-res-det" style="display:none;margin-bottom:14px"></div>
       <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">🏆 Productos más vendidos <span class="text-hint" style="font-weight:400">· toca uno para ver variantes</span></div>${rankVend||vacio('Aún no hay ventas')}</div>
       <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">💰 Productos con más ganancia <span class="text-hint" style="font-weight:400">· después de costo y gastos</span></div>${rankGan||vacio('Aún no hay ventas con compra asignada')}</div>
