@@ -7661,7 +7661,7 @@ async function brLoadResumen(){
     const factor = (gastosS>0 && invS>0) ? gastosS/invS : 0;   // S/ de gasto por cada S/ de costo
     const gastoDe = (costoS, uCub) => costoS*factor;   // solo gastos reales registrados, repartidos según el costo
     let vendido=0, unidades=0, cobrado=0, porCobrar=0, unidCub=0, ventaCub=0, costoCubS=0;
-    const porProd = {}, porCanal = {}, porPed = {};
+    const porProd = {}, porCanal = {}, porPed = {}, porCli = {};
     items.forEach(i=>{
       const v = i.precio_venta*i.cantidad; vendido += v; unidades += i.cantidad;
       const pd = pedDe[i.pedido_id]; const pag = !!(pd && pd.pagado);
@@ -7681,7 +7681,14 @@ async function brLoadResumen(){
       const CP = C.prods[pk] = C.prods[pk] || {nombre:i.producto, u:0, v:0}; CP.u += i.cantidad; CP.v += v;
       const PD = porPed[i.pedido_id] = porPed[i.pedido_id] || {total:0, u:0, pagado:pag, nombre:nomPed(pd)};
       PD.total += v; PD.u += i.cantidad;
+      const cliKey = pd ? (pd.cliente_id ? 'c:'+pd.cliente_id : 'w:'+(pd.usuario_wa||'').trim().toLowerCase()) : 'x:'+i.pedido_id;
+      const CL = porCli[cliKey] = porCli[cliKey] || {nombre:nomPed(pd), total:0, u:0, peds:new Set(), pagoTodo:true, prods:{}};
+      CL.total += v; CL.u += i.cantidad; CL.peds.add(i.pedido_id); if(!pag) CL.pagoTodo = false;
+      const cpk = (i.producto||'')+' · '+((i.variante||'').trim()||'Único'); CL.prods[cpk] = (CL.prods[cpk]||0)+i.cantidad;
     });
+    const clientas = Object.values(porCli), nCli = clientas.length, nPed = Object.keys(porPed).length;
+    const nPagaron = clientas.filter(c=>c.pagoTodo).length;
+    const ticket = nPed ? vendido/nPed : 0, ticketCli = nCli ? vendido/nCli : 0;
     Object.values(porProd).forEach(P=>{ P.gasto = gastoDe(P.costoS, P.uCub); P.gan = P.vCub - P.costoS - P.gasto; Object.values(P.vars).forEach(V=>{ V.gasto = gastoDe(V.costoS, V.uCub); V.gan = V.vCub - V.costoS - V.gasto; }); });
     Object.values(porCanal).forEach(C=>{ C.gasto = gastoDe(C.costoS, C.uCub); C.gan = C.vCub - C.costoS - C.gasto; });
     const gastoAplicado = gastoDe(costoCubS, unidCub);
@@ -7739,6 +7746,15 @@ async function brLoadResumen(){
     brResDet.bru = titulo('🧮 Ganancia bruta = precio de venta − precio de compra') + '<div class="text-hint" style="font-size:12px;margin-bottom:6px">Sin envíos, impuestos ni flete. Solo ventas que ya tienen compra asignada.</div>' +
       (Object.values(porProd).filter(P=>P.uCub>0).sort((a,b)=>(b.vCub-b.costoS)-(a.vCub-a.costoS)).map(P=>fila(brEsc(P.nombre)+' <span class="text-hint">· '+P.uCub+' unid. · venta '+brSoles(P.vCub)+' − compra '+brSoles(P.costoS)+'</span>','<strong>'+brSoles(P.vCub-P.costoS)+'</strong>')).join('') || vacio('Aún no hay ventas con compra asignada')) +
       fila('<strong>Total ganancia bruta</strong>','<strong style="color:var(--green)">'+brSoles(gananciaBruta)+'</strong>');
+    brResDet.porc = detPed(false, '⏳ Por cobrar') + '<div style="height:12px"></div>' + detPed(true, '💰 Ya cobrado');
+    brResDet.falta += '<div style="height:12px"></div>' + brResDet.sobra;
+    brResDet.gan = brResDet.bru + '<div style="height:14px"></div>' + brResDet.gan;
+    brResDet.cli = titulo('👥 Clientas con pedidos ('+nCli+')') + '<div class="text-hint" style="font-size:12px;margin-bottom:6px">'+nPagaron+' pagaron todo · '+(nCli-nPagaron)+' tienen algo por cobrar</div>' +
+      (clientas.slice().sort((a,b)=>b.total-a.total).map(c=>fila(brEsc(c.nombre)+' <span class="text-hint">· '+c.u+' unid.'+(c.pagoTodo?' · ✓ pagó':' · ⏳ pendiente')+'</span>','<strong>'+brSoles(c.total)+'</strong>')).join('') || vacio('Aún no hay clientas'));
+    brResDet.tic = titulo('🎟️ Ticket promedio') +
+      fila('Vendido total', brSoles(vendido)) + fila('Pedidos', String(nPed)) + fila('<strong>Ticket promedio por pedido</strong>', '<strong>'+brSoles(ticket)+'</strong>') +
+      fila('Clientas', String(nCli)) + fila('<strong>Promedio por clienta</strong>', '<strong>'+brSoles(ticketCli)+'</strong>') +
+      '<div class="text-hint" style="font-size:11.5px;margin-top:8px">Pedido = lo que una clienta compra en un mismo pedido. Una clienta puede tener varios pedidos, por eso el promedio por clienta es mayor o igual.</div>';
     // ── Rankings y canales ──
     const maxU = Math.max(1, ...prodsOrd.map(P=>P.u));
     const topVend = prodsOrd.slice().sort((a,b)=>b.u-a.u||b.v-a.v).slice(0,10);
@@ -7754,22 +7770,23 @@ async function brLoadResumen(){
     const canales = Object.entries(porCanal).sort((a,b)=>b[1].v-a[1].v).map(([n,C])=>`<details style="border-bottom:0.5px solid var(--border);padding:6px 0"><summary style="cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:8px;list-style:none;align-items:center"><span>${brCanalBadge(n==='Sin canal'?'':n)}</span><span>${C.u} unid. · <strong>${brSoles(C.v)}</strong>${C.uCub?' · <span style="color:var(--green)">gan. '+brSoles(C.gan)+'</span>':''}</span></summary>
       <div style="padding:4px 0 8px 12px">${Object.values(C.prods).sort((a,b)=>b.v-a.v).map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>${brEsc(p.nombre)}</span><span>${p.u} unid. · ${brSoles(p.v)}</span></div>`).join('')}</div></details>`).join('');
 
-    const m = (key,val,lbl,color)=>`<div class="metric br-click" data-k="${key}" onclick="brResAbrir('${key}')"><div class="metric-val" style="${color?'color:'+color:''}">${val}</div><div class="metric-lbl">${lbl}</div><div style="font-size:10px;color:var(--text2);margin-top:6px;opacity:.7">ver detalle ›</div></div>`;
+    const topCli = clientas.slice().sort((a,b)=>b.total-a.total).slice(0,10);
+    const maxC = Math.max(1, ...topCli.map(c=>c.total));
+    const rankCli = topCli.map((c,n)=>`<details style="border-bottom:0.5px solid var(--border);padding:6px 0"><summary style="cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:8px;list-style:none"><span>${n+1}. ${brEsc(c.nombre)}</span><span><strong>${brSoles(c.total)}</strong> · ${c.u} unid. · ${c.peds.size} pedido${c.peds.size!==1?'s':''}</span></summary>${barra(c.total/maxC*100,'var(--pink)')}<div style="padding:4px 0 8px 12px">${Object.entries(c.prods).map(([k,q])=>`<div style="font-size:12px;padding:2px 0">${q}× ${brEsc(k)}</div>`).join('')}</div></details>`).join('');
+    const m = (key,val,lbl,sub,color)=>`<div class="metric br-click" data-k="${key}" onclick="brResAbrir('${key}')"><div class="metric-val" style="${color?'color:'+color:''}">${val}</div><div class="metric-lbl">${lbl}</div>${sub?`<div style="font-size:11px;color:var(--text2);margin-top:4px">${sub}</div>`:''}<div style="font-size:10px;color:var(--text2);margin-top:6px;opacity:.7">ver detalle ›</div></div>`;
     box.innerHTML = `<style>.br-click{cursor:pointer;transition:box-shadow .15s}.br-click:hover{box-shadow:0 0 0 1px var(--pink)}.br-click.act{box-shadow:0 0 0 2px var(--pink)}#br-view-resumen summary::-webkit-details-marker{display:none}</style>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><div class="text-muted text-sm">Toca cualquier tarjeta para ver el detalle.</div><button class="btn btn-sm btn-primary" onclick="brAbrirGasto()">+ Registrar gasto</button></div>
       <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
-      ${m('inv','R$ '+invRL.toFixed(2),'Invertido en compras (reales)')}
-      ${m('inv2',brSoles(invS),'Invertido (soles, 1 R$ = '+BR_TASA+')')}
-      ${m('ven',brSoles(vendido),'Vendido total ('+unidades+' unid.)')}
-      ${m('cob',brSoles(cobrado),'Ya cobrado')}
-      ${m('porc',brSoles(porCobrar),'Por cobrar')}
-      ${m('falta',faltaU+' unid.','Faltan por comprar',faltaU?'var(--pink)':'')}
-      ${m('sobra',sobraU+' unid. · '+brSoles(sobraS),'Mercadería en mano (sin vender)')}
-      ${m('env',brSoles(envS),'Envíos registrados')}
-      ${m('imp',brSoles(impS),'Impuestos registrados'+(otrS>0?' (+ '+brSoles(otrS)+' otros)':''))}
-      ${m('bru',brSoles(gananciaBruta),'Ganancia bruta (venta − compra, sin gastos)','var(--green)')}
-      ${m('gan',brSoles(ganancia),(gastosS>0?'Ganancia referencial (bruta − tus gastos)':'Ganancia referencial (sin gastos registrados)'),'var(--green)')}</div>
+      ${m('cli',nCli,'👥 Clientas con pedidos',nPagaron+' pagaron · '+(nCli-nPagaron)+' pendientes')}
+      ${m('ven',brSoles(vendido),'🛍️ Vendido total',unidades+' unid.')}
+      ${m('tic',brSoles(ticket),'🎟️ Ticket promedio','por clienta '+brSoles(ticketCli))}
+      ${m('inv',brSoles(invS),'🧾 Invertido','R$ '+invRL.toFixed(2))}
+      ${m('porc',brSoles(porCobrar),'⏳ Por cobrar','ya cobrado '+brSoles(cobrado))}
+      ${m('falta',faltaU+' unid.','🛒 Faltan por comprar','en mano: '+sobraU+' unid. · '+brSoles(sobraS),faltaU?'var(--pink)':'')}
+      ${m('gas',brSoles(gastosS),'🚚 Gastos registrados','envíos '+brSoles(envS)+' · impuestos '+brSoles(impS)+(otrS>0?' · otros '+brSoles(otrS):''))}
+      ${m('gan',brSoles(gananciaBruta),'📈 Ganancia bruta','con tus gastos: '+brSoles(ganancia),'var(--green)')}</div>
       <div class="card" id="br-res-det" style="display:none;margin-bottom:14px"></div>
+      <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">🏅 Top 10 clientas por monto <span class="text-hint" style="font-weight:400">· toca una para ver lo que compró</span></div>${rankCli||vacio('Aún no hay pedidos')}</div>
       <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">🏆 Productos más vendidos <span class="text-hint" style="font-weight:400">· toca uno para ver variantes</span></div>${rankVend||vacio('Aún no hay ventas')}</div>
       <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">💰 Productos con más ganancia <span class="text-hint" style="font-weight:400">· después de costo y gastos</span></div>${rankGan||vacio('Aún no hay ventas con compra asignada')}</div>
       <div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">Ventas por canal <span class="text-hint" style="font-weight:400">· toca uno para ver sus productos</span></div>${canales}</div>
