@@ -1300,6 +1300,7 @@ td.empty-state{padding:20px;text-align:center}
           <div class="tab" id="br-tab-comprar" onclick="brTab('comprar')">🛒 Por comprar</div>
           <div class="tab" id="br-tab-compras" onclick="brTab('compras')">🧾 Compras</div>
           <div class="tab" id="br-tab-pedidos" onclick="brTab('pedidos')">📦 Pedidos</div>
+          <div class="tab" id="br-tab-armado" onclick="brTab('armado')">🧰 Armado Lima</div>
           <div class="tab" id="br-tab-resumen" onclick="brTab('resumen')">📊 Resumen</div>
         </div>
         <div id="br-buscar-wrap" style="display:none;margin-bottom:12px;position:relative">
@@ -1335,6 +1336,7 @@ td.empty-state{padding:20px;text-align:center}
         <div id="br-view-comprar" style="display:none"></div>
         <div id="br-view-compras" style="display:none"></div>
         <div id="br-view-pedidos" style="display:none"></div>
+        <div id="br-view-armado" style="display:none"></div>
         <div id="br-view-resumen" style="display:none"></div>
       </div>
 
@@ -6996,18 +6998,19 @@ function brAplicarFiltro(){
 }
 function brTab(t){
   brTabActual = t;
-  ['registro','comprar','compras','pedidos','resumen'].forEach(k=>{
+  ['registro','comprar','compras','pedidos','armado','resumen'].forEach(k=>{
     document.getElementById('br-tab-'+k).classList.toggle('active', k===t);
     document.getElementById('br-view-'+k).style.display = k===t ? '' : 'none';
   });
   const bw = document.getElementById('br-buscar-wrap');
-  if(bw) bw.style.display = (t==='comprar'||t==='compras'||t==='pedidos') ? '' : 'none';
+  if(bw) bw.style.display = (t==='comprar'||t==='compras'||t==='pedidos'||t==='armado') ? '' : 'none';
   const bi = document.getElementById('br-buscar');
   if(bi){ bi.value = brQ; bi.placeholder = t==='compras' ? '🔍 Buscar compra por producto, variante o fecha' : t==='comprar' ? '🔍 Buscar por celular, usuario de WhatsApp o producto' : '🔍 Buscar por celular, usuario de WhatsApp o producto'; }
   if(t==='registro'){ brRenderCanales(); brCargarProductos(); }
   if(t==='comprar') brLoadComprar();
   if(t==='compras') brLoadCompras();
   if(t==='pedidos') brLoadPedidos();
+  if(t==='armado') brLoadArmado();
   if(t==='resumen') brLoadResumen();
 }
 
@@ -7593,6 +7596,151 @@ async function brDespacharSeleccion(){
     for(const p of lista) await dbPatch(`brasil_pedidos?id=eq.${p.id}`, {estado:'despachado', despachado_en:new Date().toISOString(), courier_codigo:codigo||null});
     toast('✓ Despachados'); brLoadPedidos();
   } catch(e){ toast('Error: '+e.message); }
+}
+
+// ── Armado en Lima ──
+const BR_CUIDADO_RE = /hidratante|body mist|body splash|jabon|aclarador|acladora|nalgas|corporal|desodorante|mouse|gel aromatizador|bombin|aceite|mascarilla|shampo|tonico|pack|oleo|booster|acondicionador|sprite|protector|proteina|perfume|exterminador|revive|queratina|balsamo|crema|gelatina|iluminador|kit negra|termoprotector|ternoprotector/;
+function brEsCuidado(prod){ return BR_CUIDADO_RE.test(brNorm(prod)); }
+let brArmLista = [], brArmTipo = 'ropa', brArmVerEmp = false, brArmAbrirFaltan = false;
+function brArmTipoDe(p){
+  const cu = p.items.filter(i=>brEsCuidado(i.producto)).length;
+  return cu===0 ? 'ropa' : (cu===p.items.length ? 'cuidado' : 'mixto');
+}
+async function brLoadArmado(){
+  const box = document.getElementById('br-view-armado');
+  box.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    await brSincronizarEstados();
+    const peds = await dbGet('brasil_pedidos?estado=neq.despachado&order=creado_en.asc');
+    if(!peds.length){ box.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--text2)">No hay pedidos por armar</div>'; return; }
+    const items = await dbGet(`brasil_items?pedido_id=in.(${peds.map(p=>p.id).join(',')})&order=creado_en.asc`);
+    const idsC = [...new Set(peds.map(p=>p.cliente_id).filter(Boolean))];
+    const clis = idsC.length ? await dbGet(`clientes?id=in.(${idsC.join(',')})&select=*`) : [];
+    brArmLista = peds.map(p=>({...p, items:items.filter(i=>i.pedido_id===p.id), cli: p.cliente_id ? (clis.find(c=>c.id===p.cliente_id)||{}) : {nombre:p.usuario_wa, sinCelular:true}}));
+    brArmRender();
+  } catch(e){ box.innerHTML = '<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
+}
+function brArmObjetivo(p, tipo){
+  const noOk = p.items.filter(i=>i.en_mano!==true);
+  if(tipo==='mixto'){
+    const ro = noOk.filter(i=>!brEsCuidado(i.producto));
+    if(ro.length) return {ids:ro.map(i=>i.id), label:'✅ Toda la ropa'};
+    return {ids:noOk.map(i=>i.id), label:'✅ Todo el cuidado'};
+  }
+  return {ids:noOk.map(i=>i.id), label:'✅ Todo en mano'};
+}
+function brArmRender(){
+  const box = document.getElementById('br-view-armado'); if(!box) return;
+  const todos = brArmLista.map(p=>({p, tipo:brArmTipoDe(p)}));
+  const cnt = {ropa:0, mixto:0, cuidado:0};
+  todos.forEach(x=>cnt[x.tipo]++);
+  const chips = [['ropa','👗 Solo ropa ('+cnt.ropa+')'],['mixto','🔀 Mixtos ('+cnt.mixto+')'],['cuidado','🧴 Solo cuidado ('+cnt.cuidado+')'],['todos','Todos ('+todos.length+')']]
+    .map(([k,t])=>`<button type="button" class="btn btn-sm ${brArmTipo===k?'btn-primary':''}" onclick="brArmTipo='${k}';brArmRender()">${t}</button>`).join('');
+  const enTipo = todos.filter(x=>brArmTipo==='todos' || x.tipo===brArmTipo);
+  const emp = enTipo.filter(x=>x.p.empacado_en).length;
+  const listos = enTipo.filter(x=>!x.p.empacado_en && x.p.items.every(i=>i.en_mano===true)).length;
+  const incomp = enTipo.filter(x=>!x.p.empacado_en && x.p.items.some(i=>i.en_mano===false)).length;
+  const resto = enTipo.length - emp - listos - incomp;
+  // Faltan en Lima: todo lo marcado ❌ (de todos los pedidos no despachados)
+  const falt = {};
+  brArmLista.forEach(p=>p.items.forEach(i=>{
+    if(i.en_mano!==false) return;
+    const k = brKey(i.producto, i.variante);
+    if(!falt[k]) falt[k] = {producto:i.producto, variante:i.variante, cant:0, clientas:[]};
+    falt[k].cant += i.cantidad; falt[k].clientas.push(p.cli.nombre||p.usuario_wa||'—');
+  }));
+  const fl = Object.values(falt).sort((a,b)=>a.producto.localeCompare(b.producto));
+  const totalFalt = fl.reduce((a,f)=>a+f.cant,0);
+  const faltHtml = `<div class="card" style="margin-bottom:12px;${fl.length?'border-color:var(--red)':''}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:600">❌ Faltan en Lima: ${totalFalt} prenda(s) · ${fl.length} producto(s)</div>
+      <div style="display:flex;gap:6px">${fl.length?`<button class="btn btn-xs" onclick="brArmCopiarFaltan()">📋 Copiar lista</button>`:''}
+      <button class="btn btn-xs" onclick="brArmAbrirFaltan=!brArmAbrirFaltan;brArmRender()">${brArmAbrirFaltan?'Ocultar':'Ver'}</button></div></div>
+    ${brArmAbrirFaltan ? (fl.length ? fl.map(f=>`<div style="font-size:12.5px;padding:4px 0;border-top:1px solid var(--border)"><strong>${f.cant}×</strong> ${brEsc(f.producto)}${f.variante?' · '+brEsc(f.variante):''}<div class="text-hint" style="font-size:11px">${brEsc(f.clientas.join(', '))}</div></div>`).join('') : '<div class="text-hint" style="margin-top:6px">Aún no marcaste nada como faltante.</div>') : ''}
+  </div>`;
+  const head = `<div class="pill-row" style="margin-bottom:10px">${chips}</div>
+    <div class="card" style="margin-bottom:12px;font-size:12.5px">
+      <div>📦 Empacados <strong>${emp}</strong> de ${enTipo.length} &nbsp;·&nbsp; 🟢 Listos para empacar <strong>${listos}</strong></div>
+      <div style="margin-top:2px">🔴 Incompletos <strong>${incomp}</strong> &nbsp;·&nbsp; ⚪ Por revisar <strong>${resto}</strong></div>
+      <label style="display:block;margin-top:6px"><input type="checkbox" ${brArmVerEmp?'checked':''} onchange="brArmVerEmp=this.checked;brArmRender()"> Ver también los ya empacados</label>
+    </div>`;
+  const vis = enTipo.filter(x=>brArmVerEmp || !x.p.empacado_en)
+    .sort((a,b)=>String(a.p.cli.nombre||'').localeCompare(String(b.p.cli.nombre||'')));
+  const cards = vis.map(({p,tipo})=>{
+    const c = p.cli;
+    const total = p.items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
+    const todoOk = p.items.every(i=>i.en_mano===true);
+    const hayNo = p.items.some(i=>i.en_mano===false);
+    const obj = brArmObjetivo(p, tipo);
+    const bloqueado = !!p.empacado_en;
+    const qPed = brNorm([c.nombre, c.telefono, p.usuario_wa].concat(p.items.map(i=>i.producto+' '+(i.variante||''))).join(' '));
+    const estadoBadge = p.empacado_en ? '<span class="badge badge-ok">📦 Empacado</span>' : todoOk ? '<span class="badge badge-ok">🟢 Listo</span>' : hayNo ? '<span class="badge badge-warn">🔴 Incompleto</span>' : '<span class="badge badge-gray">⚪ Por revisar</span>';
+    const filas = p.items.map(i=>{
+      const cu = brEsCuidado(i.producto);
+      const bOk = i.en_mano===true ? 'btn-primary' : '';
+      const noSt = i.en_mano===false ? 'background:var(--red);color:#fff;border-color:var(--red)' : '';
+      const btns = bloqueado ? '' : `<button class="btn btn-xs ${bOk}" onclick="brArmSet('${i.id}',true)">✅</button><button class="btn btn-xs" style="${noSt}" onclick="brArmSet('${i.id}',false)">❌</button>`;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border)">
+        <div style="flex:1;font-size:13px;min-width:0">${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${cu?'<span class="badge badge-gray">cuidado</span>':''}</div>${btns}</div>`;
+    }).join('');
+    let acciones = '';
+    if(bloqueado) acciones = `<button class="btn btn-xs" onclick="brArmDeshacer('${p.id}')">↩ Deshacer empaque</button>`;
+    else {
+      if(obj.ids.length) acciones += `<button class="btn btn-xs" onclick="brArmTodo('${p.id}')">${obj.label}</button>`;
+      if(todoOk) acciones += `<button class="btn btn-sm btn-primary" onclick="brArmEmpacar('${p.id}')">📦 Empacado</button>`;
+    }
+    return `<div class="card br-fil-row" data-q="${brEsc(qPed)}" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+        <div style="font-size:14px;font-weight:600">${brEsc(c.nombre||'Sin nombre')} ${c.sinCelular?'<span class="badge badge-warn">sin celular</span>':`<span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span>`}</div>
+        ${estadoBadge}</div>
+      ${filas}
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <label style="font-size:12.5px"><input type="checkbox" ${p.pagado?'checked':''} onchange="brArmPagado('${p.id}',this.checked)"> 💰 Pagó · <strong>${brSoles(total)}</strong></label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${acciones}</div></div>
+    </div>`;
+  }).join('');
+  box.innerHTML = faltHtml + head + (cards || '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">No hay pedidos en esta lista 🎉</div>');
+  brAplicarFiltro();
+}
+function brArmBuscar(pid){ return brArmLista.find(p=>p.id===pid); }
+async function brArmSet(itemId, v){
+  let it=null; brArmLista.forEach(p=>p.items.forEach(i=>{ if(i.id===itemId) it=i; }));
+  if(!it) return;
+  const nuevo = it.en_mano===v ? null : v;
+  try { await dbPatch(`brasil_items?id=eq.${itemId}`, {en_mano:nuevo}); it.en_mano = nuevo; brArmRender(); }
+  catch(e){ toast('Error: '+e.message); }
+}
+async function brArmTodo(pid){
+  const p = brArmBuscar(pid); if(!p) return;
+  const obj = brArmObjetivo(p, brArmTipoDe(p));
+  try {
+    for(const id of obj.ids) await dbPatch(`brasil_items?id=eq.${id}`, {en_mano:true});
+    p.items.forEach(i=>{ if(obj.ids.includes(i.id)) i.en_mano = true; });
+    brArmRender();
+  } catch(e){ toast('Error: '+e.message); }
+}
+async function brArmEmpacar(pid){
+  const p = brArmBuscar(pid); if(!p) return;
+  if(!p.items.every(i=>i.en_mano===true)){ toast('Faltan prendas por marcar ✅'); return; }
+  const ahora = new Date().toISOString();
+  try { await dbPatch(`brasil_pedidos?id=eq.${pid}`, {empacado_en:ahora, estado:'listo_lima'}); p.empacado_en = ahora; p.estado='listo_lima'; toast('📦 Pedido empacado'); brArmRender(); }
+  catch(e){ toast('Error: '+e.message); }
+}
+async function brArmDeshacer(pid){
+  const p = brArmBuscar(pid); if(!p) return;
+  try { await dbPatch(`brasil_pedidos?id=eq.${pid}`, {empacado_en:null, estado:'comprado'}); p.empacado_en = null; p.estado='comprado'; brArmRender(); }
+  catch(e){ toast('Error: '+e.message); }
+}
+async function brArmPagado(pid, v){
+  const p = brArmBuscar(pid);
+  try { await dbPatch(`brasil_pedidos?id=eq.${pid}`, {pagado:v}); if(p) p.pagado = v; toast(v?'✓ Marcado como pagado':'Pago desmarcado'); }
+  catch(e){ toast('Error: '+e.message); }
+}
+function brArmCopiarFaltan(){
+  const f = {};
+  brArmLista.forEach(p=>p.items.forEach(i=>{ if(i.en_mano!==false) return; const k=brKey(i.producto,i.variante); if(!f[k]) f[k]={t:i.producto+(i.variante?' · '+i.variante:''), c:0}; f[k].c += i.cantidad; }));
+  const txt = Object.values(f).sort((a,b)=>a.t.localeCompare(b.t)).map(x=>x.c+'× '+x.t).join('\n');
+  navigator.clipboard.writeText(txt).then(()=>toast('✓ Lista copiada')).catch(()=>toast('No se pudo copiar'));
 }
 
 // ── Resumen ──
