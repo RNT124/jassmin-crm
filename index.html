@@ -612,13 +612,25 @@ td.empty-state{padding:20px;text-align:center}
       <div class="f5-subtitle">Registra tus datos</div>
     </div>
     <div class="f5-card">
+      <div id="rg-br-items" style="display:none"></div>
+      <div id="rg-br-ok-wrap" style="display:none">
+        <div class="f5-body">
+          <div class="f5-title">¡Hola, <span id="rg-br-ok-nombre"></span>! 👋</div>
+          <div style="background:#F1EFE8;border-radius:10px;padding:14px;text-align:left;margin-bottom:16px">
+            <div style="font-size:11px;color:#9C9A92;margin-bottom:6px">TUS DATOS REGISTRADOS</div>
+            <div id="rg-br-ok-detalle" style="font-size:12.5px;color:#1A1A18;line-height:1.8"></div>
+          </div>
+          <button class="f5-btn-full" onclick="rgBrConfirmar()">✅ Están correctos</button>
+          <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A;margin-top:8px" onclick="rgBrActualizar()">✏️ Actualizar mis datos</button>
+        </div>
+      </div>
 
       <!-- PASO 0: buscar por teléfono -->
       <div id="rg-buscar-wrap">
         <div class="f5-body">
-          <div class="f5-title">Tus datos de envío 🌸</div>
-          <div class="f5-desc">Ingresa tu número para ver si ya estás registrada, o crear tus datos por primera vez.</div>
-          <label class="f5-label">Tu número WhatsApp *</label>
+          <div class="f5-title" id="rg-buscar-title">Tus datos de envío 🌸</div>
+          <div class="f5-desc" id="rg-buscar-desc">Ingresa tu número para ver si ya estás registrada, o crear tus datos por primera vez.</div>
+          <label class="f5-label" id="rg-buscar-label">Tu número WhatsApp *</label>
           <input class="f5-input" id="rg-buscar-tel" placeholder="987 654 321" type="tel" maxlength="12">
           <div class="f5-error" id="rg-buscar-error"></div>
           <button class="f5-btn-full" onclick="rgBuscar()">Continuar →</button>
@@ -705,7 +717,7 @@ td.empty-state{padding:20px;text-align:center}
         <div class="f5-success">
           <div class="f5-success-icon">✅</div>
           <div style="font-size:18px;font-weight:700;color:#1A1A18;margin-bottom:6px">¡Datos guardados!</div>
-          <div style="font-size:12.5px;color:#5F5E5A;margin-bottom:16px;line-height:1.6">Ya puedes comprar en nuestros lives sin preocuparte por llenar tu dirección cada vez.</div>
+          <div id="rg-confirm-msg" style="font-size:12.5px;color:#5F5E5A;margin-bottom:16px;line-height:1.6">Ya puedes comprar en nuestros lives sin preocuparte por llenar tu dirección cada vez.</div>
           <div style="background:#F1EFE8;border-radius:10px;padding:14px;text-align:left;margin-bottom:16px">
             <div style="font-size:11px;color:#9C9A92;margin-bottom:6px">TUS DATOS</div>
             <div id="rg-confirm-detalle" style="font-size:12.5px;color:#1A1A18;line-height:1.8"></div>
@@ -717,6 +729,7 @@ td.empty-state{padding:20px;text-align:center}
             <div style="font-size:11px;color:#9C9A92;margin-top:6px;text-align:center">Le avisamos a nuestro equipo para que programe tu envío cuanto antes</div>
             <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A;margin-top:8px" onclick="rgConfirmarAcumular('rg-confirm')">🛍️ Prefiero seguir acumulando</button>
           </div>
+          <button id="rg-br-wa" class="f5-btn-full" style="display:none;background:#25D366;margin-bottom:8px" onclick="rgBrAbrirWA()">📲 Enviar mis datos por WhatsApp</button>
           <button class="f5-btn-full" style="background:#F1EFE8;color:#5F5E5A" onclick="rgEditar()">Actualizar mis datos</button>
           <div style="font-size:12px;color:#9C9A92;margin-top:8px">¿Dudas? Escríbenos al <strong style="color:#1A1A18">921 328 731</strong></div>
         </div>
@@ -1301,6 +1314,7 @@ td.empty-state{padding:20px;text-align:center}
           <div class="tab" id="br-tab-compras" onclick="brTab('compras')">🧾 Compras</div>
           <div class="tab" id="br-tab-pedidos" onclick="brTab('pedidos')">📦 Pedidos</div>
           <div class="tab" id="br-tab-armado" onclick="brTab('armado')">🧰 Armado Lima</div>
+          <div class="tab" id="br-tab-datos" onclick="brTab('datos')">📝 Datos</div>
           <div class="tab" id="br-tab-resumen" onclick="brTab('resumen')">📊 Resumen</div>
         </div>
         <div id="br-buscar-wrap" style="display:none;margin-bottom:12px;position:relative">
@@ -1337,6 +1351,7 @@ td.empty-state{padding:20px;text-align:center}
         <div id="br-view-compras" style="display:none"></div>
         <div id="br-view-pedidos" style="display:none"></div>
         <div id="br-view-armado" style="display:none"></div>
+        <div id="br-view-datos" style="display:none"></div>
         <div id="br-view-resumen" style="display:none"></div>
       </div>
 
@@ -6308,6 +6323,7 @@ function showRegistro(){
 }
 
 async function rgBuscar(){
+  if(rgModoBrasil) return rgBrBuscar();
   const tel = document.getElementById('rg-buscar-tel').value.replace(/\D/g,'');
   const errEl = document.getElementById('rg-buscar-error');
   if(tel.length < 9){ errEl.textContent='Ingresa tu número de WhatsApp (9 dígitos).'; errEl.style.display='block'; return; }
@@ -6431,7 +6447,7 @@ function rgGetAgenciaShalom(){
 
 async function rgGuardar(){
   const nombre = document.getElementById('rg-nombre').value.trim();
-  const tel = document.getElementById('rg-tel').value.replace(/\D/g,'');
+  const tel = rgModoBrasil ? rgBrNormTel(document.getElementById('rg-tel').value) : document.getElementById('rg-tel').value.replace(/\D/g,'');
   const dni = document.getElementById('rg-dni').value.trim();
   const errEl = document.getElementById('rg-error');
   if(!nombre){ errEl.textContent='Ingresa tu nombre completo.'; errEl.style.display='block'; return; }
@@ -6478,6 +6494,7 @@ async function rgGuardar(){
   } catch(e) {
     errEl.textContent='Error guardando: '+e.message; errEl.style.display='block'; return;
   }
+  if(rgModoBrasil){ try { await rgBrVincular(); } catch(e){ errEl.textContent='Error vinculando tu pedido: '+e.message; errEl.style.display='block'; return; } }
   document.getElementById('rg-form-wrap').style.display='none';
   document.getElementById('rg-confirm-wrap').style.display='block';
   document.getElementById('rg-confirm-detalle').innerHTML = rgCourier==='shalom'
@@ -6497,6 +6514,7 @@ async function rgGuardar(){
       if(notaInput) notaInput.value='';
     } catch(e){}
   }
+  if(rgModoBrasil) rgBrPostGuardar();
 }
 
 function rgEditar(){
@@ -6998,12 +7016,12 @@ function brAplicarFiltro(){
 }
 function brTab(t){
   brTabActual = t;
-  ['registro','comprar','compras','pedidos','armado','resumen'].forEach(k=>{
+  ['registro','comprar','compras','pedidos','armado','datos','resumen'].forEach(k=>{
     document.getElementById('br-tab-'+k).classList.toggle('active', k===t);
     document.getElementById('br-view-'+k).style.display = k===t ? '' : 'none';
   });
   const bw = document.getElementById('br-buscar-wrap');
-  if(bw) bw.style.display = (t==='comprar'||t==='compras'||t==='pedidos'||t==='armado') ? '' : 'none';
+  if(bw) bw.style.display = (t==='comprar'||t==='compras'||t==='pedidos'||t==='armado'||t==='datos') ? '' : 'none';
   const bi = document.getElementById('br-buscar');
   if(bi){ bi.value = brQ; bi.placeholder = t==='compras' ? '🔍 Buscar compra por producto, variante o fecha' : t==='comprar' ? '🔍 Buscar por celular, usuario de WhatsApp o producto' : '🔍 Buscar por celular, usuario de WhatsApp o producto'; }
   if(t==='registro'){ brRenderCanales(); brCargarProductos(); }
@@ -7011,6 +7029,7 @@ function brTab(t){
   if(t==='compras') brLoadCompras();
   if(t==='pedidos') brLoadPedidos();
   if(t==='armado') brLoadArmado();
+  if(t==='datos') brLoadDatos();
   if(t==='resumen') brLoadResumen();
 }
 
@@ -7598,6 +7617,165 @@ async function brDespacharSeleccion(){
   } catch(e){ toast('Error: '+e.message); }
 }
 
+// ── Datos de envío de clientas de Brasil (link público ?datos) ──
+let rgModoBrasil = false, rgBrPeds = [], rgBrItems = [], rgBrCli = null, rgBrBusqueda = '';
+const BR_WA_NEGOCIO = '51961724293';
+const BR_LINK_DATOS = 'https://rnt124.github.io/jassmin-crm/?datos';
+function rgBrEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function rgBrNormTel(v){ let d=String(v||'').replace(/\D/g,''); if(d.length>9 && d.indexOf('51')===0) d=d.slice(2); return d; }
+function showDatosBrasil(){
+  rgModoBrasil = true;
+  showRegistro();
+  const q = (id,t)=>{ const e=document.getElementById(id); if(e) e.innerHTML=t; };
+  q('rg-buscar-title','Completa tus datos de envío 📦');
+  q('rg-buscar-desc','Escribe el celular con el que compraste en el live. Si no lo tenemos, escribe tu usuario de WhatsApp.');
+  q('rg-buscar-label','Tu celular o usuario de WhatsApp *');
+  const inp = document.getElementById('rg-buscar-tel');
+  inp.type='text'; inp.maxLength=40; inp.placeholder='987 654 321 o tu usuario';
+  inp.setAttribute('autocapitalize','none'); inp.setAttribute('autocorrect','off'); inp.setAttribute('spellcheck','false');
+  const t = document.getElementById('rg-tel'); t.removeAttribute('readonly'); t.style.background=''; t.placeholder='987 654 321';
+}
+async function rgBrBuscar(){
+  const raw = document.getElementById('rg-buscar-tel').value.trim();
+  const errEl = document.getElementById('rg-buscar-error');
+  errEl.style.display='none';
+  if(!raw){ errEl.textContent='Escribe tu celular o tu usuario de WhatsApp.'; errEl.style.display='block'; return; }
+  const tieneLetras = /[a-zA-ZñÑ]/.test(raw);
+  rgBrBusqueda = raw; rgBrCli = null; rgBrPeds = []; rgBrItems = [];
+  let tel = '';
+  try {
+    if(!tieneLetras){
+      tel = rgBrNormTel(raw);
+      if(tel.length<9){ errEl.textContent='Escribe tu celular de 9 dígitos o tu usuario de WhatsApp.'; errEl.style.display='block'; return; }
+      const cs = await dbGet(`clientes?telefono=in.(${tel},51${tel})&select=*`);
+      if(cs && cs.length){
+        rgBrCli = cs[0];
+        rgBrPeds = await dbGet(`brasil_pedidos?cliente_id=in.(${cs.map(c=>c.id).join(',')})&estado=neq.despachado&select=*`);
+      }
+    } else {
+      const u = raw.replace(/[%*_,()\\"]/g,'').replace(/^@+/,'').trim();
+      if(u.length<2){ errEl.textContent='Escribe tu usuario completo.'; errEl.style.display='block'; return; }
+      rgBrPeds = await dbGet(`brasil_pedidos?estado=neq.despachado&or=(usuario_wa.ilike.${encodeURIComponent(u)},usuario_wa.ilike.${encodeURIComponent('@'+u)})&select=*`);
+      const conCli = rgBrPeds.find(p=>p.cliente_id);
+      if(conCli){ const cs = await dbGet(`clientes?id=eq.${conCli.cliente_id}&select=*`); if(cs && cs.length) rgBrCli = cs[0]; }
+    }
+  } catch(e){
+    errEl.textContent='Error buscando tu pedido: '+e.message; errEl.style.display='block'; return;
+  }
+  if(!rgBrPeds.length){
+    const msg = encodeURIComponent('Hola! No encuentro mi pedido en el formulario. Mi dato: '+raw);
+    errEl.innerHTML = (tieneLetras ? 'No encontramos pedidos con ese usuario.' : 'No encontramos pedidos con ese celular. Si compraste con tu usuario de WhatsApp, escríbelo en lugar del celular.')
+      + ` <a href="https://wa.me/${BR_WA_NEGOCIO}?text=${msg}" style="color:#B3184A;font-weight:600">Escríbenos por WhatsApp</a>`;
+    errEl.style.display='block'; return;
+  }
+  try { rgBrItems = await dbGet(`brasil_items?pedido_id=in.(${rgBrPeds.map(p=>p.id).join(',')})&select=*`); } catch(e){ rgBrItems = []; }
+  const box = document.getElementById('rg-br-items');
+  const nPren = rgBrItems.reduce((a,i)=>a+(i.cantidad||1),0);
+  box.innerHTML = `<div class="f5-body" style="padding-bottom:0"><div style="background:#FBEFF3;border-radius:10px;padding:12px 14px;text-align:left">
+    <div style="font-size:11px;color:#B3184A;margin-bottom:6px;font-weight:600">🛍️ LO QUE COMPRASTE (${nPren})</div>
+    ${rgBrItems.map(i=>`<div style="font-size:12.5px;color:#1A1A18;line-height:1.7">${i.cantidad||1}× ${rgBrEsc(i.producto)}${i.variante?' · '+rgBrEsc(i.variante):''}</div>`).join('') || '<div style="font-size:12.5px">—</div>'}
+    <div style="font-size:11px;color:#9C9A92;margin-top:6px">Si algo no es tuyo, avísanos por WhatsApp.</div></div></div>`;
+  box.style.display='block';
+  document.getElementById('rg-buscar-wrap').style.display='none';
+  if(rgBrCli && rgBrCli.direccion && rgBrCli.tipo_envio_preferido){
+    rgClienteActual = rgBrCli;
+    const c = rgBrCli, esShalom = c.tipo_envio_preferido.startsWith('shalom');
+    const dir = String(c.direccion||'');
+    const dirMask = esShalom ? dir : (dir.slice(0,6)+'…');
+    const dniMask = c.dni ? '••••••'+String(c.dni).slice(-2) : '—';
+    document.getElementById('rg-br-ok-nombre').textContent = String(c.nombre||'').split(' ')[0] || '';
+    document.getElementById('rg-br-ok-detalle').innerHTML = esShalom
+      ? `<strong>Shalom</strong><br>${rgBrEsc(dirMask)}<br>${rgBrEsc(c.distrito||'')}<br>DNI: ${dniMask}`
+      : `<strong>Motorizado</strong><br>${rgBrEsc(dirMask)}<br>${rgBrEsc(c.distrito||'')}<br>DNI: ${dniMask}`;
+    document.getElementById('rg-br-ok-wrap').style.display='block';
+  } else {
+    rgClienteActual = rgBrCli || null;
+    const tf = rgBrCli?.telefono ? rgBrNormTel(rgBrCli.telefono) : tel;
+    rgMostrarFormNuevo(tf||'');
+  }
+}
+function rgBrActualizar(){
+  document.getElementById('rg-br-ok-wrap').style.display='none';
+  rgMostrarFormNuevo(rgBrNormTel(rgBrCli?.telefono||''));
+}
+async function rgBrConfirmar(){
+  try {
+    await dbPatch(`brasil_pedidos?id=in.(${rgBrPeds.map(p=>p.id).join(',')})`, {datos_en:new Date().toISOString()});
+  } catch(e){ alert('Error: '+e.message); return; }
+  const c = rgBrCli;
+  document.getElementById('rg-br-ok-wrap').style.display='none';
+  document.getElementById('rg-confirm-wrap').style.display='block';
+  const esShalom = (c.tipo_envio_preferido||'').startsWith('shalom');
+  document.getElementById('rg-confirm-detalle').innerHTML = `<strong>${rgBrEsc(c.nombre||'')}</strong><br>${esShalom?'Shalom: ':''}${rgBrEsc(c.direccion||'')}<br>${rgBrEsc(c.distrito||'')}<br><span style="color:var(--text3)">WA: ${rgBrEsc(c.telefono||'')}</span>`;
+  rgBrPostGuardar();
+}
+async function rgBrVincular(){
+  if(!rgBrPeds.length || !rgClienteActual?.id) return;
+  await dbPatch(`brasil_pedidos?id=in.(${rgBrPeds.map(p=>p.id).join(',')})`, {cliente_id:rgClienteActual.id, datos_en:new Date().toISOString()});
+}
+function rgBrPostGuardar(){
+  const u = document.getElementById('rg-confirm-urgente-wrap'); if(u) u.style.display='none';
+  rgPedidoActivoId = null;
+  const m = document.getElementById('rg-confirm-msg');
+  if(m) m.textContent = 'Listo, ya tenemos tus datos. Te avisaremos cuando tu pedido salga.';
+  const b = document.getElementById('rg-br-wa'); if(b) b.style.display='block';
+  setTimeout(rgBrAbrirWA, 1500);
+}
+function rgBrAbrirWA(){
+  const c = rgClienteActual || rgBrCli; if(!c) return;
+  const esShalom = (c.tipo_envio_preferido||'').startsWith('shalom');
+  const envioTxt = esShalom
+    ? `Shalom — ${c.direccion||''} · ${c.distrito||''}${c.dni?`\nDNI: ${c.dni}`:''}`
+    : `Motorizado — ${c.direccion||''}${c.referencia?' ('+c.referencia+')':''} · ${c.distrito||''}${c.dni?`\nDNI: ${c.dni}`:''}`;
+  const nPren = rgBrItems.reduce((a,i)=>a+(i.cantidad||1),0);
+  const msg = `Hola! Soy ${c.nombre||''} (WA: ${c.telefono||''}).\nYa completé mis datos de envío ✅${nPren?`\nMi pedido: ${nPren} prenda(s)/producto(s)`:''}\n\n${envioTxt}`;
+  window.location.href = `https://wa.me/${BR_WA_NEGOCIO}?text=${encodeURIComponent(msg)}`;
+}
+
+// ── Datos pendientes (vista interna) ──
+async function brLoadDatos(){
+  const box = document.getElementById('br-view-datos');
+  box.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    const peds = await dbGet('brasil_pedidos?estado=neq.despachado&order=creado_en.asc');
+    const items = peds.length ? await dbGet(`brasil_items?pedido_id=in.(${peds.map(p=>p.id).join(',')})&select=pedido_id,cantidad`) : [];
+    const idsC = [...new Set(peds.map(p=>p.cliente_id).filter(Boolean))];
+    const clis = idsC.length ? await dbGet(`clientes?id=in.(${idsC.join(',')})&select=*`) : [];
+    const grupos = {};
+    peds.forEach(p=>{
+      const k = p.cliente_id ? 'c:'+p.cliente_id : 'u:'+brNorm(p.usuario_wa||'');
+      if(!grupos[k]) grupos[k] = {cli: p.cliente_id ? (clis.find(c=>c.id===p.cliente_id)||{}) : null, usuario:p.usuario_wa, peds:[], prendas:0};
+      grupos[k].peds.push(p);
+      grupos[k].prendas += items.filter(i=>i.pedido_id===p.id).reduce((a,i)=>a+i.cantidad,0);
+    });
+    const lista = Object.values(grupos);
+    const tieneDatos = g=> !!(g.cli && g.cli.direccion && String(g.cli.direccion).trim());
+    const pend = lista.filter(g=>!tieneDatos(g)).sort((a,b)=>String(a.cli?.nombre||a.usuario||'').localeCompare(String(b.cli?.nombre||b.usuario||'')));
+    const ok = lista.filter(tieneDatos);
+    const porLink = lista.filter(g=>g.peds.some(p=>p.datos_en)).length;
+    const pedPend = pend.reduce((a,g)=>a+g.peds.length,0);
+    const msgDifusion = 'Hola chicas 🌸 Para enviar sus pedidos necesito sus datos de envío. Entra a este link, escribe tu celular (o tu usuario de WhatsApp) y completa tus datos 👇\n'+BR_LINK_DATOS+'\n¡Gracias! 💕';
+    window.brMsgDifusion = msgDifusion;
+    const head = `<div class="card" style="margin-bottom:12px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">📝 Datos de envío</div>
+      <div style="font-size:12.5px;line-height:1.8">🔴 Faltan <strong>${pend.length}</strong> clientas (${pedPend} pedidos)<br>🟢 Con datos <strong>${ok.length}</strong> clientas · ${porLink} lo llenaron por el link</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText(window.brMsgDifusion).then(()=>toast('✓ Mensaje con link copiado')).catch(()=>toast('No se pudo copiar'))">📋 Copiar mensaje con link</button>
+        <button class="btn btn-sm" onclick="navigator.clipboard.writeText('${BR_LINK_DATOS}').then(()=>toast('✓ Link copiado')).catch(()=>toast('No se pudo copiar'))">🔗 Solo el link</button></div></div>`;
+    const filas = pend.map(g=>{
+      const nom = g.cli?.nombre || g.usuario || 'Sin nombre';
+      const tel = g.cli?.telefono ? rgBrNormTel(g.cli.telefono) : '';
+      const q = brNorm([nom, g.usuario, tel].join(' '));
+      const wa = tel ? `<a class="btn btn-xs" target="_blank" href="https://wa.me/51${tel}?text=${encodeURIComponent('Hola! Para enviar tu pedido necesito tus datos de envío 🌸 Complétalos aquí: '+BR_LINK_DATOS)}">💬 WhatsApp</a>` : '<span class="badge badge-warn">solo usuario</span>';
+      return `<div class="card br-fil-row" data-q="${brEsc(q)}" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="min-width:0"><div style="font-size:13.5px;font-weight:600">${brEsc(nom)}</div>
+        <div class="text-hint" style="font-size:11.5px">${tel?brEsc(tel)+' · ':''}${g.usuario&&g.cli?.nombre?brEsc(g.usuario)+' · ':''}${g.prendas} producto(s) · ${g.peds.length} pedido(s)</div></div>${wa}</div>`;
+    }).join('');
+    box.innerHTML = head + (filas || '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">¡Todas las clientas tienen sus datos! 🎉</div>');
+    brAplicarFiltro();
+  } catch(e){ box.innerHTML = '<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
+}
+
 // ── Armado en Lima ──
 const BR_CUIDADO_RE = /hidratante|body mist|body splash|jabon|aclarador|acladora|nalgas|corporal|desodorante|mouse|gel aromatizador|bombin|aceite|mascarilla|shampo|tonico|pack|oleo|booster|acondicionador|sprite|protector|proteina|perfume|exterminador|revive|queratina|balsamo|crema|gelatina|iluminador|kit negra|termoprotector|ternoprotector/;
 function brEsCuidado(prod){ return BR_CUIDADO_RE.test(brNorm(prod)); }
@@ -8183,9 +8361,11 @@ async function renderAsistenciaAdmin(){
   const trk=params.get('tracking');
   const reg=params.get('registro');
   const seg=params.get('seguimiento');
+  const dat=params.get('datos');
   if(trk){ showTracking(trk); }
   else if(reg!==null){ showRegistro(); }
   else if(seg!==null){ showSeguimiento(); }
+  else if(dat!==null){ showDatosBrasil(); }
 })();
 </script>
 </body>
