@@ -1314,6 +1314,7 @@ td.empty-state{padding:20px;text-align:center}
           <div class="tab" id="br-tab-compras" onclick="brTab('compras')">🧾 Compras</div>
           <div class="tab" id="br-tab-pedidos" onclick="brTab('pedidos')">📦 Pedidos</div>
           <div class="tab" id="br-tab-armado" onclick="brTab('armado')">🧰 Armado Lima</div>
+          <div class="tab" id="br-tab-envios" onclick="brTab('envios')">🚚 Envíos</div>
           <div class="tab" id="br-tab-datos" onclick="brTab('datos')">📝 Datos</div>
           <div class="tab" id="br-tab-resumen" onclick="brTab('resumen')">📊 Resumen</div>
         </div>
@@ -1351,6 +1352,7 @@ td.empty-state{padding:20px;text-align:center}
         <div id="br-view-compras" style="display:none"></div>
         <div id="br-view-pedidos" style="display:none"></div>
         <div id="br-view-armado" style="display:none"></div>
+        <div id="br-view-envios" style="display:none"></div>
         <div id="br-view-datos" style="display:none"></div>
         <div id="br-view-resumen" style="display:none"></div>
       </div>
@@ -7016,12 +7018,12 @@ function brAplicarFiltro(){
 }
 function brTab(t){
   brTabActual = t;
-  ['registro','comprar','compras','pedidos','armado','datos','resumen'].forEach(k=>{
+  ['registro','comprar','compras','pedidos','armado','envios','datos','resumen'].forEach(k=>{
     document.getElementById('br-tab-'+k).classList.toggle('active', k===t);
     document.getElementById('br-view-'+k).style.display = k===t ? '' : 'none';
   });
   const bw = document.getElementById('br-buscar-wrap');
-  if(bw) bw.style.display = (t==='comprar'||t==='compras'||t==='pedidos'||t==='armado'||t==='datos') ? '' : 'none';
+  if(bw) bw.style.display = (t==='comprar'||t==='compras'||t==='pedidos'||t==='armado'||t==='envios'||t==='datos') ? '' : 'none';
   const bi = document.getElementById('br-buscar');
   if(bi){ bi.value = brQ; bi.placeholder = t==='compras' ? '🔍 Buscar compra por producto, variante o fecha' : t==='comprar' ? '🔍 Buscar por celular, usuario de WhatsApp o producto' : '🔍 Buscar por celular, usuario de WhatsApp o producto'; }
   if(t==='registro'){ brRenderCanales(); brCargarProductos(); }
@@ -7029,6 +7031,7 @@ function brTab(t){
   if(t==='compras') brLoadCompras();
   if(t==='pedidos') brLoadPedidos();
   if(t==='armado') brLoadArmado();
+  if(t==='envios') brLoadEnvios();
   if(t==='datos') brLoadDatos();
   if(t==='resumen') brLoadResumen();
 }
@@ -7581,9 +7584,9 @@ function brSeleccionados(){
   const ids = [...document.querySelectorAll('.br-sel:checked')].map(x=>x.value);
   return brPedLista.filter(p=>ids.includes(p.id));
 }
-function brExcelMotorizado(){
-  const lista = brSeleccionados();
-  if(!lista.length){ toast('Selecciona pedidos "Listo en Lima"'); return; }
+function brExcelMotorizado(lista0){
+  const lista = Array.isArray(lista0) ? lista0 : brSeleccionados();
+  if(!lista.length){ toast('Selecciona pedidos de la lista'); return; }
   if(lista.some(p=>p.cli.sinCelular)){ toast('⚠️ Hay clientas sin celular — agrégalo primero con "📱 Agregar celular"'); return; }
   if(lista.some(p=>(p.cli.tipo_envio_preferido||'').startsWith('shalom'))){ toast('⚠️ Hay clientas de Shalom seleccionadas — el Excel es solo para motorizado'); return; }
   const hoy = new Date();
@@ -7603,8 +7606,8 @@ function brExcelMotorizado(){
   XLSX.writeFile(wb, 'brasil-motorizado-'+hoy.toISOString().slice(0,10)+'.xlsx');
   toast('✓ Excel descargado — '+lista.length+' pedido(s)');
 }
-async function brDespacharSeleccion(){
-  const lista = brSeleccionados();
+async function brDespacharSeleccion(lista0){
+  const lista = Array.isArray(lista0) ? lista0 : brSeleccionados();
   if(!lista.length){ toast('Selecciona pedidos "Listo en Lima"'); return; }
   if(lista.some(p=>p.cli.sinCelular)){ toast('⚠️ Hay clientas sin celular — agrégalo primero con "📱 Agregar celular"'); return; }
   const sinPago = lista.filter(p=>!p.pagado);
@@ -7613,7 +7616,7 @@ async function brDespacharSeleccion(){
   const codigo = prompt('Código de seguimiento (vacío si no aplica):') || '';
   try {
     for(const p of lista) await dbPatch(`brasil_pedidos?id=eq.${p.id}`, {estado:'despachado', despachado_en:new Date().toISOString(), courier_codigo:codigo||null});
-    toast('✓ Despachados'); brLoadPedidos();
+    toast('✓ Despachados'); if(brTabActual==='envios') brLoadEnvios(); else brLoadPedidos();
   } catch(e){ toast('Error: '+e.message); }
 }
 
@@ -7775,6 +7778,92 @@ async function brLoadDatos(){
     brAplicarFiltro();
   } catch(e){ box.innerHTML = '<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
+
+// ── Tablero de envíos (recorrido de cada pedido) ──
+const BR_LLEGADA_TXT = '9 de noviembre';
+const BR_ENVIO_MOTO = 14;
+let brEnvLista = [], brEnvEtapa = 'listo', brEnvDesp = 0;
+const BR_ETAPAS = [['comprar','🛒 Por comprar'],['camino','🇧🇷 Esperando llegada'],['faltan','🔴 Faltan prendas'],['enlima','📍 En Lima · empacar'],['sindatos','📦 Empacado · sin datos'],['listo','✅ Listo para despachar']];
+function brEnvEsShalom(p){ return (p.cli?.tipo_envio_preferido||'').startsWith('shalom'); }
+function brEnvEtapaDe(p){
+  p.tieneDatos = !!(p.cli && p.cli.direccion && String(p.cli.direccion).trim());
+  if(p.empacado_en) return p.tieneDatos ? 'listo' : 'sindatos';
+  if(p.items.length && p.items.every(i=>i.en_mano===true)) return 'enlima';
+  if(p.items.some(i=>i.en_mano===false)) return 'faltan';
+  if(p.estado==='por_comprar') return 'comprar';
+  return 'camino';
+}
+async function brLoadEnvios(){
+  const box = document.getElementById('br-view-envios');
+  box.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    await brSincronizarEstados();
+    const peds = await dbGet('brasil_pedidos?estado=neq.despachado&order=creado_en.asc');
+    const desp = await dbGet('brasil_pedidos?estado=eq.despachado&select=id');
+    brEnvDesp = desp.length;
+    const items = peds.length ? await dbGet(`brasil_items?pedido_id=in.(${peds.map(p=>p.id).join(',')})&order=creado_en.asc`) : [];
+    const idsC = [...new Set(peds.map(p=>p.cliente_id).filter(Boolean))];
+    const clis = idsC.length ? await dbGet(`clientes?id=in.(${idsC.join(',')})&select=*`) : [];
+    brEnvLista = peds.map(p=>({...p, items:items.filter(i=>i.pedido_id===p.id), cli: p.cliente_id ? (clis.find(c=>c.id===p.cliente_id)||{}) : {nombre:p.usuario_wa, sinCelular:true}}));
+    brEnvLista.forEach(p=>{ p.etapa = brEnvEtapaDe(p); });
+    brEnvRender();
+  } catch(e){ box.innerHTML = '<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
+}
+function brEnvCard(p, sel){
+  const c = p.cli, shalom = brEnvEsShalom(p);
+  const tel = c.telefono ? rgBrNormTel(c.telefono) : '';
+  const prendas = p.items.map(i=>`${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''}`).join(' + ');
+  const total = p.items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
+  const q = brNorm([c.nombre, c.telefono, p.usuario_wa, c.distrito].concat(p.items.map(i=>i.producto+' '+(i.variante||''))).join(' '));
+  const chk = sel ? `<input type="checkbox" class="br-env-sel" data-t="${shalom?'shalom':'moto'}" value="${p.id}" style="width:auto;display:inline-block;vertical-align:middle;margin-right:6px">` : '';
+  let extra = '';
+  if(p.etapa==='listo'){
+    extra = `<div class="text-hint" style="font-size:11.5px;margin:2px 0">${shalom?'📦 Shalom — ':'🏍️ '}${brEsc(c.direccion||'')}${c.distrito?' ('+brEsc(c.distrito)+')':''}</div>
+      <div style="font-size:12px;margin-top:4px">${shalom?'💵 Envío: lo paga en la agencia':`💵 Cobrar al entregar: <strong>S/ ${BR_ENVIO_MOTO}</strong>`} · ${p.pagado?'💰 prendas pagadas':'<span style="color:var(--red)">⚠️ pago de prendas sin marcar</span>'}</div>`;
+  }
+  if(p.etapa==='sindatos' && tel){
+    const msg = 'Hola 🌸 ¡Tu pedido de ropa ya está listo y empacado! Para solicitar tu envío completa tus datos aquí: '+BR_LINK_DATOS+' (motorizado S/ '+BR_ENVIO_MOTO+' a Lima y Callao)';
+    extra = `<div style="margin-top:6px"><a class="btn btn-xs" target="_blank" href="https://wa.me/51${tel}?text=${encodeURIComponent(msg)}">💬 Pedirle sus datos</a></div>`;
+  }
+  return `<div class="card br-fil-row" data-q="${brEsc(q)}" style="margin-bottom:8px">
+    <div style="font-size:13.5px;font-weight:600">${chk}${brEsc(c.nombre||'Sin nombre')} <span class="text-hint" style="font-weight:400;font-size:12px">${tel?'· '+brEsc(tel):(c.sinCelular?'· sin celular':'')}</span></div>
+    <div style="font-size:12.5px;margin-top:2px">${prendas} <span class="text-hint">· ${brSoles(total)}</span></div>${extra}</div>`;
+}
+function brEnvRender(){
+  const box = document.getElementById('br-view-envios'); if(!box) return;
+  const cnt = {}; BR_ETAPAS.forEach(([k])=>cnt[k]=0);
+  brEnvLista.forEach(p=>cnt[p.etapa]++);
+  const chips = BR_ETAPAS.map(([k,t])=>`<button type="button" class="btn btn-sm ${brEnvEtapa===k?'btn-primary':''}" onclick="brEnvEtapa='${k}';brEnvRender()">${t} (${cnt[k]})</button>`).join('');
+  const head = `<div class="card" style="margin-bottom:12px;font-size:12.5px">
+      <div style="font-weight:600;margin-bottom:4px">🚚 Recorrido de tus pedidos</div>
+      <div>🇧🇷→Lima: la mercadería de Brasil llega el <strong>${BR_LLEGADA_TXT}</strong> · 🚚 Ya despachados: <strong>${brEnvDesp}</strong></div></div>
+    <div class="pill-row" style="margin-bottom:12px">${chips}</div>`;
+  const lista = brEnvLista.filter(p=>p.etapa===brEnvEtapa)
+    .sort((a,b)=>String(a.cli.nombre||'').localeCompare(String(b.cli.nombre||'')));
+  let cuerpo = '';
+  if(brEnvEtapa==='listo'){
+    const moto = lista.filter(p=>!brEnvEsShalom(p)), sha = lista.filter(p=>brEnvEsShalom(p));
+    cuerpo = `<div class="card" style="margin-bottom:12px;font-size:12.5px">
+        <div>🏍️ Motorizado: <strong>${moto.length}</strong> pedidos · cobrar envío S/ ${moto.length*BR_ENVIO_MOTO} en total</div>
+        <div>📦 Shalom: <strong>${sha.length}</strong> pedidos</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn btn-xs" onclick="brEnvSelTodos('moto')">☑ Todos los de motorizado</button>
+          <button class="btn btn-xs" onclick="brEnvSelTodos('shalom')">☑ Todos los de Shalom</button>
+          <button class="btn btn-sm" onclick="brExcelMotorizado(brEnvSel())">📄 Excel motorizado</button>
+          <button class="btn btn-sm btn-primary" onclick="brDespacharSeleccion(brEnvSel())">🚚 Marcar despachados</button></div></div>`
+      + (moto.length ? `<div style="font-size:12px;font-weight:600;margin:8px 0 6px">🏍️ Motorizado</div>`+moto.map(p=>brEnvCard(p,true)).join('') : '')
+      + (sha.length ? `<div style="font-size:12px;font-weight:600;margin:8px 0 6px">📦 Shalom</div>`+sha.map(p=>brEnvCard(p,true)).join('') : '');
+    if(!lista.length) cuerpo = '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">Aún no hay pedidos listos: empacados y con datos de envío.</div>';
+  } else {
+    const msgs = {comprar:'Pedidos con productos aún no comprados.', camino:'Comprados y esperando que llegue la mercadería a Lima.', faltan:'Pedidos donde marcaste ❌ alguna prenda.', enlima:'Todo en mano: falta empacarlos en Armado Lima.', sindatos:'Empacados, esperando que la clienta complete sus datos.'};
+    cuerpo = `<div class="text-hint" style="font-size:12px;margin-bottom:8px">${msgs[brEnvEtapa]||''}</div>`
+      + (lista.length ? lista.map(p=>brEnvCard(p,false)).join('') : '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">Nada en esta etapa 🎉</div>');
+  }
+  box.innerHTML = head + cuerpo;
+  brAplicarFiltro();
+}
+function brEnvSel(){ const ids=[...document.querySelectorAll('.br-env-sel:checked')].map(x=>x.value); return brEnvLista.filter(p=>ids.includes(p.id)); }
+function brEnvSelTodos(t){ document.querySelectorAll('.br-env-sel[data-t="'+t+'"]').forEach(x=>{ x.checked=true; }); }
 
 // ── Armado en Lima ──
 const BR_CUIDADO_RE = /hidratante|body mist|body splash|jabon|aclarador|acladora|nalgas|corporal|desodorante|mouse|gel aromatizador|bombin|aceite|mascarilla|shampo|tonico|pack|oleo|booster|acondicionador|sprite|protector|proteina|perfume|exterminador|revive|queratina|balsamo|crema|gelatina|iluminador|kit negra|termoprotector|ternoprotector/;
