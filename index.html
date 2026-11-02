@@ -1541,6 +1541,22 @@ td.empty-state{padding:20px;text-align:center}
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-br-ident">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title">Corregir usuario o celular</div>
+    <input type="hidden" id="bid-id">
+    <div class="text-hint" id="bid-actual" style="margin-bottom:10px"></div>
+    <div class="form-row"><label class="form-label">Usuario de WhatsApp</label><input id="bid-usuario" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Ej: nancy.dnt" style="width:100%"></div>
+    <div class="form-row"><label class="form-label">Celular (9 dígitos)</label><input id="bid-tel" type="text" inputmode="tel" autocomplete="off" placeholder="987654321" style="width:100%"></div>
+    <div class="text-hint" style="font-size:11.5px">Si el celular ya existe en tu base, te pregunto antes de asignarle este pedido a esa clienta. Los otros pedidos no se tocan.</div>
+    <div id="bid-aviso" style="color:var(--red);font-size:12.5px;margin-top:8px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-br-ident')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="brGuardarIdent()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-br-gasto">
   <div class="modal" style="max-width:440px">
     <div class="modal-title" id="brg-titulo">Registrar gasto</div>
@@ -7838,7 +7854,7 @@ function brEnvCard(p, sel){
     extra = `<div style="margin-top:6px"><a class="btn btn-xs" target="_blank" href="https://wa.me/51${tel}?text=${encodeURIComponent(msg)}">💬 Pedirle sus datos</a></div>`;
   }
   return `<div class="card br-fil-row" data-q="${brEsc(q)}" style="margin-bottom:8px">
-    <div style="font-size:13.5px;font-weight:600">${chk}${brEsc(c.nombre||'Sin nombre')} <span class="text-hint" style="font-weight:400;font-size:12px">${tel?'· '+brEsc(tel):(c.sinCelular?'· sin celular':'')}</span></div>
+    <div style="font-size:13.5px;font-weight:600">${chk}${brEsc(c.nombre||'Sin nombre')} <span class="text-hint" style="font-weight:400;font-size:12px">${tel?'· '+brEsc(tel):(c.sinCelular?'· sin celular':'')}</span> <button class="btn btn-xs" onclick="brAbrirIdent('${p.id}')" title="Corregir usuario o celular">✏️</button></div>
     <div style="font-size:12.5px;margin-top:2px">${prendas} <span class="text-hint">· ${brSoles(total)}</span></div>${extra}</div>`;
 }
 function brEnvRender(){
@@ -7876,6 +7892,59 @@ function brEnvRender(){
 }
 function brEnvSel(){ const ids=[...document.querySelectorAll('.br-env-sel:checked')].map(x=>x.value); return brEnvLista.filter(p=>ids.includes(p.id)); }
 function brEnvSelTodos(t){ document.querySelectorAll('.br-env-sel[data-t="'+t+'"]').forEach(x=>{ x.checked=true; }); }
+
+// ── Corregir usuario de WhatsApp / celular de un pedido ──
+function brIdBuscar(id){
+  return (brEnvLista||[]).find(p=>p.id===id) || (brArmLista||[]).find(p=>p.id===id) || (brPedLista||[]).find(p=>p.id===id) || null;
+}
+function brAbrirIdent(id){
+  const p = brIdBuscar(id); if(!p) return;
+  const c = p.cli || {};
+  document.getElementById('bid-id').value = id;
+  document.getElementById('bid-usuario').value = p.usuario_wa || '';
+  document.getElementById('bid-tel').value = c.telefono || '';
+  document.getElementById('bid-actual').textContent = 'Ahora: ' + (c.sinCelular ? 'sin celular' : (c.nombre||'Sin nombre')+(c.telefono?' · '+c.telefono:''));
+  document.getElementById('bid-aviso').textContent = '';
+  document.getElementById('modal-br-ident').classList.add('open');
+}
+async function brGuardarIdent(){
+  const id = document.getElementById('bid-id').value;
+  const p = brIdBuscar(id); if(!p) return;
+  const aviso = document.getElementById('bid-aviso');
+  const usuario = document.getElementById('bid-usuario').value.trim().replace(/^@+/,'') || null;
+  const telRaw = document.getElementById('bid-tel').value.trim();
+  const tel = telRaw ? rgBrNormTel(telRaw) : '';
+  if(telRaw && tel.length!==9){ aviso.textContent='El celular debe tener 9 dígitos.'; return; }
+  const c = p.cli || {};
+  const telActual = c.telefono ? rgBrNormTel(c.telefono) : '';
+  try {
+    const patch = {usuario_wa: usuario};
+    if(tel && tel!==telActual){
+      const ex = await dbGet(`clientes?telefono=in.(${tel},51${tel})&select=*`);
+      const otro = ex.find(x=>x.id!==p.cliente_id);
+      if(otro){
+        const n = (await dbGet(`brasil_pedidos?cliente_id=eq.${otro.id}&select=id`)).length;
+        if(!confirm(`Ese celular ya existe como "${otro.nombre||'Sin nombre'}" (${n} pedido(s) de Brasil).\n¿Asignar ESTE pedido a esa clienta?`)) return;
+        patch.cliente_id = otro.id;
+      } else if(p.cliente_id){
+        const otrosBr = (await dbGet(`brasil_pedidos?cliente_id=eq.${p.cliente_id}&id=neq.${id}&select=id`)).length;
+        const otrosPe = (await dbGet(`pedidos?cliente_id=eq.${p.cliente_id}&select=id&limit=1`)).length;
+        if(!otrosBr && !otrosPe){
+          await dbPatch(`clientes?id=eq.${p.cliente_id}`, {telefono:tel});
+        } else {
+          const nuevo = await dbPost('clientes', {telefono:tel, nombre: usuario || c.nombre || 'Nueva clienta'});
+          patch.cliente_id = (Array.isArray(nuevo)?nuevo[0]:nuevo).id;
+        }
+      } else {
+        const nuevo = await dbPost('clientes', {telefono:tel, nombre: usuario || p.usuario_wa || 'Nueva clienta'});
+        patch.cliente_id = (Array.isArray(nuevo)?nuevo[0]:nuevo).id;
+      }
+    }
+    await dbPatch(`brasil_pedidos?id=eq.${id}`, patch);
+    closeModal('modal-br-ident'); toast('✓ Datos del pedido actualizados');
+    if(brTabActual==='envios') brLoadEnvios(); else if(brTabActual==='armado') brLoadArmado(); else if(brTabActual==='pedidos') brLoadPedidos(); else if(brTabActual==='datos') brLoadDatos();
+  } catch(e){ aviso.textContent = 'Error: '+e.message; }
+}
 
 // ── Armado en Lima ──
 const BR_CUIDADO_RE = /hidratante|body mist|body splash|jabon|aclarador|acladora|nalgas|corporal|desodorante|mouse|gel aromatizador|bombin|aceite|mascarilla|shampo|tonico|pack|oleo|booster|acondicionador|sprite|protector|proteina|perfume|exterminador|revive|queratina|balsamo|crema|gelatina|iluminador|kit negra|termoprotector|ternoprotector/;
@@ -7970,7 +8039,7 @@ function brArmRender(){
     }
     return `<div class="card br-fil-row" data-q="${brEsc(qPed)}" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:4px">
-        <div style="font-size:14px;font-weight:600">${brEsc(c.nombre||'Sin nombre')} ${c.sinCelular?'<span class="badge badge-warn">sin celular</span>':`<span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span>`}</div>
+        <div style="font-size:14px;font-weight:600">${brEsc(c.nombre||'Sin nombre')} ${c.sinCelular?'<span class="badge badge-warn">sin celular</span>':`<span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span>`} <button class="btn btn-xs" onclick="brAbrirIdent('${p.id}')" title="Corregir usuario o celular">✏️</button></div>
         ${estadoBadge}</div>
       ${filas}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
