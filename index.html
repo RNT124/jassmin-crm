@@ -7624,6 +7624,18 @@ async function brDespacharSeleccion(lista0){
 let rgModoBrasil = false, rgBrPeds = [], rgBrItems = [], rgBrCli = null, rgBrBusqueda = '';
 const BR_WA_NEGOCIO = '51961724293';
 const BR_LINK_DATOS = 'https://rnt124.github.io/jassmin-crm/?datos';
+const BR_MSG_DATOS = `¡Hola! 🌸 Te saludamos de Jassmin.pe.
+
+Para solicitar el envío de tu pedido, sigue estos pasos:
+
+1. Ingresa al siguiente enlace: ${BR_LINK_DATOS}
+2. Vincula tu pedido con tu número de celular o usuario de WhatsApp.
+3. Verifica que el registro de tu pedido esté correcto.
+4. Completa todos tus datos y llena el formulario hasta el final.
+
+Al finalizar, serás redirigida a WhatsApp con los datos que ingresaste para confirmar que tu formulario se completó correctamente.
+
+¡Gracias por tu compra y por confiar en Jassmin! 💕`;
 function rgBrEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function rgBrNormTel(v){ let d=String(v||'').replace(/\D/g,''); if(d.length>9 && d.indexOf('51')===0) d=d.slice(2); return d; }
 function showDatosBrasil(){
@@ -7769,7 +7781,7 @@ async function brLoadDatos(){
       const nom = g.cli?.nombre || g.usuario || 'Sin nombre';
       const tel = g.cli?.telefono ? rgBrNormTel(g.cli.telefono) : '';
       const q = brNorm([nom, g.usuario, tel].join(' '));
-      const wa = tel ? `<a class="btn btn-xs" target="_blank" href="https://wa.me/51${tel}?text=${encodeURIComponent('Hola! Para enviar tu pedido necesito tus datos de envío 🌸 Complétalos aquí: '+BR_LINK_DATOS)}">💬 WhatsApp</a>` : '<span class="badge badge-warn">solo usuario</span>';
+      const wa = tel ? `<a class="btn btn-xs" target="_blank" href="https://wa.me/51${tel}?text=${encodeURIComponent(BR_MSG_DATOS)}">💬 WhatsApp</a>` : '<span class="badge badge-warn">solo usuario</span>';
       return `<div class="card br-fil-row" data-q="${brEsc(q)}" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
         <div style="min-width:0"><div style="font-size:13.5px;font-weight:600">${brEsc(nom)}</div>
         <div class="text-hint" style="font-size:11.5px">${tel?brEsc(tel)+' · ':''}${g.usuario&&g.cli?.nombre?brEsc(g.usuario)+' · ':''}${g.prendas} producto(s) · ${g.peds.length} pedido(s)</div></div>${wa}</div>`;
@@ -7822,7 +7834,7 @@ function brEnvCard(p, sel){
       <div style="font-size:12px;margin-top:4px">${shalom?'💵 Envío: lo paga en la agencia':`💵 Cobrar al entregar: <strong>S/ ${BR_ENVIO_MOTO}</strong>`} · ${p.pagado?'💰 prendas pagadas':'<span style="color:var(--red)">⚠️ pago de prendas sin marcar</span>'}</div>`;
   }
   if(p.etapa==='sindatos' && tel){
-    const msg = 'Hola 🌸 ¡Tu pedido de ropa ya está listo y empacado! Para solicitar tu envío completa tus datos aquí: '+BR_LINK_DATOS+' (motorizado S/ '+BR_ENVIO_MOTO+' a Lima y Callao)';
+    const msg = BR_MSG_DATOS;
     extra = `<div style="margin-top:6px"><a class="btn btn-xs" target="_blank" href="https://wa.me/51${tel}?text=${encodeURIComponent(msg)}">💬 Pedirle sus datos</a></div>`;
   }
   return `<div class="card br-fil-row" data-q="${brEsc(q)}" style="margin-bottom:8px">
