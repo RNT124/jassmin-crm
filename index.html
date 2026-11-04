@@ -738,6 +738,14 @@ td.empty-state{padding:20px;text-align:center}
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════ RESUMEN DE PEDIDO PARA EMPACAR (público, por QR) ═══ -->
+<div id="empaque-page" style="display:none;min-height:100vh;background:#F7F5F2;padding:16px;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#1A1A18">
+  <div style="max-width:480px;margin:0 auto">
+    <div style="text-align:center;letter-spacing:3px;font-weight:700;font-size:15px;margin:6px 0 14px">JASSMIN</div>
+    <div id="emp-body"><div style="text-align:center;padding:30px;color:#6b6a65">Cargando pedido...</div></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════ SEGUIMIENTO POR TELÉFONO (público) ═══ -->
 <div id="seguimiento-page" style="display:none">
   <div class="f5-wrap">
@@ -5600,6 +5608,7 @@ function hideAllRootPages(){
   document.getElementById('form-envio-page').style.display='none';
   document.getElementById('registro-page').style.display='none';
   document.getElementById('seguimiento-page').style.display='none';
+  const ep=document.getElementById('empaque-page'); if(ep) ep.style.display='none';
 }
 
 // ── FORMULARIO Y SEGUIMIENTO — ver funciones showTracking/showFormEnvio/renderTrackingPage arriba ──
@@ -7821,6 +7830,45 @@ async function brLoadDatos(){
   } catch(e){ box.innerHTML = '<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
 
+// ── Página pública de empaque (QR de la etiqueta) ──
+const BR_URL_BASE = 'https://rnt124.github.io/jassmin-crm/';
+let empTotal = 0;
+async function showPedidoEmpaque(id){
+  hideAllRootPages();
+  document.getElementById('empaque-page').style.display='block';
+  const body = document.getElementById('emp-body');
+  try {
+    if(!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Código inválido');
+    const peds = await dbGet(`brasil_pedidos?id=eq.${id}&select=*`);
+    if(!peds.length){ body.innerHTML = '<div style="text-align:center;padding:30px;color:#6b6a65">No encontramos este pedido.</div>'; return; }
+    const p = peds[0];
+    const items = await dbGet(`brasil_items?pedido_id=eq.${id}&select=*&order=creado_en.asc`);
+    let cli = {}; if(p.cliente_id){ const cs = await dbGet(`clientes?id=eq.${p.cliente_id}&select=nombre,tipo_envio_preferido`); cli = cs[0]||{}; }
+    const shalom = (cli.tipo_envio_preferido||'').startsWith('shalom');
+    const nombre = cli.nombre || p.usuario_wa || 'Sin nombre';
+    empTotal = items.length;
+    const nPren = items.reduce((a,i)=>a+(i.cantidad||1),0);
+    body.innerHTML = `<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="font-size:20px;font-weight:700">Pedido #${rgBrEsc(id.slice(0,4).toUpperCase())}</div>
+        <div style="background:#1A1A18;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:14px">${cli.tipo_envio_preferido ? (shalom?'SHALOM':'MOTORIZADO') : 'SIN ENVÍO AÚN'}</div></div>
+      <div style="font-size:18px;font-weight:600;margin:10px 0 2px">${rgBrEsc(nombre)}</div>
+      <div style="font-size:13px;color:#6b6a65;margin-bottom:12px">${nPren} prenda${nPren===1?'':'s'}${p.empacado_en?' · 📦 ya empacado':''}</div>
+      ${items.map((i,k)=>`<label id="emp-row-${k}" style="display:flex;align-items:center;gap:12px;padding:12px 10px;border-top:1px solid #ece9e3;font-size:16px;line-height:1.3">
+        <input type="checkbox" onchange="empMarcar()" style="width:26px;height:26px;flex:none;margin:0">
+        <span><strong>${i.cantidad||1}×</strong> ${rgBrEsc(i.producto)}${i.variante?' · <strong>'+rgBrEsc(i.variante)+'</strong>':''}</span></label>`).join('')}
+      <div id="emp-prog" style="text-align:center;font-weight:700;font-size:15px;margin-top:14px;color:#6b6a65">0 de ${empTotal} listas</div>
+    </div>`;
+  } catch(e){ body.innerHTML = '<div style="text-align:center;padding:30px;color:#b3184a">No se pudo cargar el pedido: '+rgBrEsc(e.message)+'</div>'; }
+}
+function empMarcar(){
+  const cks = [...document.querySelectorAll('#emp-body input[type=checkbox]')];
+  cks.forEach(c=>{ c.parentElement.style.opacity = c.checked ? '.45' : '1'; c.parentElement.style.textDecoration = c.checked ? 'line-through' : 'none'; });
+  const n = cks.filter(c=>c.checked).length, pr = document.getElementById('emp-prog');
+  pr.textContent = n===cks.length && cks.length ? '✅ Todo listo para empacar' : n+' de '+cks.length+' listas';
+  pr.style.color = n===cks.length && cks.length ? '#1b7f3b' : '#6b6a65';
+}
+
 // ── Etiquetas de envío 76x50 mm (impresora térmica) ──
 const BR_LOGO_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAUoAAAA8AQAAAAAoXs7AAAAC40lEQVR42pWUsY7cNhCGP/KEsxwssALSXGfVqbZ0dwT8Ioc8hYvkluV1cZkuB/g9HCW44sp7A8uGC6dJtIctmAOX44KkRO260E0hiOKvn//MP0OkZyvyh0h8sUqCEhF35tl2W5HuUmJ0mgtlEQu8H94hv300CEClgQ4w5BCvRNxaJLwKZ+K2fi2IyLAWpH8l0svEioYKCK26xlntsBYARTNAM5JqNIADbzDsUL8AMJA+vyygOZyl5TMY6KACyzwS1APlYdTF5xPWAWo6aGl66AF0OIUe4qKK1HXeVPId1usjXTyAJteihGqgT4sV1ZB3TXcCdQLtjLUtnnMBhlickMsZT276E+geGw2X/M1QODFjbUn1sbGcKfXanUBroBlyHmrcrdIf99S7BO2bDvapSBAIUauOdtU/cbNK0AaoD0C7H1UAqGTXC9A2Qjt6Kgw0h9yAqZsBsJWd0qpBcw81t8Dl2CeZv0Ml1lsGFE9wztdZFxk7LfWUaicWZZ+A1uYitd1xsQzAhlswMuvo0i4dxWsHKwZ4TQd0+9zhw/damzO7h3MeZtPgjqHx0CtAWQf09dyuMEKD0h64CMCVh5osMdmFwY8CAnAuwMWsoZJdHuci9CBis0VVgGpSu01W/P9QphVHKTs98+Af1pu48wSXubwK0G4+Pe5fqAvWPo2SnfVW2wH1BqoIrSYJYEB5kytU2KVTwq0tNU5XRWHX7CIa47qY+zn0a+azHPVpoW1kbeLv5dyHox7RebR6n1T8Pbv/1RG0g5oAn3DxyAJguTtOaxDQeLhhoMU3o94P8a3TUxKWOwLSRIIhqR21WJ2r6Da3csOf9qnlLQ3OAf8Vl6GgoQoDOL/68rjh9bt7Ix4Y/EFsb2PKDt4+FnU7+7URXuzeeIHVlNYP/BxzMUrkpWNJ/KVZHJpQL4Y+g/U50GYx1D+DtV0MdWYhVMluzVILdsu1fl4OvVsMld8XQx+vlkKrHxdb8A31VSkBam5zNgAAAABJRU5ErkJggg==';
 let brEtqItems = [];
@@ -7850,11 +7898,7 @@ async function brEtqCanvas(p){
   const y0 = 94, qrX = W-M-QS, qrEnd = y0+QS, narrowW = qrX-M-12, fullW = W-2*M;
   // QR con el resumen del pedido (texto simple: se lee con la cámara del celular)
   try {
-    let txt = 'JASSMIN #'+String(p.id).slice(0,4).toUpperCase()+'\n'+(c.nombre||p.usuario_wa||'').replace(/\d{5,}/g,'')+'\n'+(shalom?'SHALOM':'MOTORIZADO')+'\n';
-    const itemsTxt = p.items.map(i=>(i.cantidad||1)+'x '+i.producto+(i.variante?' '+i.variante:''));
-    let usados = 0;
-    for(const t of itemsTxt){ if((txt+t).length > 230) break; txt += t+'\n'; usados++; }
-    if(usados < itemsTxt.length) txt += '... +'+(itemsTxt.length-usados)+' mas';
+    const txt = BR_URL_BASE+'?pedido='+p.id;
     qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
     const qr = qrcode(0, 'M'); qr.addData(txt, 'Byte'); qr.make();
     const n = qr.getModuleCount(), cell = Math.max(2, Math.floor(QS/(n+4)));
@@ -8704,10 +8748,12 @@ async function renderAsistenciaAdmin(){
   const reg=params.get('registro');
   const seg=params.get('seguimiento');
   const dat=params.get('datos');
+  const pedQ=params.get('pedido');
   if(trk){ showTracking(trk); }
   else if(reg!==null){ showRegistro(); }
   else if(seg!==null){ showSeguimiento(); }
   else if(dat!==null){ showDatosBrasil(); }
+  else if(pedQ){ showPedidoEmpaque(pedQ); }
 })();
 </script>
 <script>/* qrcode-generator 1.4.4 (MIT) */
