@@ -2,3 +2,4 @@
 alter table brasil_items add column if not exists en_mano boolean;
 alter table brasil_pedidos add column if not exists empacado_en timestamptz;
 alter table brasil_pedidos add column if not exists datos_en timestamptz;
+alter table brasil_pedidos add column if not exists etiqueta_en timestamptz;

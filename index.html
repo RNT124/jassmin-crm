@@ -1541,6 +1541,20 @@ td.empty-state{padding:20px;text-align:center}
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-br-etq">
+  <div class="modal" style="max-width:520px;max-height:92vh;overflow:auto">
+    <div class="modal-title" id="etq-titulo">🖨 Etiquetas</div>
+    <div class="text-hint" style="font-size:11.5px;margin-bottom:10px">En iPhone: toca <strong>Compartir / guardar</strong>, guarda las imágenes en Fotos y ábrelas en la app 4BARCODE. En computador: toca <strong>Imprimir</strong> y elige tu Xprinter con papel 76×50 mm.</div>
+    <div id="etq-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="brEtqCompartir()">📲 Compartir / guardar</button>
+      <button class="btn btn-sm" onclick="brEtqImprimirPC()">🖨 Imprimir (computador)</button>
+      <button class="btn btn-sm" onclick="brEtqMarcar()">✅ Marcar como impresas</button>
+      <button class="btn btn-sm" onclick="closeModal('modal-br-etq')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-br-ident">
   <div class="modal" style="max-width:440px">
     <div class="modal-title">Corregir usuario o celular</div>
@@ -7807,6 +7821,114 @@ async function brLoadDatos(){
   } catch(e){ box.innerHTML = '<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
 
+// ── Etiquetas de envío 76x50 mm (impresora térmica) ──
+const BR_LOGO_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAUoAAAA8AQAAAAAoXs7AAAAC40lEQVR42pWUsY7cNhCGP/KEsxwssALSXGfVqbZ0dwT8Ioc8hYvkluV1cZkuB/g9HCW44sp7A8uGC6dJtIctmAOX44KkRO260E0hiOKvn//MP0OkZyvyh0h8sUqCEhF35tl2W5HuUmJ0mgtlEQu8H94hv300CEClgQ4w5BCvRNxaJLwKZ+K2fi2IyLAWpH8l0svEioYKCK26xlntsBYARTNAM5JqNIADbzDsUL8AMJA+vyygOZyl5TMY6KACyzwS1APlYdTF5xPWAWo6aGl66AF0OIUe4qKK1HXeVPId1usjXTyAJteihGqgT4sV1ZB3TXcCdQLtjLUtnnMBhlickMsZT276E+geGw2X/M1QODFjbUn1sbGcKfXanUBroBlyHmrcrdIf99S7BO2bDvapSBAIUauOdtU/cbNK0AaoD0C7H1UAqGTXC9A2Qjt6Kgw0h9yAqZsBsJWd0qpBcw81t8Dl2CeZv0Ml1lsGFE9wztdZFxk7LfWUaicWZZ+A1uYitd1xsQzAhlswMuvo0i4dxWsHKwZ4TQd0+9zhw/damzO7h3MeZtPgjqHx0CtAWQf09dyuMEKD0h64CMCVh5osMdmFwY8CAnAuwMWsoZJdHuci9CBis0VVgGpSu01W/P9QphVHKTs98+Af1pu48wSXubwK0G4+Pe5fqAvWPo2SnfVW2wH1BqoIrSYJYEB5kytU2KVTwq0tNU5XRWHX7CIa47qY+zn0a+azHPVpoW1kbeLv5dyHox7RebR6n1T8Pbv/1RG0g5oAn3DxyAJguTtOaxDQeLhhoMU3o94P8a3TUxKWOwLSRIIhqR21WJ2r6Da3csOf9qnlLQ3OAf8Vl6GgoQoDOL/68rjh9bt7Ix4Y/EFsb2PKDt4+FnU7+7URXuzeeIHVlNYP/BxzMUrkpWNJ/KVZHJpQL4Y+g/U50GYx1D+DtV0MdWYhVMluzVILdsu1fl4OvVsMld8XQx+vlkKrHxdb8A31VSkBam5zNgAAAABJRU5ErkJggg==';
+let brEtqItems = [];
+function brEtqLogo(){
+  return new Promise(res=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src='data:image/png;base64,'+BR_LOGO_B64; });
+}
+function brEtqWrap(ctx, text, maxW){
+  const words = String(text||'').split(/\s+/).filter(Boolean); const out=[]; let cur='';
+  for(const w of words){ const t = cur ? cur+' '+w : w; if(!cur || ctx.measureText(t).width<=maxW) cur=t; else { out.push(cur); cur=w; } }
+  if(cur) out.push(cur); return out;
+}
+async function brEtqCanvas(p){
+  const W=608, H=400, M=24, FONT='-apple-system, "Helvetica Neue", Arial, sans-serif';
+  const cv = document.createElement('canvas'); cv.width=W; cv.height=H;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#000'; ctx.textBaseline='top';
+  const logo = await brEtqLogo();
+  if(logo) ctx.drawImage(logo, M, 14, 300, Math.round(logo.height*300/logo.width));
+  const c = p.cli||{}, shalom = brEnvEsShalom(p);
+  const nPren = p.items.reduce((a,i)=>a+(i.cantidad||1),0);
+  ctx.font = `bold 22px ${FONT}`; ctx.textAlign='right';
+  ctx.fillText('#'+String(p.id).slice(0,4).toUpperCase(), W-M, 14);
+  ctx.font = `20px ${FONT}`; ctx.fillText(nPren+' prenda'+(nPren===1?'':'s'), W-M, 42);
+  ctx.textAlign='left';
+  ctx.fillRect(M, 82, W-2*M, 3);
+  let y = 94;
+  // nombre (se achica si es largo)
+  const nombre = String(c.nombre||p.usuario_wa||'Sin nombre').toUpperCase();
+  let fs = 38; ctx.font = `bold ${fs}px ${FONT}`;
+  while(fs>22 && ctx.measureText(nombre).width > W-2*M){ fs-=2; ctx.font=`bold ${fs}px ${FONT}`; }
+  ctx.fillText(nombre, M, y); y += fs+10;
+  ctx.font = `bold 32px ${FONT}`;
+  const tel = c.telefono ? rgBrNormTel(c.telefono) : '';
+  ctx.fillText('CEL: '+(tel ? tel.replace(/(\d{3})(\d{3})(\d{3})/,'$1 $2 $3') : '—'), M, y); y += 42;
+  // líneas de dirección
+  const filas = [];
+  if(shalom){
+    if(c.dni) filas.push({t:'DNI: '+c.dni, b:true});
+    filas.push({t:'SHALOM - '+String(c.distrito||'').toUpperCase(), b:true});
+    filas.push({t:'Agencia: '+(c.direccion||''), b:false});
+  } else {
+    if(c.distrito) filas.push({t:String(c.distrito).toUpperCase(), b:true});
+    filas.push({t:c.direccion||'', b:false});
+    if(c.referencia) filas.push({t:'Ref: '+c.referencia, b:false});
+  }
+  const libre = (H-72) - y;
+  let lineas = [];
+  for(const size of [28,25,22,19,17]){
+    lineas = [];
+    filas.forEach(f=>{ ctx.font = `${f.b?'bold ':''}${size}px ${FONT}`; brEtqWrap(ctx, f.t, W-2*M).forEach(t=>lineas.push({t, b:f.b, size})); });
+    if(lineas.length*(size+6) <= libre) break;
+  }
+  lineas.forEach(l=>{ ctx.font = `${l.b?'bold ':''}${l.size}px ${FONT}`; ctx.fillText(l.t, M, y); y += l.size+6; });
+  // pie
+  ctx.lineWidth=3; ctx.strokeStyle='#000'; ctx.strokeRect(M+1.5, H-62, W-2*M-3, 46);
+  ctx.font = `bold 28px ${FONT}`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(shalom ? 'ENVÍO: PAGA EN AGENCIA' : 'COBRAR S/ '+BR_ENVIO_MOTO, W/2, H-39);
+  // blanco y negro puro para la térmica
+  const img = ctx.getImageData(0,0,W,H), d = img.data;
+  for(let i=0;i<d.length;i+=4){ const v = d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11 < 170 ? 0 : 255; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; }
+  ctx.putImageData(img,0,0);
+  return cv;
+}
+async function brAbrirEtiquetas(ids){
+  const lista = brEnvLista.filter(p=>ids.includes(p.id) && p.tieneDatos);
+  if(!lista.length){ toast('Selecciona pedidos que ya tengan datos de envío'); return; }
+  brEtqItems = [];
+  const box = document.getElementById('etq-lista');
+  box.innerHTML = '<div class="loading">Generando etiquetas...</div>';
+  document.getElementById('modal-br-etq').classList.add('open');
+  try {
+    for(const p of lista){
+      const cv = await brEtqCanvas(p);
+      const blob = await new Promise(r=>cv.toBlob(r,'image/png'));
+      const nom = String(p.cli.nombre||p.usuario_wa||'cliente').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').slice(0,24);
+      brEtqItems.push({p, url:cv.toDataURL('image/png'), file:new File([blob], 'etiqueta-'+nom+'-'+String(p.id).slice(0,4)+'.png', {type:'image/png'})});
+    }
+    document.getElementById('etq-titulo').textContent = '🖨 '+brEtqItems.length+' etiqueta(s) · 76×50 mm';
+    box.innerHTML = brEtqItems.map(x=>`<div style="text-align:center"><img src="${x.url}" style="width:100%;max-width:300px;border:1px solid var(--border);border-radius:4px"><div class="text-hint" style="font-size:11px">${brEsc(x.p.cli.nombre||x.p.usuario_wa||'')}${x.p.etiqueta_en?' · 🏷 ya impresa':''}</div></div>`).join('');
+  } catch(e){ box.innerHTML = '<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
+}
+async function brEtqCompartir(){
+  const files = brEtqItems.map(x=>x.file);
+  if(!files.length) return;
+  try {
+    if(navigator.canShare && navigator.canShare({files})){ await navigator.share({files}); }
+    else toast('Tu navegador no deja compartir imágenes. Mantén presionada cada etiqueta para guardarla.');
+  } catch(e){ if(e && e.name!=='AbortError') toast('No se pudo compartir: '+e.message); }
+}
+function brEtqImprimirPC(){
+  if(!brEtqItems.length) return;
+  const w = window.open('', '_blank');
+  if(!w){ toast('El navegador bloqueó la ventana. Permite ventanas emergentes e intenta de nuevo.'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas 76x50</title><style>@page{size:76mm 50mm;margin:0}html,body{margin:0;padding:0}img{display:block;width:76mm;height:50mm;page-break-after:always;break-after:page}</style></head><body>'
+    + brEtqItems.map(x=>'<img src="'+x.url+'">').join('') + '</body></html>');
+  w.document.close();
+  setTimeout(()=>{ w.focus(); w.print(); }, 600);
+}
+async function brEtqMarcar(){
+  if(!brEtqItems.length) return;
+  const ids = brEtqItems.map(x=>x.p.id);
+  try {
+    await dbPatch(`brasil_pedidos?id=in.(${ids.join(',')})`, {etiqueta_en:new Date().toISOString()});
+    brEtqItems.forEach(x=>{ x.p.etiqueta_en = new Date().toISOString(); });
+    closeModal('modal-br-etq'); toast('✓ Marcadas como impresas'); brEnvRender();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
 // ── Tablero de envíos (recorrido de cada pedido) ──
 const BR_LLEGADA_TXT = '9 de noviembre';
 const BR_ENVIO_MOTO = 14;
@@ -7847,6 +7969,7 @@ function brEnvCard(p, sel){
   let extra = '';
   if(p.etapa==='listo'){
     extra = `<div class="text-hint" style="font-size:11.5px;margin:2px 0">${shalom?'📦 Shalom — ':'🏍️ '}${brEsc(c.direccion||'')}${c.distrito?' ('+brEsc(c.distrito)+')':''}</div>
+      <div style="margin-top:4px"><button class="btn btn-xs" onclick="brAbrirEtiquetas(['${p.id}'])">🖨 Etiqueta</button> ${p.etiqueta_en?'<span class="badge badge-ok">🏷 impresa</span>':'<span class="badge badge-gray">sin imprimir</span>'}</div>
       <div style="font-size:12px;margin-top:4px">${shalom?'💵 Envío: lo paga en la agencia':`💵 Cobrar al entregar: <strong>S/ ${BR_ENVIO_MOTO}</strong>`} · ${p.pagado?'💰 prendas pagadas':'<span style="color:var(--red)">⚠️ pago de prendas sin marcar</span>'}</div>`;
   }
   if(p.etapa==='sindatos' && tel){
@@ -7877,6 +8000,8 @@ function brEnvRender(){
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
           <button class="btn btn-xs" onclick="brEnvSelTodos('moto')">☑ Todos los de motorizado</button>
           <button class="btn btn-xs" onclick="brEnvSelTodos('shalom')">☑ Todos los de Shalom</button>
+          <button class="btn btn-xs" onclick="brEnvSelSinEtiqueta()">☑ Los que faltan imprimir</button>
+          <button class="btn btn-sm" onclick="brAbrirEtiquetas(brEnvSel().map(p=>p.id))">🖨 Etiquetas (seleccionados)</button>
           <button class="btn btn-sm" onclick="brExcelMotorizado(brEnvSel())">📄 Excel motorizado</button>
           <button class="btn btn-sm btn-primary" onclick="brDespacharSeleccion(brEnvSel())">🚚 Marcar despachados</button></div></div>`
       + (moto.length ? `<div style="font-size:12px;font-weight:600;margin:8px 0 6px">🏍️ Motorizado</div>`+moto.map(p=>brEnvCard(p,true)).join('') : '')
@@ -7891,6 +8016,7 @@ function brEnvRender(){
   brAplicarFiltro();
 }
 function brEnvSel(){ const ids=[...document.querySelectorAll('.br-env-sel:checked')].map(x=>x.value); return brEnvLista.filter(p=>ids.includes(p.id)); }
+function brEnvSelSinEtiqueta(){ document.querySelectorAll('.br-env-sel').forEach(x=>{ const p=brEnvLista.find(q=>q.id===x.value); x.checked = !!(p && !p.etiqueta_en); }); }
 function brEnvSelTodos(t){ document.querySelectorAll('.br-env-sel[data-t="'+t+'"]').forEach(x=>{ x.checked=true; }); }
 
 // ── Corregir usuario de WhatsApp / celular de un pedido ──
