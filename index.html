@@ -1552,10 +1552,11 @@ td.empty-state{padding:20px;text-align:center}
 <div class="modal-overlay" id="modal-br-etq">
   <div class="modal" style="max-width:520px;max-height:92vh;overflow:auto">
     <div class="modal-title" id="etq-titulo">🖨 Etiquetas</div>
-    <div class="text-hint" style="font-size:11.5px;margin-bottom:10px">En iPhone: toca <strong>Compartir / guardar</strong>, guarda las imágenes en Fotos y ábrelas en la app 4BARCODE. En computador: toca <strong>Imprimir</strong> y elige tu Xprinter con papel 76×50 mm.</div>
+    <div class="text-hint" style="font-size:11.5px;margin-bottom:10px">En iPhone: toca <strong>Compartir PDF</strong> y ábrelo en la app 4BARCODE (o guárdalo en Archivos); trae una etiqueta por página. En computador: toca <strong>Imprimir</strong> y elige tu Xprinter con papel 76×50 mm.</div>
     <div id="etq-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:12px"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary btn-sm" onclick="brEtqCompartir()">📲 Compartir / guardar</button>
+      <button class="btn btn-primary btn-sm" onclick="brEtqPdf()">📄 Compartir PDF (todas en un archivo)</button>
+      <button class="btn btn-sm" onclick="brEtqCompartir()">🖼 Imágenes sueltas</button>
       <button class="btn btn-sm" onclick="brEtqImprimirPC()">🖨 Imprimir (computador)</button>
       <button class="btn btn-sm" onclick="brEtqMarcar()">✅ Marcar como impresas</button>
       <button class="btn btn-sm" onclick="closeModal('modal-br-etq')">Cerrar</button>
@@ -7960,11 +7961,48 @@ async function brAbrirEtiquetas(ids){
       const cv = await brEtqCanvas(p);
       const blob = await new Promise(r=>cv.toBlob(r,'image/png'));
       const nom = String(p.cli.nombre||p.usuario_wa||'cliente').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').slice(0,24);
-      brEtqItems.push({p, url:cv.toDataURL('image/png'), file:new File([blob], 'etiqueta-'+nom+'-'+String(p.id).slice(0,4)+'.png', {type:'image/png'})});
+      brEtqItems.push({p, cv, url:cv.toDataURL('image/png'), file:new File([blob], 'etiqueta-'+nom+'-'+String(p.id).slice(0,4)+'.png', {type:'image/png'})});
     }
     document.getElementById('etq-titulo').textContent = '🖨 '+brEtqItems.length+' etiqueta(s) · 76×50 mm';
     box.innerHTML = brEtqItems.map(x=>`<div style="text-align:center"><img src="${x.url}" style="width:100%;max-width:300px;border:1px solid var(--border);border-radius:4px"><div class="text-hint" style="font-size:11px">${brEsc(x.p.cli.nombre||x.p.usuario_wa||'')}${x.p.etiqueta_en?' · 🏷 ya impresa':''}</div></div>`).join('');
   } catch(e){ box.innerHTML = '<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
+}
+// PDF de etiquetas: una página de 76x50 mm por etiqueta (imagen blanco y negro sin pérdida)
+function brEtqPdfBlob(canvases){
+  const enc = new TextEncoder(), parts = [], offs = []; let len = 0;
+  const push = u8=>{ parts.push(u8); len += u8.length; };
+  const str = t=>push(enc.encode(t));
+  const n = canvases.length, PW = 215.43, PH = 141.73;
+  str('%PDF-1.4\n');
+  const begin = k=>{ offs[k] = len; str(k+' 0 obj\n'); };
+  begin(1); str('<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  begin(2); str('<< /Type /Pages /Count '+n+' /Kids ['+canvases.map((_,i)=>(3+3*i)+' 0 R').join(' ')+'] >>\nendobj\n');
+  canvases.forEach((cv,i)=>{
+    const pg = 3+3*i, ct = 4+3*i, im = 5+3*i, W = cv.width, H = cv.height, rb = W>>3;
+    begin(pg); str('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+PW+' '+PH+'] /Contents '+ct+' 0 R /Resources << /XObject << /Im0 '+im+' 0 R >> >> >>\nendobj\n');
+    const cs = 'q '+PW+' 0 0 '+PH+' 0 0 cm /Im0 Do Q';
+    begin(ct); str('<< /Length '+cs.length+' >>\nstream\n'+cs+'\nendstream\nendobj\n');
+    const d = cv.getContext('2d').getImageData(0,0,W,H).data, bytes = new Uint8Array(rb*H);
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(d[(y*W+x)*4] > 127) bytes[y*rb+(x>>3)] |= (128>>(x&7));
+    begin(im); str('<< /Type /XObject /Subtype /Image /Width '+W+' /Height '+H+' /ColorSpace /DeviceGray /BitsPerComponent 1 /Length '+bytes.length+' >>\nstream\n');
+    push(bytes); str('\nendstream\nendobj\n');
+  });
+  const total = 3+3*n, xr = len;
+  str('xref\n0 '+total+'\n0000000000 65535 f \n');
+  for(let k=1;k<total;k++) str(String(offs[k]).padStart(10,'0')+' 00000 n \n');
+  str('trailer\n<< /Size '+total+' /Root 1 0 R >>\nstartxref\n'+xr+'\n%%EOF');
+  return new Blob(parts, {type:'application/pdf'});
+}
+async function brEtqPdf(){
+  if(!brEtqItems.length) return;
+  const blob = brEtqPdfBlob(brEtqItems.map(x=>x.cv));
+  const nombre = 'etiquetas-'+new Date().toISOString().slice(0,10)+'-'+brEtqItems.length+'.pdf';
+  const file = new File([blob], nombre, {type:'application/pdf'});
+  try {
+    if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file]}); return; }
+  } catch(e){ if(e && e.name==='AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  toast('PDF descargado: '+nombre);
 }
 async function brEtqCompartir(){
   const files = brEtqItems.map(x=>x.file);
