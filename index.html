@@ -7933,6 +7933,16 @@ async function brEtqMarcar(){
 const BR_LLEGADA_TXT = '9 de noviembre';
 const BR_ENVIO_MOTO = 14;
 let brEnvLista = [], brEnvEtapa = 'listo', brEnvDesp = 0;
+let brEnvFecha = 'todos', brEnvOrden = 'antiguo';
+function brLimaDia(d){ return new Date(d).toLocaleDateString('en-CA',{timeZone:'America/Lima'}); }
+function brHace(iso){
+  const min = Math.max(0, Math.round((Date.now()-new Date(iso).getTime())/60000));
+  if(min<1) return 'hace un momento';
+  if(min<60) return 'hace '+min+' min';
+  const h = Math.floor(min/60); if(h<24) return 'hace '+h+' h';
+  const d = Math.floor(h/24); return 'hace '+d+' día'+(d===1?'':'s');
+}
+function brFechaHora(iso){ return new Date(iso).toLocaleString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).replace(',',''); }
 const BR_ETAPAS = [['comprar','🛒 Por comprar'],['camino','🇧🇷 Esperando llegada'],['faltan','🔴 Faltan prendas'],['enlima','📍 En Lima · empacar'],['sindatos','📦 Empacado · sin datos'],['listo','✅ Listo para despachar']];
 function brEnvEsShalom(p){ return (p.cli?.tipo_envio_preferido||'').startsWith('shalom'); }
 function brEnvEtapaDe(p){
@@ -7969,6 +7979,7 @@ function brEnvCard(p, sel){
   let extra = '';
   if(p.etapa==='listo'){
     extra = `<div class="text-hint" style="font-size:11.5px;margin:2px 0">${shalom?'📦 Shalom — ':'🏍️ '}${brEsc(c.direccion||'')}${c.distrito?' ('+brEsc(c.distrito)+')':''}</div>
+      <div style="font-size:12px;margin-top:4px">📝 ${p.datos_en?'Datos recibidos: <strong>'+brHace(p.datos_en)+'</strong> · '+brFechaHora(p.datos_en):'<span class="text-hint">Datos previos (sin fecha)</span>'}</div>
       <div style="margin-top:4px"><button class="btn btn-xs" onclick="brAbrirEtiquetas(['${p.id}'])">🖨 Etiqueta</button> ${p.etiqueta_en?'<span class="badge badge-ok">🏷 impresa</span>':'<span class="badge badge-gray">sin imprimir</span>'}</div>
       <div style="font-size:12px;margin-top:4px">${shalom?'💵 Envío: lo paga en la agencia':`💵 Cobrar al entregar: <strong>S/ ${BR_ENVIO_MOTO}</strong>`} · ${p.pagado?'💰 prendas pagadas':'<span style="color:var(--red)">⚠️ pago de prendas sin marcar</span>'}</div>`;
   }
@@ -7989,12 +8000,27 @@ function brEnvRender(){
       <div style="font-weight:600;margin-bottom:4px">🚚 Recorrido de tus pedidos</div>
       <div>🇧🇷→Lima: la mercadería de Brasil llega el <strong>${BR_LLEGADA_TXT}</strong> · 🚚 Ya despachados: <strong>${brEnvDesp}</strong></div></div>
     <div class="pill-row" style="margin-bottom:12px">${chips}</div>`;
-  const lista = brEnvLista.filter(p=>p.etapa===brEnvEtapa)
+  let lista = brEnvLista.filter(p=>p.etapa===brEnvEtapa)
     .sort((a,b)=>String(a.cli.nombre||'').localeCompare(String(b.cli.nombre||'')));
   let cuerpo = '';
   if(brEnvEtapa==='listo'){
+    const hoy = brLimaDia(Date.now()), ayer = brLimaDia(Date.now()-86400000), hace3 = Date.now()-3*86400000;
+    if(brEnvFecha==='hoy') lista = lista.filter(p=>p.datos_en && brLimaDia(p.datos_en)===hoy);
+    else if(brEnvFecha==='ayer') lista = lista.filter(p=>p.datos_en && brLimaDia(p.datos_en)===ayer);
+    else if(brEnvFecha==='3d') lista = lista.filter(p=>p.datos_en && new Date(p.datos_en).getTime()>=hace3);
+    if(brEnvOrden!=='nombre'){
+      const t = p=>p.datos_en ? new Date(p.datos_en).getTime() : null;
+      lista.sort((a,b)=>{ const x=t(a), y=t(b); if(x===null&&y===null) return 0; if(x===null) return 1; if(y===null) return -1; return brEnvOrden==='antiguo' ? x-y : y-x; });
+    }
+    const chipF = (k,tx)=>`<button type="button" class="btn btn-xs ${brEnvFecha===k?'btn-primary':''}" onclick="brEnvFecha='${k}';brEnvRender()">${tx}</button>`;
+    const chipO = (k,tx)=>`<button type="button" class="btn btn-xs ${brEnvOrden===k?'btn-primary':''}" onclick="brEnvOrden='${k}';brEnvRender()">${tx}</button>`;
+    const filtrosHtml = `<div class="card" style="margin-bottom:12px;font-size:12.5px">
+        <div style="font-weight:600;margin-bottom:6px">📝 Cuándo enviaron sus datos</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${chipF('todos','Todos')}${chipF('hoy','Hoy')}${chipF('ayer','Ayer')}${chipF('3d','Últimos 3 días')}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="text-hint">Orden:</span>${chipO('antiguo','Primero los más antiguos')}${chipO('reciente','Más recientes primero')}${chipO('nombre','Por nombre')}</div>
+        ${brEnvFecha!=='todos'?'<div class="text-hint" style="font-size:11px;margin-top:6px">Los filtros por día solo muestran quienes llenaron sus datos por el link.</div>':''}</div>`;
     const moto = lista.filter(p=>!brEnvEsShalom(p)), sha = lista.filter(p=>brEnvEsShalom(p));
-    cuerpo = `<div class="card" style="margin-bottom:12px;font-size:12.5px">
+    cuerpo = filtrosHtml + `<div class="card" style="margin-bottom:12px;font-size:12.5px">
         <div>🏍️ Motorizado: <strong>${moto.length}</strong> pedidos · cobrar envío S/ ${moto.length*BR_ENVIO_MOTO} en total</div>
         <div>📦 Shalom: <strong>${sha.length}</strong> pedidos</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
@@ -8006,7 +8032,7 @@ function brEnvRender(){
           <button class="btn btn-sm btn-primary" onclick="brDespacharSeleccion(brEnvSel())">🚚 Marcar despachados</button></div></div>`
       + (moto.length ? `<div style="font-size:12px;font-weight:600;margin:8px 0 6px">🏍️ Motorizado</div>`+moto.map(p=>brEnvCard(p,true)).join('') : '')
       + (sha.length ? `<div style="font-size:12px;font-weight:600;margin:8px 0 6px">📦 Shalom</div>`+sha.map(p=>brEnvCard(p,true)).join('') : '');
-    if(!lista.length) cuerpo = '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">Aún no hay pedidos listos: empacados y con datos de envío.</div>';
+    if(!lista.length) cuerpo = filtrosHtml + '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">'+(brEnvFecha!=='todos'?'Nadie llenó sus datos en ese período.':'Aún no hay pedidos listos: empacados y con datos de envío.')+'</div>';
   } else {
     const msgs = {comprar:'Pedidos con productos aún no comprados.', camino:'Comprados y esperando que llegue la mercadería a Lima.', faltan:'Pedidos donde marcaste ❌ alguna prenda.', enlima:'Todo en mano: falta empacarlos en Armado Lima.', sindatos:'Empacados, esperando que la clienta complete sus datos.'};
     cuerpo = `<div class="text-hint" style="font-size:12px;margin-bottom:8px">${msgs[brEnvEtapa]||''}</div>`
