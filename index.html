@@ -7850,7 +7850,7 @@ async function brEtqCanvas(p){
   const y0 = 94, qrX = W-M-QS, qrEnd = y0+QS, narrowW = qrX-M-12, fullW = W-2*M;
   // QR con el resumen del pedido (texto simple: se lee con la cámara del celular)
   try {
-    let txt = 'JASSMIN #'+String(p.id).slice(0,4).toUpperCase()+'\n'+(c.nombre||p.usuario_wa||'')+(tel?' · '+tel:'')+'\n'+(shalom?'SHALOM':'MOTORIZADO')+'\n';
+    let txt = 'JASSMIN #'+String(p.id).slice(0,4).toUpperCase()+'\n'+(c.nombre||p.usuario_wa||'').replace(/\d{5,}/g,'')+'\n'+(shalom?'SHALOM':'MOTORIZADO')+'\n';
     const itemsTxt = p.items.map(i=>(i.cantidad||1)+'x '+i.producto+(i.variante?' '+i.variante:''));
     let usados = 0;
     for(const t of itemsTxt){ if((txt+t).length > 230) break; txt += t+'\n'; usados++; }
