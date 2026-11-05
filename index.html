@@ -9097,11 +9097,11 @@ async function shCargarClientes(){
 }
 async function shPedidosDe(cliId){
   const [pe, br] = await Promise.all([
-    dbGet(`pedidos?cliente_id=eq.${cliId}&estado=in.(pago_completo,empaquetado)&select=id,numero,estado,carrito_id`),
-    dbGet(`brasil_pedidos?cliente_id=eq.${cliId}&estado=eq.listo_lima&select=id,estado`)
+    dbGet(`pedidos?cliente_id=eq.${cliId}&or=(estado.in.(pago_completo,empaquetado),and(estado.eq.en_camino,shalom_orden.is.null))&select=id,numero,estado,carrito_id`),
+    dbGet(`brasil_pedidos?cliente_id=eq.${cliId}&or=(estado.eq.listo_lima,and(estado.eq.despachado,shalom_orden.is.null))&select=id,estado`)
   ]);
-  return pe.map(p=>({tipo:'pe', id:p.id, estado:p.estado, carrito_id:p.carrito_id, lbl:'Pedido '+p.numero+' (Perú)'}))
-    .concat(br.map(p=>({tipo:'br', id:p.id, estado:p.estado, lbl:'Brasil #'+String(p.id).slice(0,4).toUpperCase()})));
+  return pe.map(p=>({tipo:'pe', id:p.id, estado:p.estado, ya:p.estado==='en_camino', carrito_id:p.carrito_id, lbl:'Pedido '+p.numero+' (Perú)'+(p.estado==='en_camino'?' · ya despachado':'')}))
+    .concat(br.map(p=>({tipo:'br', id:p.id, estado:p.estado, ya:p.estado==='despachado', lbl:'Brasil #'+String(p.id).slice(0,4).toUpperCase()+(p.estado==='despachado'?' · ya despachado':'')})));
 }
 async function shAsignar(row, cli){
   row.cli = cli || null; row.pedidos = []; row.pedido = null;
@@ -9174,7 +9174,7 @@ function shFilaHtml(r, st){
   let pedHtml='';
   if(c){
     if(r.pedidos.length>1) pedHtml = `<select style="font-size:12px;margin-top:4px" onchange="shElegirPed('${r.k}',this.value)"><option value="">Elige el pedido…</option>${r.pedidos.map(p=>`<option value="${p.id}" ${ped&&ped.id===p.id?'selected':''}>${brEsc(p.lbl)}</option>`).join('')}</select>`;
-    else if(ped) pedHtml = `<div class="text-hint" style="font-size:11.5px;margin-top:2px">🧾 ${brEsc(ped.lbl)}</div>`;
+    else if(ped) pedHtml = `<div class="text-hint" style="font-size:11.5px;margin-top:2px">🧾 ${brEsc(ped.lbl)}${ped.ya?' <span class="badge badge-gray" style="font-size:10px">solo agrega boleta</span>':''}</div>`;
   }
   const buscar = st==='confirmado' ? '' : `<div style="margin-top:6px"><input type="text" placeholder="🔍 Buscar otra clienta (nombre, DNI o cel)" oninput="shBuscar('${r.k}',this.value)" style="font-size:12px"><div id="sh-bus-${r.k}"></div></div>`;
   const campos = st==='confirmado' ? `<div class="text-hint" style="font-size:12px;margin-top:4px">Orden <strong>${brEsc(r.orden)}</strong> · Código <strong>${brEsc(r.clave)}</strong></div>` :
@@ -9204,17 +9204,18 @@ async function shSubirFoto(blob){
 }
 async function shConfirmarFila(r, saltarPreventa){
   const p = r.pedido; if(!p||!r.cli) throw new Error('Falta clienta o pedido');
-  if(p.tipo==='pe' && !saltarPreventa && p.carrito_id){
+  if(p.tipo==='pe' && !p.ya && !saltarPreventa && p.carrito_id){
     const pv = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&preventa=eq.true&estado_bolsa=neq.eliminado&select=id`);
     if(pv.length && !confirm(`${r.cli.nombre}: su pedido tiene ${pv.length} prenda(s) en pre-venta sin reponer. ¿Despachar de todas formas?`)) throw new Error('omitido');
   }
   const foto = await shSubirFoto(r.blob);
   const base = {courier_codigo:r.orden, shalom_orden:r.orden, shalom_clave:r.clave, shalom_emision:r.emision?new Date(r.emision+'-05:00').toISOString():null, shalom_foto:foto};
   if(p.tipo==='pe'){
-    await dbPatch(`pedidos?id=eq.${p.id}`, {...base, estado:'en_camino'});
-    await registrarHistorialPedido(p.id, p.estado, 'en_camino', 'Boleta Shalom '+r.orden);
+    if(p.ya) await dbPatch(`pedidos?id=eq.${p.id}`, base);
+    else { await dbPatch(`pedidos?id=eq.${p.id}`, {...base, estado:'en_camino'}); await registrarHistorialPedido(p.id, p.estado, 'en_camino', 'Boleta Shalom '+r.orden); }
   } else {
-    await dbPatch(`brasil_pedidos?id=eq.${p.id}`, {...base, estado:'despachado', despachado_en:new Date().toISOString()});
+    if(p.ya) await dbPatch(`brasil_pedidos?id=eq.${p.id}`, base);
+    else await dbPatch(`brasil_pedidos?id=eq.${p.id}`, {...base, estado:'despachado', despachado_en:new Date().toISOString()});
   }
   r.estado='confirmado'; r.fotoUrl=foto;
 }
