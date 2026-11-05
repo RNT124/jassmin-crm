@@ -1486,7 +1486,8 @@ td.empty-state{padding:20px;text-align:center}
           <div id="despacho-bulk-bar" style="display:none;position:sticky;top:0;z-index:5;background:var(--primary);color:#fff;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
             <span id="despacho-bulk-count" style="font-size:12.5px;font-weight:500"></span>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkExportarCSV()">📊 Exportar Excel</button>
+              <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkExportarCSV()">📊 Excel motorizado</button>
+              <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkExcelShalomPro()">📦 Excel Shalom PRO</button>
               <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkImprimirEtiquetas()">🏷️ Imprimir etiquetas</button>
             </div>
           </div>
@@ -1567,6 +1568,28 @@ td.empty-state{padding:20px;text-align:center}
 </div>
 
 <!-- Modal: ver pedido + confirmar pago -->
+<!-- Modal: Excel Shalom PRO (registro masivo) -->
+<div class="modal-overlay" id="modal-shalom-pro">
+  <div class="modal" style="max-width:620px;max-height:92vh;overflow-y:auto">
+    <div class="modal-title">📦 Excel para Shalom PRO (registro masivo)</div>
+    <div style="background:var(--blue-light);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--blue-dark);margin-bottom:12px">
+      Revisa que la agencia destino de cada clienta sea la correcta. Lo que confirmes queda guardado: la próxima vez esa agencia sale sola.
+    </div>
+    <div class="form-row"><label class="form-label">Agencia ORIGEN (donde dejas los paquetes)</label>
+      <input id="shp-origen" list="shp-orig-list" placeholder="Buscar agencia de origen…" style="width:100%" autocomplete="off"></div>
+    <div class="form-row"><label class="form-label">Tamaño de paquete por defecto</label>
+      <div style="display:flex;gap:6px"><select id="shp-merc" style="flex:1"></select>
+      <button type="button" class="btn btn-sm" onclick="shProMercTodos()">Aplicar a todos</button></div></div>
+    <div id="shp-resumen" style="font-size:12px;font-weight:600;margin:4px 0 8px"></div>
+    <div id="shp-filas"></div>
+    <datalist id="shp-dest-list"></datalist>
+    <datalist id="shp-orig-list"></datalist>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal('modal-shalom-pro')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="shProDescargar()">⬇️ Descargar Excel</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="modal-br-compra">
   <div class="modal" style="max-width:480px">
     <div class="modal-title">Registrar compra</div>
@@ -5313,6 +5336,156 @@ function bulkExportarCSV(){
   marcarDespachadosSiSeConfirma(ids);
 }
 
+const SHALOM_PRO_DESTINOS = ["AAHH SANTA ROSA PIURA", "ABANCAY CO", "AGUAS VERDES", "AGUAYTÍA", "ALTO PUNO", "ALTO TRUJILLO", "AMARILIS CO", "AMBO", "ANCON", "ANDAHUAYLAS", "AÑO NUEVO", "ANT PANAM SUR CDRA 11", "ANTA IZCUCHACA", "APLAO", "ASOC LAS FLORES -  AV 54", "ASOC. NUEVO HORIZONTE - AV. 54", "ATAHUALPA", "ATOCONGO", "AUCAYACU", "AUTOPISTA LA JOYA", "AV  4 DE NOVIEMBRE CO", "AV  BALTA CDRA. 36", "AV  BOLIVAR", "AV  CENTRAL  SMP", "AV  ESPERANZA", "AV  FLORA TRISTAN", "AV  INDEPENDENCIA", "AV  JOSE GALVEZ", "AV  LA FONTANA", "AV  MARCO PUENTE", "AV  NICOLAS DUEÑAS CDRA. 5", "AV  QUILCA", "AV  SAN JUAN PAMPLONA ALTA", "AV  SANTA ROSA - STA ANITA", "AV  TUPAC AMARU KM. 19", "AV  VIGIL", "AV 15 DE AGOSTO", "AV ABRAHAM VALDELOMAR CO", "AV ALAMEDA DEL CORREGIDOR", "AV ANTONIO LORENA", "AV AUGUSTO SALAZAR BONDY", "AV BERTELLO CALLAO", "AV BUENOS AIRES", "AV CENTRAL SJL", "AV CHARCANI", "AV CIRCUNVALACIÓN CRUCE CON MARIATEGUI", "AV CIRCUNVALACION NAZCA", "AV CIRCUNVALACION SJL", "AV COLONIZADORES  CO", "AV COSTANERA", "AV EJERCITO", "AV EL SOL", "AV ENRIQUE MEIGGS", "AV FERNANDO BELAUNDE", "AV HERMANOS ANGULO", "AV HEROES DEL PACIFICO CO", "AV HNOS UCEDA - AMERICA NORTE", "AV HUANDOY CON AV CENTRAL", "AV HUANDOY CON MARAÑON", "AV JESUS", "AV JOSE A. QUIÑONES", "AV JOSE GRANDA CDRA 38", "AV JOSE GRANDA CDRA. 25", "AV JOSE LEAL CDRA 6", "AV JOSE SACO ROJAS", "AV LARCO", "AV LAS AMERICAS", "AV LIMA", "AV LOS INCAS", "AV LOS PRECURSORES / LAS AMERICAS", "AV MALECON  CHECA CDRA. 1", "AV MANUEL VALLE", "AV MARISCAL CASTILLA  PARQ INDUSTRIAL", "AV MEXICO CO", "AV MIGUEL GRAU  PAMPLONA ALTA", "AV PACHACUTEC", "AV PARRA 379", "AV PARTICIPACION PARCELA", "AV PUMACAHUA", "AV RAUL MATA LA CRUZ- DOS GRIFOS", "AV REVOLUCIÓN", "AV SAENZ PEÑA", "AV SANTA ROSA URB LOS ALAMOS", "AV SOCABAYA - LOS TORITOS", "AV TACNA", "AV TAHUANTINSUYO", "AV TOMAS MARSANO - LA BOLICHERA", "AV UNIV.  RETABLO", "AV UNIVERSITARIA CON IZAGUIRRE", "AV VENEZUELA", "AV VICTOR R. HAYA CO", "AV. 12 DE NOVIEMBRE", "AV. 13 DE ENERO", "AV. 27 DE NOVIEMBRE CO", "AV. ANGAMOS", "AV. ANGELICA GAMARRA", "AV. ARIAS ARAGUEZ", "AV. CANADA", "AV. CANEVARO", "AV. CANTA CALLAO  CON ALISOS", "AV. CANTA CALLAO CON IZAGUIRRE", "AV. CARLOS IZAGUIRRE CDRA. 14", "AV. CARLOS IZAGUIRRE CUADRA 23", "AV. CESAR VALLEJO", "AV. DEL MERCADO", "AV. DOMINICOS CDRA 14", "AV. DOS DE OCTUBRE", "AV. GERARDO UNGER CDRA 64", "AV. GRAU", "AV. GULLMAN", "AV. HORACIO ZEVALLOS", "AV. HUANCANE CDRA. 9", "AV. HUAROCHIRÍ", "AV. LA MARINA", "AV. LA MOLINA CDRA. 35", "AV. LAMPA", "AV. LAS MAGNOLIAS", "AV. LAS PALMERAS", "AV. LIMA - VMT", "AV. LIMA CDRA 38", "AV. LOS PESCADORES CO", "AV. LOS PLATINOS", "AV. LUIS EGUIGUREN", "AV. MODESTO BORDA", "AV. MUNICIPAL", "AV. PACÍFICO BELEN", "AV. PASTOR SEVILLA", "AV. PERU 15", "AV. PRINCIPAL", "AV. SAN LORENZO", "AV. SANTA ROSA CRUCE AV. EL SOL", "AV. TRAPICHE", "AV. TUPAC AMARU KM. 23.5", "AV. UNIV. PARQUE SINCHI ROCA", "AV. UNIVERSITARIA CDRA. 16", "AV. VILLA MARIA", "AVIACION 2819", "AYABACA", "AYACUCHO CO", "AYAVIRI", "AZANGARO", "BAGUA CAPITAL", "BAGUA GRANDE", "BAMBAMARCA", "BAÑOS DEL INCA", "BARRANCA", "BARRIO SAN JOSE", "BARRIO SAN MARTÍN", "BARRIO STA ANA CO", "BARRIO YANANACO", "BAYOVAR", "BELLAVISTA CALLAO", "BELLAVISTA SULLANA", "CACHIMAYO - SAN SEBASTIAN", "CAJABAMBA", "CAJAMARCA CO", "CAJAMARCA HORACIO ZEVALLOS", "CALLAO FAUCETT", "CALLE A  CON AV INDUSTRIAL", "CALLE EMAÚS", "CALLE LIMA", "CALLE LIVERPOOL", "CALLE LOS ANGELES", "CALLE SANTA CRUZ - AMERICA SUR", "CALLE TACNA", "CALLE TAHUANTINSUYO", "CALLE YARABAMBA", "CALLERIA AV SAENZ PEÑA", "CALLERIA JR JOSE GALVEZ", "CAMANA", "CAMPOY", "CAÑETE IMPERIAL", "CAÑETE SAN VICENTE", "CANTO GRANDE", "CARABAYLLO ESTABLO", "CARAZ", "CARHUAZ", "CARMEN ALTO", "CASA GRANDE", "CASMA", "CATACAOS", "CELENDIN", "CERRO DE PASCO", "CHACHAPOYAS CO DOS DE MAYO", "CHACHAPOYAS JR GRAU", "CHALA", "CHALLHUAHUACHO", "CHANCAY", "CHAO", "CHEN CHEN", "CHEPEN", "CHILCA CO LEONCIO PRADO", "CHILCA HUANCAYO", "CHILETE - AGENTE", "CHINCHA PUEBLO NUEVO", "CHINCHERO", "CHONGOYAPE", "CHORRILLOS CO", "CHORRILLOS LOS FAISANES", "CHOSICA", "CHOTA", "CHULUCANAS", "CHUPACA", "CHURÍN", "CIENEGUILLA KM. 14.5", "CIUDAD DE DIOS", "CIUDAD MUNICIPAL", "CIUDAD UNIVERSITARIA", "COCACHACRA", "COMBAPATA", "CONCEPCION", "CONGATA", "CORRALES", "CRUZ DE MOTUPE", "CTRA IQUITOS NAUTA", "CUSCO CALCA", "CUSCO CO VIA EVITAMIENTO", "CUSCO PARQUE INDUSTRIAL", "CUSCO URUBAMBA", "CUTERVO", "DESAGUADERO", "EL ALTO", "EL CRUCE LA JOYA", "EL MILAGRO", "EL PROGRESO KM 22", "EL RETAMAL", "EL TRIUNFO", "ESPINAR", "FERREÑAFE", "FIORI", "GARATEA", "GERMÁN AGUIRRE", "GUADALUPE LA LIBERTAD", "HIGUERETA", "HUACHO AV  INDACOCHEA", "HUAMACHUCO", "HUAMBOCANCHA BAJA", "HUANCABAMBA", "HUANCARO", "HUANCAYO JR. ICA", "HUANTA", "HUARACLLA", "HUARAL", "HUARAZ INDEPENDENCIA", "HUARMEY", "HUAURA", "HUAYCAN  EL DESCANSO", "HUAYCAN AV HORACIO ZEVALLOS", "HUAYCAN AV JOSE C MARIATEGUI", "HUAYCAN ENTRADA", "HUAYLLAY", "IBERIA", "ICA AV. JJ ELIAS", "ICA SAN JOAQUIN", "ICA SANTIAGO", "ICA SUBTANJALLA CO", "ICA URB. MANZANILLA", "IGNACIO ESCUDERO", "ILAVE", "ILO CO PAMPA INALAMBRICA", "ILO PACOCHA", "ILO PUERTO", "IQUITOS  AV TUPAC AMARU", "IQUITOS CO JR. BOLOGNESI", "IQUITOS JR PABLO ROSSEL", "JACOBO HUNTER", "JAEN CO", "JAUJA", "JAYANCA", "JESUS MARIA", "JESUS NAZARENO", "JICAMARCA", "JIRON ANCASH", "JR  FREDY ALIAGA CO", "JR AGUSTIN GAMARRA", "JR CASANOVA CON PETIT THOUARS", "JR CHINCHAYSUYO CDRA 4", "JR LEONCIO PRADO", "JR MAYRO", "JR. CAHUIDE", "JR. HUARAZ -  BREÑA", "JR. MAMA OCLLO", "JR. RAMÓN CASTILLA", "JR. RAYMONDI", "JR. TAHUANTINSUYO", "JUANJUI  CENTRO", "JUANJUÍ FERNANDO BELAUNDE TERRY CO", "LA CINCUENTA", "LA CRUZ  TUMBES", "LA CURVA DE MANCHAY", "LA MERCED", "LA OROYA", "LA TABLADA ZONA NUEVA", "LA TINGUIÑA", "LA UNION", "LA VILLA  CRUCE PISCO", "LAMAS", "LAMBAYEQUE CENTRO", "LAMBAYEQUE PANAMERICANA", "LARCOMAR", "LAS CONCHITAS", "LAS DELICIAS DE VILLA", "LAS LOMAS", "LAS MERCEDES", "LIMA AV TINGO MARÍA", "LOS FRESNOS", "LOS ORGANOS", "LOS PINOS", "LOS SAUCES", "LUYA", "MAGDALENA DEL MAR", "MALA", "MALL LAMBRAMANI", "MALVINAS - JR. GARCIA VILLóN", "MALVINAS - JR. RICARDO TRENEMAN", "MANANTAY  AV AGUAYTIA", "MANANTAY AV TUPAC AMARU", "MANCHAY TRES MARIAS", "MÁNCORA", "MARIA AUXILIADORA", "MARIANO MELGAR", "MATARANI", "MAZAMARI", "MAZUKO", "MEGAPLAZA CHORRILLOS", "MEGAPLAZA INDEPENDENCIA", "MI PERU", "MIRAFLORES AREQUIPA", "MIRAFLORES CHICLAYO", "MOCHE", "MOLLENDO CO", "MONSEFU", "MORROPE", "MORROPON", "MOTUPE", "MOYOBAMBA  CENTRO", "MOYOBAMBA  CO", "NUEVA CAJAMARCA", "NUEVA ESPERANZA VMT", "NUEVO IMPERIAL CO", "NUEVO LURIN", "OCONGATE", "OLMOS", "OROPESA", "OTUZCO", "OVALO DE LA FAMILIA", "OVALO HUANCHACO CO", "OVALO LA PERLA", "ÓVALO MARIÁTEGUI", "OVALO PAPAL", "OVALO PUENTE PIEDRA", "OXAPAMPA", "PACANGUILLA", "PACASMAYO CENTRO", "PACASMAYO LAS PALMERAS", "PACHACUTEC  AV 150", "PACHACUTEC PDRO CHINITAS", "PACHACUTEC PDRO VC", "PAIJAN", "PAIMAS", "PAITA", "PAMPA GRANDE TUMBES", "PANGOA", "PARAD.  LOS LICENCIADOS", "PARAMONGA", "PARCONA", "PARDO MIGUEL NARANJOS", "PARQUE INDUSTRIAL CO PIURA FUTURA", "PARQUE LA MOLINA", "PATAPO", "PEDRO RUIZ", "PERENE", "PESQUERO", "PICHANAKI", "PICHARI", "PICOTA", "PILCOMAYO", "PIMENTEL", "PIO  PATA", "PISAC", "PLAZA LA TOMILLA", "PLAZA NORTE ENTREGAS", "POCOLLAY", "POMALCA", "PRO", "PROLONG LUIS MASSARO", "PUCALLPA CO FEDERICO BASADRE", "PUENTE ARICA", "PUENTE LURIN", "PUENTE NUEVO", "PUENTE SANTA ANITA", "PUENTE VIRU", "PUNCHANA", "PUNTA HERMOSA", "QUEBRADA LAS LECHUZAS CO", "QUILLABAMBA", "REAL PLAZA SALAVERRY", "REP. DE PANAMA", "REQUE", "RIMAC AV. AMANCAES", "RIMAC GUARDIA REPUBLICANA CDRA. 9", "RIOJA", "SALAS ICA", "SALAVERRY HUACHO CO", "SALCEDO", "SAN AGUSTIN DE CAJAS", "SAN ANTONIO", "SAN CARLOS HUANCAYO", "SAN CLEMENTE", "SAN IGNACIO", "SAN JERONIMO", "SAN JOSE DE SISA", "SAN JUAN BAUTISTA", "SAN JUAN DE MARCONA", "SAN MARCOS", "SAN MARTIN BELLAVISTA", "SAN MIGUEL CAJAMARCA", "SAN PABLO  CAJAMARCA", "SAN PEDRO DE LLOC", "SAN RAMÓN", "SANTA", "SANTA CLARA", "SANTA MARÍA DE HUACHIPA", "SANTA ROSA", "SANTO DOMINGO", "SANTO TOMAS", "SAPALLANGA", "SAPOSOA", "SATIPO", "SAYAN", "SECHURA", "SEGUNDA DE PRO", "SEGUNDA JERUSALEN", "SICUANI AV CONFEDERACION CO", "SICUANI AV MANUEL CALLO", "SJL- LAS FLORES", "SJL-AV.PROCERES", "SMP AV BERTELLO", "SMP AV PACASMAYO", "SMP-AV. PROCERES", "SORITOR", "SULLANA CO ZONA INDUSTRIAL", "SULLANA SANTA ROSA", "SUNAMPE  CO", "SUPE", "SURCO MATEO PUMACAHUA", "TACALA", "TACNA CIUDAD NUEVA", "TACNA CO AV. JORGE BASADRE", "TALARA  CO ASOC CALIFORNIA", "TALARA ALTA 9 DE OCTUBRE", "TALARA BAJA PARQUE 22", "TAMBO GRANDE", "TAMBOPATA AV CIRCUNVALACION", "TAMBOPATA AV UCAYALI  CO", "TARAPOTO CO JR ALFONSO UGARTE", "TARAPOTO JR. SARGENTO LOREZ", "TARAPOTO LA BANDA DE SHILCAYO", "TARMA", "TEMBLADERA  CAJAMARCA", "TERMINAL JAUJA", "TERMINAL LOS ANDES", "TICA TICA", "TRES DE OCTUBRE", "TRUJILLO LA PERLA", "TUCUME", "TUMAN", "TUMBES - AV ARICA", "TUMBES CO - PANAMERICANA NORTE KM 2360", "TUMBES PUYANGO", "TUNGASUCA", "UCHIZA", "URB MANUEL PRADO", "URB SANTA ELVIRA", "URB UNIVERSAL", "URB. BANCOPATA AV. INDUSTRIAL", "URB. REPARTICIÓN", "URCOS", "VARIANTE UCHUMAYO CO", "VELASCO ASTETE", "VIA EXPRESA SUR", "VILLA RICA", "VILLA SAN FRANCISCO", "VIÑANIS", "VIRU CENTRO", "VISTA ALEGRE CO", "WICHANZAO", "YARINACOCHA  AV UNIVERSITARIA", "YARINACOCHA CENTRO", "YUNGAY", "YURA", "YURIMAGUAS", "ZAMACOLA", "ZAPALLAL", "ZARUMILLA", "ZORRITOS", "01 DE MAYO"];
+const SHALOM_PRO_ORIGENES = ["AAHH SANTA ROSA PIURA", "ABANCAY CO", "AGUAS VERDES", "AGUAYTÍA", "ALTO PUNO", "ALTO TRUJILLO", "AMARILIS CO", "AMBO", "ANCON", "ANDAHUAYLAS", "AÑO NUEVO", "ANT PANAM SUR CDRA 11", "ANTA IZCUCHACA", "APLAO", "ASOC LAS FLORES -  AV 54", "ASOC. NUEVO HORIZONTE - AV. 54", "ATAHUALPA", "ATOCONGO", "AUCAYACU", "AUTOPISTA LA JOYA", "AV  4 DE NOVIEMBRE CO", "AV  BALTA CDRA. 36", "AV  BOLIVAR", "AV  CENTRAL  SMP", "AV  ESPERANZA", "AV  FLORA TRISTAN", "AV  INDEPENDENCIA", "AV  JOSE GALVEZ", "AV  LA FONTANA", "AV  MARCO PUENTE", "AV  NICOLAS DUEÑAS CDRA. 5", "AV  QUILCA", "AV  SAN JUAN PAMPLONA ALTA", "AV  SANTA ROSA - STA ANITA", "AV  TUPAC AMARU KM. 19", "AV  VIGIL", "AV 15 DE AGOSTO", "AV ABRAHAM VALDELOMAR CO", "AV ALAMEDA DEL CORREGIDOR", "AV ANTONIO LORENA", "AV AUGUSTO SALAZAR BONDY", "AV BERTELLO CALLAO", "AV BUENOS AIRES", "AV CENTRAL SJL", "AV CHARCANI", "AV CIRCUNVALACIÓN CRUCE CON MARIATEGUI", "AV CIRCUNVALACION NAZCA", "AV CIRCUNVALACION SJL", "AV COLONIZADORES  CO", "AV COSTANERA", "AV EJERCITO", "AV EL SOL", "AV ENRIQUE MEIGGS", "AV FERNANDO BELAUNDE", "AV HERMANOS ANGULO", "AV HEROES DEL PACIFICO CO", "AV HNOS UCEDA - AMERICA NORTE", "AV HUANDOY CON AV CENTRAL", "AV HUANDOY CON MARAÑON", "AV HUAROCHIRI ENVIOS", "AV JESUS", "AV JOSE A. QUIÑONES", "AV JOSE GRANDA CDRA 38", "AV JOSE GRANDA CDRA. 25", "AV JOSE LEAL CDRA 6", "AV JOSE SACO ROJAS", "AV LARCO", "AV LAS AMERICAS", "AV LIMA", "AV LOS INCAS", "AV LOS PRECURSORES / LAS AMERICAS", "AV MALECON  CHECA CDRA. 1", "AV MANUEL VALLE", "AV MARISCAL CASTILLA  PARQ INDUSTRIAL", "AV MEXICO CO", "AV MIGUEL GRAU  PAMPLONA ALTA", "AV PACHACUTEC", "AV PARRA 379", "AV PARTICIPACION PARCELA", "AV PUMACAHUA", "AV RAUL MATA LA CRUZ- DOS GRIFOS", "AV REVOLUCIÓN", "AV SAENZ PEÑA", "AV SANTA ROSA URB LOS ALAMOS", "AV SOCABAYA - LOS TORITOS", "AV TACNA", "AV TAHUANTINSUYO", "AV TOMAS MARSANO - LA BOLICHERA", "AV TUPAC AMARU CDRA. 57", "AV UNIV.  RETABLO", "AV UNIVERSITARIA CON IZAGUIRRE", "AV VENEZUELA", "AV VICTOR R. HAYA CO", "AV. 12 DE NOVIEMBRE", "AV. 13 DE ENERO", "AV. 27 DE NOVIEMBRE CO", "AV. ALFREDO BENAVIDES", "AV. ANGAMOS", "AV. ANGELICA GAMARRA", "AV. ARAMBURU", "AV. ARIAS ARAGUEZ", "AV. CANADA", "AV. CANEVARO", "AV. CANTA CALLAO  CON ALISOS", "AV. CANTA CALLAO CON IZAGUIRRE", "AV. CARLOS IZAGUIRRE CDRA. 14", "AV. CARLOS IZAGUIRRE CUADRA 23", "AV. CESAR VALLEJO", "AV. COMANDANTE ESPINAR", "AV. DEL MERCADO", "AV. DOMINICOS CDRA 14", "AV. DOS DE OCTUBRE", "AV. GERARDO UNGER CDRA 64", "AV. GRAU", "AV. GULLMAN", "AV. HORACIO ZEVALLOS", "AV. HUANCANE CDRA. 9", "AV. HUAROCHIRÍ", "AV. JOSE PARDO", "AV. LA MARINA", "AV. LA MOLINA CDRA. 35", "AV. LAMPA", "AV. LAS MAGNOLIAS", "AV. LAS PALMERAS", "AV. LIMA - VMT", "AV. LIMA CDRA 38", "AV. LOS PESCADORES CO", "AV. LOS PLATINOS", "AV. LUIS EGUIGUREN", "AV. MODESTO BORDA", "AV. MUNICIPAL", "AV. PACÍFICO BELEN", "AV. PASTOR SEVILLA", "AV. PERU 15", "AV. PRIMAVERA 120", "AV. PRINCIPAL", "AV. SAN FELIPE", "AV. SAN LORENZO", "AV. SANTA ROSA CRUCE AV. EL SOL", "AV. TRAPICHE", "AV. TUPAC AMARU KM. 23.5", "AV. UNIV. PARQUE SINCHI ROCA", "AV. UNIVERSITARIA CDRA. 16", "AV. VILLA MARIA", "AVIACION 2819", "AYABACA", "AYACUCHO CO", "AYAVIRI", "AZANGARO", "BAGUA CAPITAL", "BAGUA GRANDE", "BAMBAMARCA", "BAÑOS DEL INCA", "BARRANCA", "BARRIO SAN JOSE", "BARRIO SAN MARTÍN", "BARRIO STA ANA CO", "BARRIO YANANACO", "BAYOVAR", "BELLAVISTA CALLAO", "BELLAVISTA SULLANA", "CACHIMAYO - SAN SEBASTIAN", "CAJABAMBA", "CAJAMARCA CO", "CAJAMARCA HORACIO ZEVALLOS", "CALLAO FAUCETT", "CALLE A  CON AV INDUSTRIAL", "CALLE EMAÚS", "CALLE LIMA", "CALLE LIVERPOOL", "CALLE LOS ANGELES", "CALLE MIGUEL DASSO", "CALLE SANTA CRUZ - AMERICA SUR", "CALLE TACNA", "CALLE TAHUANTINSUYO", "CALLE YARABAMBA", "CALLERIA AV SAENZ PEÑA", "CALLERIA JR JOSE GALVEZ", "CAMANA", "CAMPOY", "CAÑETE IMPERIAL", "CAÑETE SAN VICENTE", "CANTO GRANDE", "CARABAYLLO ESTABLO", "CARAZ", "CARHUAZ", "CARMEN ALTO", "CASA GRANDE", "CASMA", "CATACAOS", "CELENDIN", "CERRO DE PASCO", "CHACHAPOYAS CO DOS DE MAYO", "CHACHAPOYAS JR GRAU", "CHALA", "CHALLHUAHUACHO", "CHANCAY", "CHAO", "CHEN CHEN", "CHEPEN", "CHILCA CO LEONCIO PRADO", "CHILCA HUANCAYO", "CHILETE - AGENTE", "CHINCHA PUEBLO NUEVO", "CHINCHERO", "CHONGOYAPE", "CHORRILLOS CO", "CHORRILLOS LOS FAISANES", "CHOSICA", "CHOTA", "CHULUCANAS", "CHUPACA", "CHURÍN", "CIENEGUILLA KM. 14.5", "CIUDAD DE DIOS", "CIUDAD MUNICIPAL", "CIUDAD UNIVERSITARIA", "COCACHACRA", "COMBAPATA", "CONCEPCION", "CONGATA", "CORPAC", "CORRALES", "CRUZ DE MOTUPE", "CTRA IQUITOS NAUTA", "CUSCO CALCA", "CUSCO CO VIA EVITAMIENTO", "CUSCO PARQUE INDUSTRIAL", "CUSCO URUBAMBA", "CUTERVO", "DESAGUADERO", "EL ALTO", "EL CRUCE LA JOYA", "EL MILAGRO", "EL PROGRESO KM 22", "EL RETAMAL", "EL TRIUNFO", "ESPINAR", "FERREÑAFE", "FIORI", "GARATEA", "GERMÁN AGUIRRE", "GUADALUPE LA LIBERTAD", "HIGUERETA", "HUACHO AV  INDACOCHEA", "HUAMACHUCO", "HUAMBOCANCHA BAJA", "HUANCABAMBA", "HUANCARO", "HUANCAYO JR. ICA", "HUANTA", "HUARACLLA", "HUARAL", "HUARAZ INDEPENDENCIA", "HUARMEY", "HUAURA", "HUAYCAN  EL DESCANSO", "HUAYCAN AV HORACIO ZEVALLOS", "HUAYCAN AV JOSE C MARIATEGUI", "HUAYCAN ENTRADA", "HUAYLLAY", "IBERIA", "ICA AV. JJ ELIAS", "ICA SAN JOAQUIN", "ICA SANTIAGO", "ICA SUBTANJALLA CO", "ICA URB. MANZANILLA", "IGNACIO ESCUDERO", "ILAVE", "ILO CO PAMPA INALAMBRICA", "ILO PACOCHA", "ILO PUERTO", "IQUITOS  AV TUPAC AMARU", "IQUITOS CO JR. BOLOGNESI", "IQUITOS JR PABLO ROSSEL", "JACOBO HUNTER", "JAEN CO", "JAUJA", "JAYANCA", "JESUS MARIA", "JESUS NAZARENO", "JICAMARCA", "JIRON ANCASH", "JR  FREDY ALIAGA CO", "JR AGUSTIN GAMARRA", "JR CASANOVA CON PETIT THOUARS", "JR CHINCHAYSUYO CDRA 4", "JR LEONCIO PRADO", "JR MAYRO", "JR. CAHUIDE", "JR. HUARAZ -  BREÑA", "JR. LUNA PIZARRO", "JR. MAMA OCLLO", "JR. RAMÓN CASTILLA", "JR. RAYMONDI", "JR. TAHUANTINSUYO", "JUANJUI  CENTRO", "JUANJUÍ FERNANDO BELAUNDE TERRY CO", "LA CINCUENTA", "LA CRUZ  TUMBES", "LA CURVA DE MANCHAY", "LA MERCED", "LA OROYA", "LA TABLADA ZONA NUEVA", "LA TINGUIÑA", "LA UNION", "LA VILLA  CRUCE PISCO", "LAMAS", "LAMBAYEQUE CENTRO", "LAMBAYEQUE PANAMERICANA", "LARCOMAR", "LAS CONCHITAS", "LAS DELICIAS DE VILLA", "LAS LOMAS", "LAS MERCEDES", "LIMA AV TINGO MARÍA", "LOS FRESNOS", "LOS ORGANOS", "LOS PINOS", "LOS SAUCES", "LUYA", "MAGDALENA DEL MAR", "MALA", "MALL LAMBRAMANI", "MALVINAS - JR. GARCIA VILLóN", "MALVINAS - JR. RICARDO TRENEMAN", "MANANTAY  AV AGUAYTIA", "MANANTAY AV TUPAC AMARU", "MANCHAY TRES MARIAS", "MÁNCORA", "MARIA AUXILIADORA", "MARIANO MELGAR", "MATARANI", "MAZAMARI", "MAZUKO", "MEGAPLAZA CHORRILLOS", "MEGAPLAZA INDEPENDENCIA", "MI PERU", "MIRAFLORES AREQUIPA", "MIRAFLORES CHICLAYO", "MOCHE", "MOLLENDO CO", "MONSEFU", "MORROPE", "MORROPON", "MOTUPE", "MOYOBAMBA  CENTRO", "MOYOBAMBA  CO", "NUEVA CAJAMARCA", "NUEVA ESPERANZA VMT", "NUEVO IMPERIAL CO", "NUEVO LURIN", "OCONGATE", "OLMOS", "OROPESA", "OTUZCO", "OUTLET ARAUCO FAUCETT", "OVALO DE LA FAMILIA", "OVALO HUANCHACO CO", "OVALO LA PERLA", "ÓVALO MARIÁTEGUI", "OVALO PAPAL", "OVALO PUENTE PIEDRA", "OXAPAMPA", "PACANGUILLA", "PACASMAYO CENTRO", "PACASMAYO LAS PALMERAS", "PACHACUTEC  AV 150", "PACHACUTEC PDRO CHINITAS", "PACHACUTEC PDRO VC", "PAIJAN", "PAIMAS", "PAITA", "PAMPA GRANDE TUMBES", "PANGOA", "PARAD.  LOS LICENCIADOS", "PARAMONGA", "PARCONA", "PARDO MIGUEL NARANJOS", "PARQUE INDUSTRIAL CO PIURA FUTURA", "PARQUE LA MOLINA", "PATAPO", "PEDRO RUIZ", "PERENE", "PESQUERO", "PICHANAKI", "PICHARI", "PICOTA", "PILCOMAYO", "PIMENTEL", "PIO  PATA", "PISAC", "PLAZA LA TOMILLA", "PLAZA NORTE ENTREGAS", "PLAZA NORTE S. EXPRESS", "POCOLLAY", "POMALCA", "PRO", "PROLONG LUIS MASSARO", "PUCALLPA CO FEDERICO BASADRE", "PUENTE ARICA", "PUENTE LURIN", "PUENTE NUEVO", "PUENTE SANTA ANITA", "PUENTE VIRU", "PUNCHANA", "PUNTA HERMOSA", "QUEBRADA LAS LECHUZAS CO", "QUILLABAMBA", "REAL PLAZA SALAVERRY", "REP. DE PANAMA", "REQUE", "RIMAC AV. AMANCAES", "RIMAC GUARDIA REPUBLICANA CDRA. 9", "RIOJA", "RIV. NAVARRETE", "SALAS ICA", "SALAVERRY HUACHO CO", "SALCEDO", "SAN AGUSTIN DE CAJAS", "SAN ANTONIO", "SAN CARLOS HUANCAYO", "SAN CLEMENTE", "SAN IGNACIO", "SAN JERONIMO", "SAN JOSE DE SISA", "SAN JUAN BAUTISTA", "SAN JUAN DE MARCONA", "SAN MARCOS", "SAN MARTIN BELLAVISTA", "SAN MIGUEL CAJAMARCA", "SAN PABLO  CAJAMARCA", "SAN PEDRO DE LLOC", "SAN RAMÓN", "SANTA", "SANTA CLARA", "SANTA MARÍA DE HUACHIPA", "SANTA ROSA", "SANTO DOMINGO", "SANTO TOMAS", "SAPALLANGA", "SAPOSOA", "SATIPO", "SAYAN", "SECHURA", "SEGUNDA DE PRO", "SEGUNDA JERUSALEN", "SICUANI AV CONFEDERACION CO", "SICUANI AV MANUEL CALLO", "SJL- LAS FLORES", "SJL-AV.PROCERES", "SMP AV BERTELLO", "SMP AV PACASMAYO", "SMP-AV. PROCERES", "SORITOR", "SULLANA CO ZONA INDUSTRIAL", "SULLANA SANTA ROSA", "SUNAMPE  CO", "SUPE", "SURCO MATEO PUMACAHUA", "TACALA", "TACNA CIUDAD NUEVA", "TACNA CO AV. JORGE BASADRE", "TALARA  CO ASOC CALIFORNIA", "TALARA ALTA 9 DE OCTUBRE", "TALARA BAJA PARQUE 22", "TAMBO GRANDE", "TAMBOPATA AV CIRCUNVALACION", "TAMBOPATA AV UCAYALI  CO", "TARAPOTO CO JR ALFONSO UGARTE", "TARAPOTO JR. SARGENTO LOREZ", "TARAPOTO LA BANDA DE SHILCAYO", "TARMA", "TEMBLADERA  CAJAMARCA", "TERMINAL JAUJA", "TERMINAL LOS ANDES", "TICA TICA", "TINGO MARÍA - LEONCIO PRADO", "TINGO MARIA CO BUENOS AIRES", "TRES DE OCTUBRE", "TRUJILLO LA PERLA", "TUCUME", "TUMAN", "TUMBES - AV ARICA", "TUMBES CO - PANAMERICANA NORTE KM 2360", "TUMBES PUYANGO", "TUNGASUCA", "UCHIZA", "URB MANUEL PRADO", "URB SANTA ELVIRA", "URB UNIVERSAL", "URB. BANCOPATA AV. INDUSTRIAL", "URB. REPARTICIÓN", "URCOS", "VARIANTE UCHUMAYO CO", "VELASCO ASTETE", "VIA EXPRESA SUR", "VILLA RICA", "VILLA SAN FRANCISCO", "VIÑANIS", "VIRU CENTRO", "VISTA ALEGRE CO", "WICHANZAO", "YARINACOCHA  AV UNIVERSITARIA", "YARINACOCHA CENTRO", "YUNGAY", "YURA", "YURIMAGUAS", "ZAMACOLA", "ZAPALLAL", "ZARUMILLA", "ZORRITOS", "01 DE MAYO"];
+// ══════════ Excel Shalom PRO (registro masivo) ══════════
+// Listas oficiales tomadas del "Formato Pro Masivo" de pro.shalom.pe (Hoja2). Si Shalom abre/cierra agencias, actualizar aquí.
+// Medidas por tipo de paquete: mismas fórmulas que trae la plantilla oficial (alto, ancho, largo en m; peso en kg)
+const SHALOM_PRO_PAQUETES = {
+  'SOBRE':[0.1,0.1,0.15,0], 'PAQUETE XXS':[0.15,0.1,0.1,0.25], 'PAQUETE XS':[0.2,0.15,0.12,0.5],
+  'PAQUETE S':[0.3,0.3,0.12,2], 'PAQUETE M':[0.3,0.24,0.2,5], 'PAQUETE L':[0.42,0.3,0.23,10]
+};
+let shProFilas = [];
+let shProMapa = {};
+
+function shEsc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function shNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9ñ ]/g,' '); }
+const SH_STOP = new Set('av avenida jr jiron calle ca co de del la las los el y mz mza lt lte n nro cdra urb sec zona asoc prolong prol carretera km s lima con en a e'.split(' '));
+function shToks(s){ return shNorm(s).split(/\s+/).filter(t=>t.length>1 && !SH_STOP.has(t)); }
+function shProClave(c){ return ((c.distrito||'')+'|'+(c.direccion||'')).trim(); }
+
+// Sugerencias de destino PRO para la agencia que eligió la clienta (solo sugerencias: siempre se revisan a mano la 1ra vez)
+function shProSugerir(c){
+  const dir = String(c.direccion||'');
+  const partes = dir.split(' — ');
+  const dist = partes.length>1 ? partes[0] : '';
+  const hay = new Set(shToks(dir+' '+(c.distrito||'')));
+  const inicio = shToks(partes.length>1 ? partes.slice(1).join(' ') : dir).slice(0,5);
+  const dt = new Set(shToks(dist));
+  const out = [];
+  SHALOM_PRO_DESTINOS.forEach(p=>{
+    const pt = shToks(p); if(!pt.length) return;
+    const cov = pt.filter(t=>hay.has(t)).length/pt.length; if(!cov) return;
+    const sc = cov + 0.2*pt.filter(t=>inicio.includes(t)).length/pt.length + 0.15*pt.filter(t=>dt.has(t)).length/pt.length + 0.01*pt.length;
+    out.push([sc,p]);
+  });
+  return out.sort((a,b)=>b[0]-a[0]).slice(0,4).map(x=>x[1]);
+}
+
+async function shProCargarMapa(){
+  try { shProMapa = JSON.parse(localStorage.getItem('shalomProMapa')||'{}')||{}; } catch(e){ shProMapa = {}; }
+  try {
+    const rows = await dbGet('shalom_pro_destinos?select=agencia,destino');
+    (rows||[]).forEach(r=>{ shProMapa[r.agencia]=r.destino; });
+  } catch(e){ /* tabla aún no creada: se usa solo lo guardado en este navegador */ }
+}
+async function shProGuardarMapa(pares){
+  pares.forEach(([k,v])=>{ shProMapa[k]=v; });
+  try { localStorage.setItem('shalomProMapa', JSON.stringify(shProMapa)); } catch(e){}
+  try {
+    await supaFetch('shalom_pro_destinos?on_conflict=agencia','POST', JSON.stringify(pares.map(([agencia,destino])=>({agencia,destino}))), 'resolution=merge-duplicates,return=minimal');
+  } catch(e){ console.warn('No se pudo guardar en Supabase (¿falta correr migracion_shalom_pro.sql?)', e); }
+}
+
+// lista: [{nombre, dni, telefono, distrito, direccion}]
+async function abrirExcelShalomPro(lista){
+  if(!lista.length){ toast('Selecciona al menos un pedido de Shalom'); return; }
+  const dl = document.getElementById('shp-dest-list');
+  if(!dl.options.length){
+    dl.innerHTML = SHALOM_PRO_DESTINOS.map(d=>`<option value="${shEsc(d)}">`).join('');
+    document.getElementById('shp-orig-list').innerHTML = SHALOM_PRO_ORIGENES.map(d=>`<option value="${shEsc(d)}">`).join('');
+  }
+  await shProCargarMapa();
+  // Una fila por clienta (si tiene 2 pedidos seleccionados, va 1 solo paquete)
+  const vistos = new Set();
+  shProFilas = [];
+  lista.forEach(c=>{
+    const k = (c.telefono||'')+'|'+(c.dni||'');
+    if(vistos.has(k)) return; vistos.add(k);
+    const clave = shProClave(c);
+    const guardado = shProMapa[clave] && SHALOM_PRO_DESTINOS.includes(shProMapa[clave]) ? shProMapa[clave] : '';
+    const sug = shProSugerir(c);
+    shProFilas.push({...c, clave, sug, destino: guardado, guardado: !!guardado});
+  });
+  const origen = shProMapa['__origen__']||'';
+  const merc = shProMapa['__mercaderia__']||'PAQUETE S';
+  document.getElementById('shp-origen').value = origen;
+  document.getElementById('shp-merc').innerHTML = Object.keys(SHALOM_PRO_PAQUETES).map(m=>`<option ${m===merc?'selected':''}>${m}</option>`).join('');
+  shProRender();
+  document.getElementById('modal-shalom-pro').classList.add('open');
+}
+
+function shProRender(){
+  const merc = document.getElementById('shp-merc').value;
+  document.getElementById('shp-filas').innerHTML = shProFilas.map((f,i)=>{
+    const dniOk = /^\d{8}$/.test(String(f.dni||'').trim());
+    const celOk = /^9\d{8}$/.test(String(f.telefono||'').replace(/\D/g,'').slice(-9));
+    const ok = SHALOM_PRO_DESTINOS.includes(f.destino);
+    const estado = !f.destino ? '<span class="badge badge-warn">Elige la agencia</span>'
+      : !ok ? '<span class="badge badge-warn">No está en la lista de Shalom</span>'
+      : f.guardado ? '<span class="badge badge-ok">✓ Ya confirmada antes</span>' : '<span class="badge badge-info">✓ Elegida</span>';
+    const chips = (!f.guardado && f.sug.length) ? `<div style="font-size:11px;color:var(--text3);margin:6px 0 4px">¿Es alguna de estas? Tócala:</div><div class="pill-row">`
+      + f.sug.map(s=>`<button type="button" class="btn btn-xs" style="${s===f.destino?'background:var(--primary);color:#fff':''}" onclick="shProElegir(${i}, this.dataset.v)" data-v="${shEsc(s)}">${shEsc(s)}</button>`).join('') + '</div>' : '';
+    return `<div class="card" style="padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;align-items:center">
+        <strong style="font-size:13px">${shEsc(f.nombre||'(sin nombre)')}</strong>${estado}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">DNI ${dniOk?shEsc(f.dni):'<span style="color:var(--red,#c0392b);font-weight:600">'+(f.dni?shEsc(f.dni)+' (inválido)':'FALTA')+'</span>'}
+        · Cel ${celOk?shEsc(f.telefono):'<span style="color:var(--red,#c0392b);font-weight:600">'+(f.telefono?shEsc(f.telefono)+' (inválido)':'FALTA')+'</span>'}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px;background:var(--gray-light);border-radius:6px;padding:6px 8px">📍 Ella eligió: <strong>${shEsc(f.distrito||'')}</strong> · ${shEsc(f.direccion||'(sin agencia)')}</div>
+      ${chips}
+      <input list="shp-dest-list" value="${shEsc(f.destino)}" placeholder="Buscar agencia destino en la lista de Shalom…" oninput="shProEscribir(${i}, this.value)" onchange="shProRender()" style="width:100%;margin-top:6px" autocomplete="off">
+      <select onchange="shProFilas[${i}].merc=this.value" style="width:100%;margin-top:6px">${Object.keys(SHALOM_PRO_PAQUETES).map(m=>`<option ${m===(f.merc||merc)?'selected':''}>${m}</option>`).join('')}</select>
+    </div>`;
+  }).join('');
+  const listos = shProFilas.filter(f=>SHALOM_PRO_DESTINOS.includes(f.destino)).length;
+  document.getElementById('shp-resumen').textContent = `${listos} de ${shProFilas.length} con agencia destino lista`;
+}
+function shProElegir(i, v){ shProFilas[i].destino=v; shProFilas[i].guardado=false; shProRender(); }
+function shProEscribir(i, v){ shProFilas[i].destino=v.trim(); shProFilas[i].guardado=false; }
+function shProMercTodos(){ const m=document.getElementById('shp-merc').value; shProFilas.forEach(f=>{ f.merc=m; }); shProRender(); }
+
+async function shProDescargar(){
+  const origen = document.getElementById('shp-origen').value.trim();
+  if(!SHALOM_PRO_ORIGENES.includes(origen)){ toast('⚠️ Elige la agencia de ORIGEN (donde dejas los paquetes) de la lista'); return; }
+  const faltan = shProFilas.filter(f=>!SHALOM_PRO_DESTINOS.includes(f.destino));
+  if(faltan.length){ toast(`⚠️ Falta elegir la agencia destino de ${faltan.length} clienta(s)`); return; }
+  const malos = shProFilas.filter(f=>!/^\d{8}$/.test(String(f.dni||'').trim()) || !/^9\d{8}$/.test(String(f.telefono||'').replace(/\D/g,'').slice(-9)));
+  if(malos.length && !confirm(`${malos.length} clienta(s) tienen DNI o celular faltante/inválido (${malos.map(f=>f.nombre).join(', ')}).\n\nShalom probablemente rechazará esas filas. ¿Descargar igual?`)) return;
+  const mercDef = document.getElementById('shp-merc').value;
+  const datos = [['DESTINATARIO (DOC)','TELF. DESTINATARIO','CONTACTO (DOC)','TELF. CONTACTO','NRO GRR','ORIGEN','DESTINO','MERCADERIA','ALTO','ANCHO','LARGO','PESO','CANTIDAD']];
+  shProFilas.forEach(f=>{
+    const dni = String(f.dni||'').trim();
+    const cel = String(f.telefono||'').replace(/\D/g,'').slice(-9);
+    const m = f.merc||mercDef; const [al,an,la,pe] = SHALOM_PRO_PAQUETES[m];
+    datos.push([/^[1-9]\d*$/.test(dni)?Number(dni):dni, cel?Number(cel):'', '', '', '', origen, f.destino, m, al, an, la, pe, 1]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(datos);
+  ws['!cols'] = [{wch:18},{wch:18},{wch:16},{wch:15},{wch:10},{wch:24},{wch:30},{wch:14},{wch:7},{wch:7},{wch:7},{wch:7},{wch:10}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');
+  const hoy = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, 'shalom-pro-masivo-'+hoy+'.xlsx');
+  // Recordar lo confirmado: la próxima vez esa agencia sale sola
+  const pares = shProFilas.filter(f=>f.clave && f.clave!=='|').map(f=>[f.clave, f.destino]);
+  pares.push(['__origen__', origen], ['__mercaderia__', mercDef]);
+  await shProGuardarMapa(pares);
+  toast(`✓ Excel Shalom PRO descargado — ${shProFilas.length} envío(s). Súbelo en pro.shalom.pe → Registro masivo`);
+  closeModal('modal-shalom-pro');
+}
+
+function bulkExcelShalomPro(){
+  const {ids, noCoincide} = despachoSeleccionados('shalom');
+  if(!ids.length){ toast('Selecciona al menos un pedido de Shalom'); return; }
+  if(noCoincide){ toast('⚠️ Solo selecciona pedidos de Shalom para este Excel'); return; }
+  abrirExcelShalomPro(despachoActual.filter(p=>ids.includes(p.id)).map(p=>p.clientes||{}));
+}
+function brExcelShalomPro(lista0){
+  const lista = Array.isArray(lista0) ? lista0 : brSeleccionados();
+  if(!lista.length){ toast('Selecciona pedidos de la lista'); return; }
+  if(lista.some(p=>!(p.cli?.tipo_envio_preferido||'').startsWith('shalom'))){ toast('⚠️ Solo selecciona clientas de Shalom para este Excel'); return; }
+  abrirExcelShalomPro(lista.map(p=>p.cli||{}));
+}
+
 async function bulkImprimirEtiquetas(){
   const {ids} = despachoSeleccionados('');
   if(!ids.length){ toast('Selecciona al menos un pedido'); return; }
@@ -7570,6 +7743,7 @@ async function brLoadPedidos(){
     brCopyData = {};
     const bulk = `<div id="br-bulk" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <button class="btn btn-sm" onclick="brExcelMotorizado()">📄 Excel motorizado (seleccionados)</button>
+      <button class="btn btn-sm" onclick="brExcelShalomPro()">📦 Excel Shalom PRO (seleccionados)</button>
       <button class="btn btn-sm" onclick="brDespacharSeleccion()">🚚 Marcar despachados (seleccionados)</button></div>`;
     box.innerHTML = head + bulk + brPedLista.map(p=>{
       const c = p.cli;
@@ -8182,6 +8356,7 @@ function brEnvRender(){
           <button class="btn btn-xs" onclick="brEnvSelSinEtiqueta()">☑ Los que faltan imprimir</button>
           <button class="btn btn-sm" onclick="brAbrirEtiquetas(brEnvSel().map(p=>p.id))">🖨 Etiquetas (seleccionados)</button>
           <button class="btn btn-sm" onclick="brExcelMotorizado(brEnvSel())">📄 Excel motorizado</button>
+          <button class="btn btn-sm" onclick="brExcelShalomPro(brEnvSel())">📦 Excel Shalom PRO</button>
           <button class="btn btn-sm btn-primary" onclick="brDespacharSeleccion(brEnvSel())">🚚 Marcar despachados</button></div></div>`
       + (moto.length ? `<div style="font-size:12px;font-weight:600;margin:8px 0 6px">🏍️ Motorizado</div>`+moto.map(p=>brEnvCard(p,true)).join('') : '')
       + (sha.length ? `<div style="font-size:12px;font-weight:600;margin:8px 0 6px">📦 Shalom</div>`+sha.map(p=>brEnvCard(p,true)).join('') : '');
