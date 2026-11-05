@@ -738,6 +738,14 @@ td.empty-state{padding:20px;text-align:center}
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════ ENVÍO SHALOM PARA LA CLIENTA (público) ═══ -->
+<div id="envio-page" style="display:none;min-height:100vh;background:#F7F5F2;padding:16px;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#1A1A18">
+  <div style="max-width:480px;margin:0 auto">
+    <div style="text-align:center;letter-spacing:3px;font-weight:700;font-size:15px;margin:6px 0 14px">JASSMIN</div>
+    <div id="env-body"><div style="text-align:center;padding:30px;color:#6b6a65">Cargando tu envío...</div></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════ RESUMEN DE PEDIDO PARA EMPACAR (público, por QR) ═══ -->
 <div id="empaque-page" style="display:none;min-height:100vh;background:#F7F5F2;padding:16px;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#1A1A18">
   <div style="max-width:480px;margin:0 auto">
@@ -828,6 +836,10 @@ td.empty-state{padding:20px;text-align:center}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
       Despacho
       <span id="badge-despacho" style="margin-left:auto;background:var(--pink);color:#fff;font-size:10px;padding:1px 7px;border-radius:20px;display:none">0</span>
+    </div>
+    <div class="sb-item" id="sb-boletas" onclick="nav('boletas',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      Boletas Shalom
     </div>
     <div class="sb-item" id="sb-item-inventario" onclick="nav('inventario',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z"/><rect x="4" y="4" width="16" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
@@ -1412,6 +1424,32 @@ td.empty-state{padding:20px;text-align:center}
       </div>
 
       <!-- ── DESPACHO DEL DÍA ── -->
+      <div id="pg-boletas" class="page">
+        <div class="tabs" id="sh-tabs" style="margin-bottom:12px">
+          <div class="tab active" data-t="subir" onclick="shTab('subir')">📸 Subir boletas</div>
+          <div class="tab" data-t="avisar" onclick="shTab('avisar')">📨 Avisar a clientas</div>
+        </div>
+        <div id="sh-sec-subir">
+          <div class="card" style="margin-bottom:12px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px">Sube las fotos de las boletas de Shalom</div>
+            <div class="text-hint" style="font-size:12px;line-height:1.6;margin-bottom:10px">Toma la foto de frente, con luz pareja y la boleta estirada. Puedes elegir varias a la vez. El sistema lee el DNI, el N.º de orden y el código, busca a la clienta y su pedido, y te muestra todo. Los números de orden y códigos <strong>debes compararlos con la foto</strong> (a veces se confunden 8, 9 o 0) y marcar la casilla de cada una. Nada se marca solo.</div>
+            <label class="btn btn-primary btn-sm" style="cursor:pointer;display:inline-block">📸 Elegir fotos<input type="file" accept="image/*" multiple style="display:none" onchange="shSubir(this)"></label>
+            <div id="sh-prog" class="text-hint" style="display:none;margin-top:10px;font-size:12.5px"></div>
+          </div>
+          <div id="sh-resumen" style="font-size:12.5px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px">
+            <div class="tabs" id="sh-filtros" style="margin:0;border:none"><div class="tab active" data-f="todos" onclick="shFiltrar('todos')">Todas</div><div class="tab" data-f="listo" onclick="shFiltrar('listo')">✅ Listas</div><div class="tab" data-f="revisar" onclick="shFiltrar('revisar')">⚠️ Revisar</div><div class="tab" data-f="confirmado" onclick="shFiltrar('confirmado')">📦 Confirmadas</div></div>
+            <button class="btn btn-sm btn-primary" id="sh-btn-todas" style="display:none" onclick="shConfirmarTodas()">✅ Confirmar las revisadas</button>
+          </div>
+          <div id="sh-lista"></div>
+        </div>
+        <div id="sh-sec-avisar" style="display:none">
+          <div id="sh-av-resumen" style="font-size:12.5px;margin-bottom:8px"></div>
+          <div class="tabs" id="sh-av-filtros" style="margin:0 0 10px;border:none"><div class="tab active" data-f="faltan" onclick="shAvFiltrar('faltan')">Faltan por avisar</div><div class="tab" data-f="avisadas" onclick="shAvFiltrar('avisadas')">Avisadas</div><div class="tab" data-f="todas" onclick="shAvFiltrar('todas')">Todas</div></div>
+          <div id="sh-av-lista"></div>
+        </div>
+      </div>
+
       <div id="pg-despacho" class="page">
         <div class="sec-header" style="margin-bottom:8px">
           <div class="tabs" style="margin:0;border:none">
@@ -2224,7 +2262,7 @@ function nav(page, el){
   document.getElementById('pg-'+page).classList.add('active');
   if(el) el.classList.add('active');
   toggleSidebarMobile(false); // cerrar el menú en celular al navegar
-  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho',asistencia:'Control de Asistencia',inventario:'Inventario',brasil:'Brasil'};
+  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho',asistencia:'Control de Asistencia',inventario:'Inventario',brasil:'Brasil',boletas:'Boletas Shalom'};
   const subtitles={
     dashboard:'Resumen de tu negocio, hoy',
     live:'Busca a tu clienta y agrega las prendas que va llevando',
@@ -2240,7 +2278,8 @@ function nav(page, el){
     despacho:'Pedidos listos para empaquetar y enviar hoy',
     asistencia: esTrabajador() ? 'Marca tu entrada y salida del día' : 'Historial de asistencia y cálculo de pago de tus trabajadoras',
     inventario:'Cuenta tu mercadería física y compárala contra el sistema',
-    brasil:'Ventas y compras hechas en Brasil — separadas del negocio normal'
+    brasil:'Ventas y compras hechas en Brasil — separadas del negocio normal',
+    boletas:'Sube las fotos de las boletas, registra los envíos y avisa a cada clienta'
   };
   document.getElementById('tb-title').textContent=titles[page]||page;
   document.getElementById('tb-subtitle').textContent=subtitles[page]||'';
@@ -2256,6 +2295,7 @@ function nav(page, el){
   if(page==='asistencia') loadAsistencia();
   if(page==='inventario') loadInventarioHistorial();
   if(page==='brasil') brTab(brTabActual);
+  if(page==='boletas') shInit();
 }
 
 // ═══════════════════════════ INIT ═══════════════════════════
@@ -5117,9 +5157,9 @@ async function loadDespacho(){
   document.getElementById('despacho-courier').innerHTML='<div class="loading">Cargando...</div>';
   try {
     // Listos para empaquetar: pago_completo
-    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
+    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,etiqueta_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
     // Empaquetados listos para courier
-    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
+    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,etiqueta_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
 
     despachoActual = [...empaquetar,...courier];
     despachoActual.forEach(p=>{ p._tipo = empaquetar.includes(p) ? 'empaquetar' : 'courier'; });
@@ -5284,9 +5324,9 @@ async function bulkImprimirEtiquetas(){
   const peds = lista.map(p=>{
     const c = p.clientes||{};
     const n = items.filter(i=>i.carrito_id===p.carrito_id).length;
-    return {id:p.id, codigo:p.numero, cli:{...c, tipo_envio_preferido:c.tipo_envio_preferido||p.tipo_envio||''}, usuario_wa:'', items:Array.from({length:n||1},()=>({cantidad:1})), tieneDatos:true};
+    return {id:p.id, codigo:p.numero, cli:{...c, tipo_envio_preferido:c.tipo_envio_preferido||p.tipo_envio||''}, usuario_wa:'', etiqueta_en:p.etiqueta_en||null, peru:true, items:Array.from({length:n||1},()=>({cantidad:1})), tieneDatos:true};
   });
-  brEtqMostrar(peds, false);
+  brEtqMostrar(peds, true);
 }
 
 function renderDespachoCard(p, tipo){
@@ -5319,6 +5359,7 @@ function renderDespachoCard(p, tipo){
       + '</div>'
     + '</div>'
     + (c.direccion||c.distrito?'<div style="margin-top:8px;font-size:12px;color:var(--text2);background:var(--gray-light);padding:6px 10px;border-radius:6px">📍 '+(c.direccion?c.direccion+(c.distrito?' — '+c.distrito:''):c.distrito)+'</div>':'')
+    + (p.etiqueta_en?'<div style="margin-top:6px"><span class="badge badge-ok" style="font-size:11px">🏷 etiqueta impresa</span></div>':'<div style="margin-top:6px"><span class="badge badge-gray" style="font-size:11px">sin imprimir</span></div>')
     + (p.courier_codigo?'<div style="margin-top:6px;font-size:11px;color:var(--text3)">Código: <span style="font-family:monospace;font-weight:600">'+p.courier_codigo+'</span></div>':'')
     + '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'
       + '<button class="btn btn-sm" onclick="copiarWA(&quot;'+p.id+'&quot;,&quot;'+c.telefono+'&quot;,&quot;'+p.numero+'&quot;)">💬 Copiar msg WA</button>'
@@ -5597,6 +5638,7 @@ function hideAllRootPages(){
   document.getElementById('form-envio-page').style.display='none';
   document.getElementById('registro-page').style.display='none';
   document.getElementById('seguimiento-page').style.display='none';
+  document.getElementById('envio-page').style.display='none';
   const ep=document.getElementById('empaque-page'); if(ep) ep.style.display='none';
 }
 
@@ -5619,7 +5661,7 @@ function renderTrackingPage(ped){
   };
   const b=banners[ped.estado]||banners.pago_pendiente;
   document.getElementById('trk-banner').style.cssText=`background:${b.bg};color:${b.c};border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:3px;margin:12px 16px 0`;
-  document.getElementById('trk-banner').innerHTML=`<div style="font-weight:600;font-size:13px">${b.lbl}</div><div style="font-size:12px;opacity:.85">${b.sub}</div>`;
+  document.getElementById('trk-banner').innerHTML=`<div style="font-weight:600;font-size:13px">${b.lbl}</div><div style="font-size:12px;opacity:.85">${b.sub}</div>`+(ped.shalom_orden?`<div style="font-size:12px;margin-top:4px">N.º de orden <strong>${ped.shalom_orden}</strong> · Código <strong>${ped.shalom_clave||'—'}</strong> · <a href="${BR_URL_BASE}?envio=${ped.id}" style="color:inherit;font-weight:600">Ver mi boleta</a></div>`:'');
 
   // Aviso aparte (no forma parte del saldo interno del sistema) — el motorizado cobra el envío en la puerta
   const notaEnvio = document.getElementById('trk-envio-nota');
@@ -8028,11 +8070,15 @@ function brEtqImprimirPC(){
 }
 async function brEtqMarcar(){
   if(!brEtqItems.length) return;
-  const ids = brEtqItems.map(x=>x.p.id);
+  const ahora = new Date().toISOString();
+  const idsBr = brEtqItems.filter(x=>!x.p.peru).map(x=>x.p.id), idsPe = brEtqItems.filter(x=>x.p.peru).map(x=>x.p.id);
   try {
-    await dbPatch(`brasil_pedidos?id=in.(${ids.join(',')})`, {etiqueta_en:new Date().toISOString()});
-    brEtqItems.forEach(x=>{ x.p.etiqueta_en = new Date().toISOString(); });
-    closeModal('modal-br-etq'); toast('✓ Marcadas como impresas'); brEnvRender();
+    if(idsBr.length) await dbPatch(`brasil_pedidos?id=in.(${idsBr.join(',')})`, {etiqueta_en:ahora});
+    if(idsPe.length) await dbPatch(`pedidos?id=in.(${idsPe.join(',')})`, {etiqueta_en:ahora});
+    brEtqItems.forEach(x=>{ x.p.etiqueta_en = ahora; if(x.p.peru){ const o=despachoActual.find(q=>q.id===x.p.id); if(o) o.etiqueta_en=ahora; } });
+    closeModal('modal-br-etq'); toast('✓ Marcadas como impresas');
+    if(idsBr.length) brEnvRender();
+    if(idsPe.length) renderDespachoListas();
   } catch(e){ toast('Error: '+e.message); }
 }
 
@@ -8784,6 +8830,320 @@ async function renderAsistenciaAdmin(){
     </div>`;
 }
 
+// ═══════════════════════════ BOLETAS SHALOM ═══════════════════════════
+const SH_TESS_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+const SH_REMITENTE_DNI = '72323443';
+let shRows = [], shClientes = null, shWorker = null, shFiltro = 'todos', shTabActual = 'subir', shAvLista = [], shAvFiltro = 'faltan', shLeyendo = false;
+function shLev(a,b){ const m=a.length,n=b.length; if(!m) return n; if(!n) return m; let p=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){ const c=[i]; for(let j=1;j<=n;j++) c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1)); p=c; } return p[n]; }
+function shNorm(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase(); }
+function shDigits(s){ return String(s).replace(/O/g,'0').replace(/[IL|]/g,'1').replace(/S/g,'5').replace(/B/g,'8').replace(/[^0-9]/g,''); }
+function shVoto(arr){ const c={}; arr.filter(Boolean).forEach(x=>c[x]=(c[x]||0)+1); const k=Object.keys(c).sort((a,b)=>c[b]-c[a]); return k.length?{v:k[0],n:c[k[0]]}:{v:'',n:0}; }
+function shParse(texts){
+  const T = texts.map(shNorm), ordenes=[], claves=[], emisiones=[];
+  T.forEach(t=>{
+    const mo = t.match(/ORDEN\W{0,4}([0-9OIL|S ]{8,13})/); if(mo){ const d=shDigits(mo[1]); if(d.length===9) ordenes.push(d); else if(d.length===10 && mo[1].indexOf(' ')>=0) ordenes.push(d.slice(0,9)); }
+    const mc = t.match(/C[O0]DIG[O0][ :.\-]{0,4}([A-Z0-9]{4})\b/); if(mc && mc[1]!=='RDEN') claves.push(mc[1].replace(/0/g,'O').replace(/1/g,'I'));
+    const me = t.match(/EMISI.{0,3}N\W{0,3}(20\d\d)\D(\d\d)\D(\d\d)\s+(\d\d:\d\d:\d\d)/); if(me) emisiones.push(me[1]+'-'+me[2]+'-'+me[3]+'T'+me[4]);
+  });
+  const vo=shVoto(ordenes), vc=shVoto(claves), ve=shVoto(emisiones);
+  const dest = T.map(t=>{ const i=t.search(/DESTINATAR/); return i>=0 ? t.slice(i) : t; });
+  return { orden:vo.v, ordenOk:vo.n>=2, clave:vc.v, claveN:vc.n, emision:ve.v, destTexts:dest };
+}
+function shDistDni(dni, texto){
+  const runs = (texto.match(/[0-9OIL|SB][0-9OIL|SB ]{5,12}[0-9OIL|SB]/g)||[]).map(shDigits).filter(x=>x.length>=6);
+  let best=9; runs.forEach(r=>{ for(let len=7;len<=9;len++){ for(let i=0;i+len<=r.length;i++){ best=Math.min(best, shLev(dni,r.slice(i,i+len))); } } });
+  return best;
+}
+function shCruzar(parsed, clientes){
+  const res=[];
+  clientes.forEach(c=>{
+    const dni=String(c.dni||'').replace(/\D/g,''); if(dni.length<7||dni===SH_REMITENTE_DNI) return;
+    let dd=9; parsed.destTexts.forEach(t=>{ dd=Math.min(dd, shDistDni(dni,t)); });
+    const toks=shNorm(c.nombre||'').split(/[^A-Z]+/).filter(x=>x.length>=4);
+    const nameHit = toks.length ? toks.filter(k=>parsed.destTexts.some(t=>t.includes(k))).length/toks.length : 0;
+    const tel=String(c.telefono||'').replace(/\D/g,'').slice(-9); let td=9;
+    if(tel.length===9) parsed.destTexts.forEach(t=>{ (t.match(/[0-9OIL|SB ]{9,12}/g)||[]).forEach(r=>{ const d=shDigits(r); for(let i=0;i+9<=d.length;i++) td=Math.min(td, shLev(tel,d.slice(i,i+9))); }); });
+    const score = (dd<=1?3:dd<=2?1.5:0) + nameHit*2 + (td<=1?2:td<=2?1:0);
+    if(score>0) res.push({c, dd, nameHit, td, score});
+  });
+  res.sort((a,b)=>b.score-a.score); return res;
+}
+// Umbral adaptativo (quita sombras): imagen integral
+function shBradley(g,w,h,win,t){
+  const W1=w+1, I=new Uint32Array(W1*(h+1));
+  for(let y=1;y<=h;y++){ let row=0; for(let x=1;x<=w;x++){ row+=g[(y-1)*w+x-1]; I[y*W1+x]=I[(y-1)*W1+x]+row; } }
+  const out=new Uint8Array(w*h), r=win>>1;
+  for(let y=0;y<h;y++){ const y0=Math.max(0,y-r), y1=Math.min(h-1,y+r);
+    for(let x=0;x<w;x++){ const x0=Math.max(0,x-r), x1=Math.min(w-1,x+r), n=(x1-x0+1)*(y1-y0+1);
+      const s=I[(y1+1)*W1+x1+1]-I[y0*W1+x1+1]-I[(y1+1)*W1+x0]+I[y0*W1+x0];
+      out[y*w+x]= g[y*w+x]*n < s*(1-t) ? 0 : 255; } }
+  return out;
+}
+function shCargarTess(){
+  return new Promise((res,rej)=>{
+    if(window.Tesseract) return res();
+    const s=document.createElement('script'); s.src=SH_TESS_URL; s.onload=()=>res(); s.onerror=()=>rej(new Error('No se pudo cargar el lector de texto (revisa tu internet)')); document.head.appendChild(s);
+  });
+}
+async function shGetWorker(){
+  if(shWorker) return shWorker;
+  await shCargarTess();
+  shWorker = await Tesseract.createWorker('eng');
+  await shWorker.setParameters({tessedit_pageseg_mode:'4'});
+  return shWorker;
+}
+async function shCanvasDe(bmp, width){
+  const sc = width/bmp.width, w=Math.round(bmp.width*sc), h=Math.round(bmp.height*sc);
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(bmp,0,0,w,h); return cv;
+}
+async function shLeerFoto(file){
+  const bmp = await createImageBitmap(file, {imageOrientation:'from-image'});
+  const worker = await shGetWorker(), texts = [];
+  for(const [width,win] of [[1800,14],[1400,12],[2000,16]]){
+    const cv = await shCanvasDe(bmp, Math.min(width,bmp.width)), ctx = cv.getContext('2d'), w=cv.width, h=cv.height;
+    const im = ctx.getImageData(0,0,w,h), d = im.data, g = new Uint8Array(w*h);
+    for(let i=0,j=0;i<d.length;i+=4,j++) g[j]=(d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11)|0;
+    const bw = shBradley(g,w,h,(Math.round(w/win)|1),0.12);
+    for(let i=0,j=0;i<d.length;i+=4,j++){ d[i]=d[i+1]=d[i+2]=bw[j]; d[i+3]=255; }
+    ctx.putImageData(im,0,0);
+    const r = await worker.recognize(cv); texts.push(r.data.text||'');
+  }
+  // foto reducida para guardar y mostrar
+  const cvF = await shCanvasDe(bmp, Math.min(1400,bmp.width));
+  const blob = await new Promise(r=>cvF.toBlob(r,'image/jpeg',0.78));
+  return { parsed: shParse(texts), blob };
+}
+async function shCargarClientes(){
+  if(shClientes) return shClientes;
+  let all=[], off=0;
+  for(;;){ const part = await dbGet(`clientes?dni=not.is.null&select=id,nombre,telefono,dni,direccion,distrito,tipo_envio_preferido&order=id&limit=1000&offset=${off}`); all=all.concat(part); if(part.length<1000) break; off+=1000; }
+  shClientes = all.filter(c=>String(c.dni||'').replace(/\D/g,'').length>=7); return shClientes;
+}
+async function shPedidosDe(cliId){
+  const [pe, br] = await Promise.all([
+    dbGet(`pedidos?cliente_id=eq.${cliId}&estado=in.(pago_completo,empaquetado)&select=id,numero,estado,carrito_id`),
+    dbGet(`brasil_pedidos?cliente_id=eq.${cliId}&estado=eq.listo_lima&select=id,estado`)
+  ]);
+  return pe.map(p=>({tipo:'pe', id:p.id, estado:p.estado, carrito_id:p.carrito_id, lbl:'Pedido '+p.numero+' (Perú)'}))
+    .concat(br.map(p=>({tipo:'br', id:p.id, estado:p.estado, lbl:'Brasil #'+String(p.id).slice(0,4).toUpperCase()})));
+}
+async function shAsignar(row, cli){
+  row.cli = cli || null; row.pedidos = []; row.pedido = null;
+  if(cli){ row.pedidos = await shPedidosDe(cli.id); if(row.pedidos.length===1) row.pedido = row.pedidos[0]; }
+}
+function shEstadoFila(row){
+  if(row.estado==='confirmado'||row.estado==='leyendo'||row.estado==='error') return row.estado;
+  const prob=[];
+  if(!row.cli) prob.push('No encontré a la clienta');
+  else if(!row.pedidos.length) prob.push('La clienta no tiene pedido pendiente');
+  else if(row.pedidos.length>1 && !row.pedido) prob.push('Tiene varios pedidos: elige uno');
+  if(!/^\d{9}$/.test(row.orden||'')) prob.push('No pude leer el N.º de orden: escríbelo');
+  if(!/^[A-Z0-9]{4}$/.test(row.clave||'')) prob.push('No pude leer el código: escríbelo');
+  if(row.cli && shRows.some(o=>o!==row && o.cli && o.cli.id===row.cli.id && o.estado!=='confirmado')) prob.push('Hay otra boleta de esta misma clienta');
+  if(row.orden && shRows.some(o=>o!==row && o.orden===row.orden)) prob.push('N.º de orden repetido en otra boleta');
+  row.prob = prob; return prob.length ? 'revisar' : 'listo';
+}
+async function shSubir(input){
+  const files = [...input.files]; input.value='';
+  if(!files.length || shLeyendo) return;
+  shLeyendo = true;
+  const box = document.getElementById('sh-prog'); box.style.display='block';
+  try {
+    await shCargarClientes();
+    const nuevas = files.map(f=>({k:'r'+Date.now()+Math.random().toString(36).slice(2,6), file:f, url:URL.createObjectURL(f), estado:'leyendo', pedidos:[], prob:[]}));
+    shRows = shRows.concat(nuevas); shRender();
+    let n=0;
+    for(const row of nuevas){
+      n++; box.textContent = '🔎 Leyendo boleta '+n+' de '+nuevas.length+'… (deja la pantalla encendida)';
+      try {
+        const r = await shLeerFoto(row.file);
+        row.blob = r.blob; row.orden = r.parsed.orden; row.ordenOk = r.parsed.ordenOk; row.clave = r.parsed.clave; row.claveN = r.parsed.claveN; row.emision = r.parsed.emision;
+        const cruce = shCruzar(r.parsed, shClientes), best = cruce[0], second = cruce[1];
+        row.cruce = cruce.slice(0,4);
+        const seguro = best && best.score>=3 && (!second || best.score - second.score >= 1.5);
+        row.estado = 'revisar';
+        await shAsignar(row, seguro ? best.c : null);
+        if(!seguro && best) row.sugerida = best.c;
+      } catch(e){ row.estado='error'; row.err = e.message; }
+      if(row.estado!=='error') row.estado = 'revisar';
+      shRender();
+    }
+    box.textContent = '✓ Listo: '+nuevas.length+' boleta(s) leídas. Revisa la tabla y confirma.';
+  } catch(e){ box.textContent = 'Error: '+e.message; }
+  shLeyendo = false; shRender();
+}
+function shResumen(){ return {total:shRows.length, listo:shRows.filter(r=>shEstadoFila(r)==='listo').length, rev:shRows.filter(r=>shEstadoFila(r)==='listo'&&r.revisado).length, revisar:shRows.filter(r=>shEstadoFila(r)==='revisar').length, conf:shRows.filter(r=>r.estado==='confirmado').length}; }
+function shFiltrar(f){ shFiltro=f; shRender(); }
+function shRender(){
+  const box = document.getElementById('sh-lista'); if(!box) return;
+  const rs = shRows.map(r=>({r, st:shEstadoFila(r)}));
+  const res = shResumen();
+  document.getElementById('sh-resumen').innerHTML = shRows.length ? `Total <strong>${res.total}</strong> · ✅ listas <strong>${res.listo}</strong> (revisadas <strong>${res.rev}</strong>) · ⚠️ revisar <strong>${res.revisar}</strong> · 📦 confirmadas <strong>${res.conf}</strong>` : '';
+  const bt = document.getElementById('sh-btn-todas'); bt.style.display = res.rev ? '' : 'none'; bt.textContent = '✅ Confirmar las '+res.rev+' revisadas';
+  const vis = rs.filter(x=> shFiltro==='todos' || (shFiltro==='listo' && x.st==='listo') || (shFiltro==='revisar' && (x.st==='revisar'||x.st==='error')) || (shFiltro==='confirmado' && x.st==='confirmado'));
+  vis.sort((a,b)=> String(a.r.cli?.nombre||'zzz').localeCompare(String(b.r.cli?.nombre||'zzz')));
+  document.querySelectorAll('#sh-filtros .tab').forEach(t=>t.classList.toggle('active', t.dataset.f===shFiltro));
+  box.innerHTML = vis.length ? vis.map(({r,st})=>shFilaHtml(r,st)).join('') : '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">'+(shRows.length?'Nada en este filtro':'Sube las fotos de las boletas para empezar 📸')+'</div>';
+}
+function shFilaHtml(r, st){
+  const col = st==='listo'?'var(--green)':st==='confirmado'?'var(--blue)':st==='leyendo'?'var(--text3)':'#E8A33D';
+  const badge = st==='listo'?'<span class="badge badge-ok">✅ lista</span>':st==='confirmado'?'<span class="badge badge-info">📦 confirmada</span>':st==='leyendo'?'<span class="badge badge-gray">🔎 leyendo…</span>':st==='error'?'<span class="badge badge-warn">⚠️ no se pudo leer</span>':'<span class="badge badge-warn">⚠️ revisar</span>';
+  const thumb = `<a href="${r.url}" target="_blank" style="flex:none"><img src="${r.url}" style="width:70px;height:96px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></a>`;
+  if(st==='leyendo') return `<div class="card" style="margin-bottom:8px;display:flex;gap:10px;border-left:3px solid ${col}">${thumb}<div style="padding-top:6px">${badge}</div></div>`;
+  if(st==='error') return `<div class="card" style="margin-bottom:8px;display:flex;gap:10px;border-left:3px solid ${col}">${thumb}<div style="flex:1">${badge}<div class="text-hint" style="font-size:11.5px;margin:4px 0">${brEsc(r.err||'')}</div><button class="btn btn-xs" onclick="shQuitar('${r.k}')">Quitar</button></div></div>`;
+  const c = r.cli, ped = r.pedido;
+  let cliHtml;
+  if(c) cliHtml = `<div style="font-size:13.5px;font-weight:600">${brEsc(c.nombre||'')}</div><div class="text-hint" style="font-size:11.5px">DNI ${brEsc(c.dni||'')} · ${brEsc(c.telefono||'')}</div>`;
+  else cliHtml = `<div style="font-size:13px;color:var(--red);font-weight:600">Clienta no identificada</div>` + (r.sugerida?`<button class="btn btn-xs" style="margin-top:4px" onclick="shElegirCli('${r.k}','${r.sugerida.id}')">¿Es ${brEsc(r.sugerida.nombre||'')}?</button>`:'');
+  let pedHtml='';
+  if(c){
+    if(r.pedidos.length>1) pedHtml = `<select style="font-size:12px;margin-top:4px" onchange="shElegirPed('${r.k}',this.value)"><option value="">Elige el pedido…</option>${r.pedidos.map(p=>`<option value="${p.id}" ${ped&&ped.id===p.id?'selected':''}>${brEsc(p.lbl)}</option>`).join('')}</select>`;
+    else if(ped) pedHtml = `<div class="text-hint" style="font-size:11.5px;margin-top:2px">🧾 ${brEsc(ped.lbl)}</div>`;
+  }
+  const buscar = st==='confirmado' ? '' : `<div style="margin-top:6px"><input type="text" placeholder="🔍 Buscar otra clienta (nombre, DNI o cel)" oninput="shBuscar('${r.k}',this.value)" style="font-size:12px"><div id="sh-bus-${r.k}"></div></div>`;
+  const campos = st==='confirmado' ? `<div class="text-hint" style="font-size:12px;margin-top:4px">Orden <strong>${brEsc(r.orden)}</strong> · Código <strong>${brEsc(r.clave)}</strong></div>` :
+    `<div style="display:flex;gap:6px;margin-top:6px"><label style="flex:1.4;font-size:11px;color:var(--text3)">N.º orden<input type="text" inputmode="numeric" value="${brEsc(r.orden||'')}" onchange="shSetCampo('${r.k}','orden',this.value)" style="font-size:13px;font-weight:600"></label><label style="flex:1;font-size:11px;color:var(--text3)">Código<input type="text" value="${brEsc(r.clave||'')}" onchange="shSetCampo('${r.k}','clave',this.value)" style="font-size:13px;font-weight:600;text-transform:uppercase"></label></div>`;
+  const chk = st==='listo' ? `<label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" ${r.revisado?'checked':''} onchange="shRevisado('${r.k}',this.checked)" style="width:20px;height:20px;flex:none;margin:0"> Revisé N.º de orden y código con la foto</label>` : '';
+  const probs = (st==='revisar' && r.prob.length) ? `<div style="font-size:11.5px;color:#B3541E;margin-top:4px">${r.prob.map(brEsc).join(' · ')}</div>` : '';
+  const acciones = st==='confirmado' ? '' : `<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-sm ${st==='listo'?'btn-primary':''}" onclick="shConfirmar('${r.k}')" ${st==='listo'?'':'title="Solo si ya verificaste con la foto"'}>✓ Confirmar</button><button class="btn btn-sm" onclick="shQuitar('${r.k}')">Quitar</button></div>`;
+  return `<div class="card" style="margin-bottom:8px;display:flex;gap:10px;border-left:3px solid ${col}">${thumb}<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:6px;align-items:flex-start"><div>${cliHtml}${pedHtml}</div>${badge}</div>${campos}${probs}${chk}${buscar}${acciones}</div></div>`;
+}
+function shSetCampo(k,campo,v){ const r=shRows.find(x=>x.k===k); if(!r) return; v=String(v||'').trim().toUpperCase(); if(campo==='orden') v=v.replace(/\D/g,''); r[campo]=v; r.revisado=true; shRender(); }
+function shRevisado(k,v){ const r=shRows.find(x=>x.k===k); if(r){ r.revisado=!!v; shRender(); } }
+function shQuitar(k){ shRows = shRows.filter(r=>r.k!==k); shRender(); }
+async function shElegirCli(k, id){ const r=shRows.find(x=>x.k===k); const c=shClientes.find(x=>String(x.id)===String(id)); if(!r||!c) return; await shAsignar(r,c); r.sugerida=null; shRender(); }
+async function shElegirPed(k, id){ const r=shRows.find(x=>x.k===k); if(!r) return; r.pedido = r.pedidos.find(p=>p.id===id)||null; shRender(); }
+function shBuscar(k,q){
+  const out = document.getElementById('sh-bus-'+k); if(!out) return;
+  q = shNorm(q).trim(); if(q.length<3){ out.innerHTML=''; return; }
+  const dq = q.replace(/\D/g,'');
+  const hits = (shClientes||[]).filter(c=> shNorm(c.nombre).includes(q) || (dq.length>=4 && (String(c.dni||'').includes(dq) || String(c.telefono||'').includes(dq)))).slice(0,6);
+  out.innerHTML = hits.map(c=>`<button class="btn btn-xs" style="display:block;width:100%;text-align:left;margin-top:3px" onclick="shElegirCli('${k}','${c.id}')">${brEsc(c.nombre||'')} · ${brEsc(c.dni||'')}</button>`).join('') || '<div class="text-hint" style="font-size:11.5px">Sin resultados (¿la clienta tiene su DNI guardado?)</div>';
+}
+async function shSubirFoto(blob){
+  const name = (crypto.randomUUID ? crypto.randomUUID() : Date.now()+'-'+Math.random().toString(36).slice(2))+'.jpg';
+  const res = await fetch(`${SUPA_URL}/storage/v1/object/boletas-shalom/${name}`, {method:'POST', headers:{apikey:SUPA_KEY, 'Content-Type':'image/jpeg'}, body:blob});
+  if(!res.ok) throw new Error('No se pudo guardar la foto: '+(await res.text()));
+  return `${SUPA_URL}/storage/v1/object/public/boletas-shalom/${name}`;
+}
+async function shConfirmarFila(r, saltarPreventa){
+  const p = r.pedido; if(!p||!r.cli) throw new Error('Falta clienta o pedido');
+  if(p.tipo==='pe' && !saltarPreventa && p.carrito_id){
+    const pv = await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&preventa=eq.true&estado_bolsa=neq.eliminado&select=id`);
+    if(pv.length && !confirm(`${r.cli.nombre}: su pedido tiene ${pv.length} prenda(s) en pre-venta sin reponer. ¿Despachar de todas formas?`)) throw new Error('omitido');
+  }
+  const foto = await shSubirFoto(r.blob);
+  const base = {courier_codigo:r.orden, shalom_orden:r.orden, shalom_clave:r.clave, shalom_emision:r.emision?new Date(r.emision+'-05:00').toISOString():null, shalom_foto:foto};
+  if(p.tipo==='pe'){
+    await dbPatch(`pedidos?id=eq.${p.id}`, {...base, estado:'en_camino'});
+    await registrarHistorialPedido(p.id, p.estado, 'en_camino', 'Boleta Shalom '+r.orden);
+  } else {
+    await dbPatch(`brasil_pedidos?id=eq.${p.id}`, {...base, estado:'despachado', despachado_en:new Date().toISOString()});
+  }
+  r.estado='confirmado'; r.fotoUrl=foto;
+}
+async function shConfirmar(k){
+  const r = shRows.find(x=>x.k===k); if(!r) return;
+  const st0 = shEstadoFila(r);
+  if(st0==='revisar' && !confirm('Esta boleta tiene avisos ('+r.prob.join(', ')+'). ¿Ya verificaste con la foto y confirmas?')) return;
+  if(st0==='listo' && !r.revisado && !confirm('¿Verificaste que el N.º de orden ('+r.orden+') y el código ('+r.clave+') coinciden con la foto?')) return;
+  try { await shConfirmarFila(r); toast('✓ '+(r.cli?.nombre||'')+' · enviada y registrada'); }
+  catch(e){ if(e.message!=='omitido') toast('Error: '+e.message); }
+  shRender();
+}
+async function shConfirmarTodas(){
+  const listas = shRows.filter(r=>shEstadoFila(r)==='listo' && r.revisado);
+  if(!listas.length) return;
+  if(!confirm('Vas a registrar '+listas.length+' pedido(s) como ENVIADOS por Shalom, con el N.º de orden y código que revisaste.\n\n¿Confirmas?')) return;
+  let ok=0, fallas=[];
+  for(const r of listas){
+    toast('Guardando '+(ok+fallas.length+1)+' de '+listas.length+'…');
+    try { await shConfirmarFila(r); ok++; } catch(e){ if(e.message!=='omitido') fallas.push((r.cli?.nombre||'?')+': '+e.message); }
+  }
+  shRender();
+  toast('✓ '+ok+' pedido(s) registrados'+(fallas.length?' · '+fallas.length+' con error':''));
+  if(fallas.length) alert('No se pudieron guardar:\n'+fallas.join('\n'));
+  if(ok) shTab('avisar');
+}
+// ── Pestaña "Avisar a clientas" ──
+function shTab(t){
+  shTabActual=t;
+  document.getElementById('sh-sec-subir').style.display = t==='subir'?'block':'none';
+  document.getElementById('sh-sec-avisar').style.display = t==='avisar'?'block':'none';
+  document.querySelectorAll('#sh-tabs .tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
+  if(t==='avisar') shCargarAvisar(); else shRender();
+}
+function shInit(){ shTab(shTabActual); }
+function shAvisados(){ try { return JSON.parse(localStorage.getItem('sh_avisados')||'{}'); } catch(e){ return {}; } }
+function shGuardarAvisado(id){ try { const a=shAvisados(); a[id]=new Date().toISOString(); localStorage.setItem('sh_avisados', JSON.stringify(a)); } catch(e){} }
+async function shCargarAvisar(){
+  const box = document.getElementById('sh-av-lista'); box.innerHTML='<div class="loading">Cargando...</div>';
+  try {
+    const sel='id,shalom_orden,shalom_clave,shalom_foto,cliente_id';
+    const [pe, br] = await Promise.all([
+      dbGet(`pedidos?shalom_orden=not.is.null&select=${sel},numero,actualizado_en&order=actualizado_en.desc&limit=300`),
+      dbGet(`brasil_pedidos?shalom_orden=not.is.null&select=${sel},despachado_en&order=despachado_en.desc&limit=300`)
+    ]);
+    const ids = [...new Set(pe.concat(br).map(p=>p.cliente_id).filter(Boolean))];
+    let clis=[]; for(let i=0;i<ids.length;i+=100){ clis = clis.concat(await dbGet(`clientes?id=in.(${ids.slice(i,i+100).join(',')})&select=id,nombre,telefono,direccion,distrito`)); }
+    const L = pe.map(p=>({id:p.id, fecha:p.actualizado_en, ref:'Pedido '+p.numero, ...p, cli:clis.find(c=>c.id===p.cliente_id)||{}}))
+      .concat(br.map(p=>({id:p.id, fecha:p.despachado_en, ref:'Brasil #'+String(p.id).slice(0,4).toUpperCase(), ...p, cli:clis.find(c=>c.id===p.cliente_id)||{}})));
+    L.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
+    shAvLista = L; shAvRender();
+  } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
+}
+function shMensaje(p){
+  const c=p.cli||{}, nom=String(c.nombre||'').trim().split(/\s+/)[0]||'';
+  const nomC = nom ? nom.charAt(0).toUpperCase()+nom.slice(1).toLowerCase() : '';
+  return `Hola ${nomC} 🌸 ¡Tu pedido ya fue enviado por Shalom! 📦\n\n📍 Agencia: ${c.direccion||''}${c.distrito?' ('+c.distrito+')':''}\n🔢 N.º de orden: ${p.shalom_orden}\n🔑 Código: ${p.shalom_clave}\n\nAquí ves tu boleta y el seguimiento 👇\n${BR_URL_BASE}?envio=${p.id}\n\n¡Gracias por tu compra! 💕`;
+}
+function shAvFiltrar(f){ shAvFiltro=f; shAvRender(); }
+function shAvRender(){
+  const box=document.getElementById('sh-av-lista'), av=shAvisados();
+  const faltan = shAvLista.filter(p=>!av[p.id]).length;
+  document.getElementById('sh-av-resumen').innerHTML = `Faltan por avisar <strong>${faltan}</strong> · Avisadas <strong>${shAvLista.length-faltan}</strong>`;
+  document.querySelectorAll('#sh-av-filtros .tab').forEach(t=>t.classList.toggle('active', t.dataset.f===shAvFiltro));
+  const vis = shAvLista.filter(p=> shAvFiltro==='todas' || (shAvFiltro==='faltan' && !av[p.id]) || (shAvFiltro==='avisadas' && av[p.id]));
+  box.innerHTML = vis.length ? vis.map(p=>{
+    const c=p.cli||{}, tel=c.telefono?rgBrNormTel(c.telefono):'', hecho=!!av[p.id];
+    const btn = tel ? `<a class="btn btn-sm ${hecho?'':'btn-primary'}" target="_blank" href="https://wa.me/51${tel}?text=${encodeURIComponent(shMensaje(p))}" onclick="shMarcarAvisado('${p.id}')">${hecho?'💬 Volver a enviar':'💬 Enviar por WhatsApp'}</a>` : '<span class="badge badge-warn">sin celular</span>';
+    return `<div class="card sh-av-row ${hecho?'':'pendiente'}" id="sh-av-${p.id}" style="margin-bottom:8px;display:flex;gap:10px;align-items:center;border-left:3px solid ${hecho?'var(--green)':'#E8A33D'}">
+      ${p.shalom_foto?`<a href="${brEsc(p.shalom_foto)}" target="_blank" style="flex:none"><img src="${brEsc(p.shalom_foto)}" style="width:44px;height:60px;object-fit:cover;border-radius:5px;border:1px solid var(--border)"></a>`:''}
+      <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600">${brEsc(c.nombre||'Sin nombre')} ${hecho?'<span class="badge badge-ok" style="font-size:10px">✓ avisada</span>':''}</div>
+      <div class="text-hint" style="font-size:11.5px">${brEsc(p.ref)} · Orden ${brEsc(p.shalom_orden)} · ${brEsc(p.shalom_clave)}</div></div>${btn}</div>`;
+  }).join('') : '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">'+(shAvLista.length?'Nada en este filtro 🎉':'Aún no hay envíos con boleta')+'</div>';
+}
+function shMarcarAvisado(id){
+  shGuardarAvisado(id);
+  setTimeout(()=>{ shAvRender(); const n=document.querySelector('.sh-av-row.pendiente'); if(n) n.scrollIntoView({block:'center',behavior:'smooth'}); }, 700);
+}
+// ── Página pública: ?envio=<id> (la ve la clienta) ──
+async function showEnvio(id){
+  hideAllRootPages();
+  document.getElementById('envio-page').style.display='block';
+  const body = document.getElementById('env-body');
+  try {
+    if(!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Código inválido');
+    let rows = await dbGet(`pedidos?id=eq.${id}&select=id,numero,cliente_id,estado,shalom_orden,shalom_clave,shalom_emision,shalom_foto`), ref='';
+    if(rows.length) ref='Pedido '+rows[0].numero;
+    else { rows = await dbGet(`brasil_pedidos?id=eq.${id}&select=id,cliente_id,estado,shalom_orden,shalom_clave,shalom_emision,shalom_foto`); ref='Pedido #'+id.slice(0,4).toUpperCase(); }
+    if(!rows.length){ body.innerHTML='<div style="text-align:center;padding:30px;color:#6b6a65">No encontramos este envío.</div>'; return; }
+    const p=rows[0]; let c={}; if(p.cliente_id){ const cs=await dbGet(`clientes?id=eq.${p.cliente_id}&select=nombre,direccion,distrito`); c=cs[0]||{}; }
+    if(!p.shalom_orden){ body.innerHTML=`<div style="background:#fff;border-radius:14px;padding:18px;text-align:center"><div style="font-size:18px;font-weight:700">${rgBrEsc(ref)}</div><div style="margin-top:8px;color:#6b6a65">Tu pedido aún no tiene boleta de Shalom. Te avisaremos apenas salga 📦</div></div>`; return; }
+    const nom = String(c.nombre||'').trim().split(/\s+/)[0]||'';
+    const fe = p.shalom_emision ? new Date(p.shalom_emision).toLocaleDateString('es-PE',{day:'2-digit',month:'long',timeZone:'America/Lima'}) : '';
+    body.innerHTML = `<div style="background:#fff;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+      <div style="font-size:20px;font-weight:700">¡Tu pedido va en camino${nom?', '+rgBrEsc(nom):''}! 📦</div>
+      <div style="font-size:13px;color:#6b6a65;margin:4px 0 14px">${rgBrEsc(ref)} · enviado por Shalom${fe?' el '+rgBrEsc(fe):''}</div>
+      <div style="background:#F7F5F2;border-radius:10px;padding:12px 14px;margin-bottom:10px"><div style="font-size:12px;color:#6b6a65">Recoge en la agencia</div><div style="font-size:16px;font-weight:600">${rgBrEsc(c.direccion||'—')}</div><div style="font-size:13px;color:#6b6a65">${rgBrEsc(c.distrito||'')}</div></div>
+      <div style="display:flex;gap:10px;margin-bottom:12px"><div style="flex:1.4;background:#F7F5F2;border-radius:10px;padding:12px 14px"><div style="font-size:12px;color:#6b6a65">N.º de orden</div><div style="font-size:20px;font-weight:700;letter-spacing:1px">${rgBrEsc(p.shalom_orden)}</div></div><div style="flex:1;background:#F7F5F2;border-radius:10px;padding:12px 14px"><div style="font-size:12px;color:#6b6a65">Código</div><div style="font-size:20px;font-weight:700;letter-spacing:2px">${rgBrEsc(p.shalom_clave||'—')}</div></div></div>
+      <div style="font-size:13px;color:#4a4943;margin-bottom:12px">Para recogerlo, lleva tu <strong>DNI</strong> y estos datos. Puedes seguir tu envío en <strong>shalom.com.pe</strong>.</div>
+      ${p.shalom_foto?`<div style="font-size:12px;color:#6b6a65;margin-bottom:6px">Tu boleta</div><a href="${rgBrEsc(p.shalom_foto)}" target="_blank"><img src="${rgBrEsc(p.shalom_foto)}" style="width:100%;border-radius:10px;border:1px solid #ece9e3"></a>`:''}
+      <div style="text-align:center;font-size:13px;margin-top:14px;color:#6b6a65">Gracias por tu compra en Jassmin 🌸</div></div>`;
+  } catch(e){ body.innerHTML='<div style="text-align:center;padding:30px;color:#b3184a">No se pudo cargar: '+rgBrEsc(e.message)+'</div>'; }
+}
+
 // Check URL params — routing público
 (function(){
   const params=new URLSearchParams(location.search);
@@ -8792,11 +9152,13 @@ async function renderAsistenciaAdmin(){
   const seg=params.get('seguimiento');
   const dat=params.get('datos');
   const pedQ=params.get('pedido');
+  const envQ=params.get('envio');
   if(trk){ showTracking(trk); }
   else if(reg!==null){ showRegistro(); }
   else if(seg!==null){ showSeguimiento(); }
   else if(dat!==null){ showDatosBrasil(); }
   else if(pedQ){ showPedidoEmpaque(pedQ); }
+  else if(envQ){ showEnvio(envQ); }
 })();
 </script>
 <script>/* qrcode-generator 1.4.4 (MIT) */
