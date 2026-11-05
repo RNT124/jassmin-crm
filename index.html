@@ -324,6 +324,12 @@ td.empty-state{padding:20px;text-align:center}
 .f5-title{font-size:16px;font-weight:600;color:#1A1A18;margin-bottom:4px}
 .f5-desc{font-size:12px;color:#5F5E5A;margin-bottom:18px;line-height:1.5}
 .f5-label{font-size:11px;font-weight:500;color:#5F5E5A;margin-bottom:4px;display:block}
+.sh-res{max-height:300px;overflow-y:auto;border-radius:8px}
+.sh-item{display:block;width:100%;text-align:left;background:#fff;border:1px solid #E8E6E0;border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;font-family:inherit;color:#1A1A18}
+.sh-item:hover{border-color:#B3184A}
+.sh-item b{font-size:13px}
+.sh-item small{display:block;font-size:11px;color:#6B6A64;margin-top:2px;line-height:1.35}
+.sh-vacio{font-size:12px;color:#9C9A92;padding:6px 2px}
 .f5-input{width:100%;padding:10px 13px;border:1px solid #E8E6E0;border-radius:8px;font-size:13px;color:#1A1A18;background:#fff;outline:none;transition:border .15s;font-family:inherit;margin-bottom:12px}
 .f5-input:focus{border-color:#D4537E}
 .f5-select{width:100%;padding:10px 13px;border:1px solid #E8E6E0;border-radius:8px;font-size:13px;color:#1A1A18;background:#fff;outline:none;margin-bottom:12px;font-family:inherit}
@@ -421,24 +427,19 @@ td.empty-state{padding:20px;text-align:center}
 
         <!-- campos shalom -->
         <div id="f5-campos-shalom" style="display:none">
-          <label class="f5-label">Departamento *</label>
-          <select class="f5-select" id="f5-depto" onchange="f5PoblarAgencias()">
-            <option value="">— seleccionar departamento —</option>
-          </select>
-          <label class="f5-label">Distrito / Provincia *</label>
-          <select class="f5-select" id="f5-shalom-distrito" onchange="poblarAgenciaDesdeDistritoGenerico('f5-depto','f5-shalom-distrito','f5-agencia')">
-            <option value="">— primero elige tu departamento —</option>
-          </select>
-          <label class="f5-label">Agencia Shalom de recojo *</label>
-          <select class="f5-select" id="f5-agencia">
-            <option value="">— primero elige tu distrito/provincia —</option>
-          </select>
+          <label class="f5-label">Agencia Shalom donde recoges *</label>
+          <div id="f5-sh-buscador">
+            <input class="f5-input" id="f5-sh-buscar" placeholder="Escribe tu ciudad, distrito o agencia (ej. Juliaca)" oninput="agBuscar('f5')" autocomplete="off" style="margin-bottom:6px">
+            <div id="f5-sh-res" class="sh-res"></div>
+            <div style="font-size:11.5px;margin:4px 0 12px"><a href="#" onclick="agManual('f5',true);return false" style="color:#B3184A">No encuentro mi agencia</a></div>
+          </div>
+          <div id="f5-sh-sel" style="display:none;margin-bottom:12px"></div>
           <div id="f5-agencia-manual" style="display:none">
             <label class="f5-label">Escribe tu ciudad *</label>
             <input class="f5-input" id="f5-ciudad-manual" placeholder="ej. Yurimaguas">
             <label class="f5-label">Escribe la agencia Shalom más cercana *</label>
             <input class="f5-input" id="f5-agencia-manual-input" placeholder="ej. Shalom Yurimaguas">
-            <div style="font-size:11px;color:#9C9A92;margin-top:-8px;margin-bottom:12px">Tu departamento aún no está en la lista — escríbelo y lo verificamos antes de despachar.</div>
+            <div style="font-size:11px;color:#9C9A92;margin-top:-8px;margin-bottom:12px">Escríbela y la verificamos antes de despachar. <a href="#" onclick="agManual(this.closest('[id$=agencia-manual]').id.split('-')[0],false);return false" style="color:#B3184A">Volver al buscador</a></div>
           </div>
         </div>
 
@@ -687,24 +688,19 @@ td.empty-state{padding:20px;text-align:center}
           </div>
 
           <div id="rg-campos-shalom" style="display:none">
-            <label class="f5-label">Departamento *</label>
-            <select class="f5-select" id="rg-depto" onchange="poblarDistritoShalomGenerico('rg-depto','rg-shalom-distrito','rg-agencia','rg-agencia-manual')">
-              <option value="">— seleccionar departamento —</option>
-            </select>
-            <label class="f5-label">Distrito / Provincia *</label>
-            <select class="f5-select" id="rg-shalom-distrito" onchange="poblarAgenciaDesdeDistritoGenerico('rg-depto','rg-shalom-distrito','rg-agencia')">
-              <option value="">— primero elige tu departamento —</option>
-            </select>
-            <label class="f5-label">Agencia Shalom de recojo *</label>
-            <select class="f5-select" id="rg-agencia">
-              <option value="">— primero elige tu distrito/provincia —</option>
-            </select>
+            <label class="f5-label">Agencia Shalom donde recoges *</label>
+            <div id="rg-sh-buscador">
+              <input class="f5-input" id="rg-sh-buscar" placeholder="Escribe tu ciudad, distrito o agencia (ej. Juliaca)" oninput="agBuscar('rg')" autocomplete="off" style="margin-bottom:6px">
+              <div id="rg-sh-res" class="sh-res"></div>
+              <div style="font-size:11.5px;margin:4px 0 12px"><a href="#" onclick="agManual('rg',true);return false" style="color:#B3184A">No encuentro mi agencia</a></div>
+            </div>
+            <div id="rg-sh-sel" style="display:none;margin-bottom:12px"></div>
             <div id="rg-agencia-manual" style="display:none">
               <label class="f5-label">Escribe tu ciudad *</label>
               <input class="f5-input" id="rg-ciudad-manual" placeholder="ej. Yurimaguas">
               <label class="f5-label">Escribe la agencia Shalom más cercana *</label>
               <input class="f5-input" id="rg-agencia-manual-input" placeholder="ej. Shalom Yurimaguas">
-              <div style="font-size:11px;color:#9C9A92;margin-top:-8px;margin-bottom:12px">Tu departamento aún no está en la lista — escríbelo y lo verificamos antes de despachar.</div>
+              <div style="font-size:11px;color:#9C9A92;margin-top:-8px;margin-bottom:12px">Escríbela y la verificamos antes de despachar. <a href="#" onclick="agManual(this.closest('[id$=agencia-manual]').id.split('-')[0],false);return false" style="color:#B3184A">Volver al buscador</a></div>
             </div>
           </div>
 
@@ -5180,9 +5176,9 @@ async function loadDespacho(){
   document.getElementById('despacho-courier').innerHTML='<div class="loading">Cargando...</div>';
   try {
     // Listos para empaquetar: pago_completo
-    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,etiqueta_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
+    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,etiqueta_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en,shalom_agencia)&order=creado_en.asc');
     // Empaquetados listos para courier
-    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,etiqueta_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
+    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,etiqueta_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en,shalom_agencia)&order=creado_en.asc');
 
     despachoActual = [...empaquetar,...courier];
     despachoActual.forEach(p=>{ p._tipo = empaquetar.includes(p) ? 'empaquetar' : 'courier'; });
@@ -5338,6 +5334,100 @@ function bulkExportarCSV(){
 
 const SHALOM_PRO_DESTINOS = ["AAHH SANTA ROSA PIURA", "ABANCAY CO", "AGUAS VERDES", "AGUAYTÍA", "ALTO PUNO", "ALTO TRUJILLO", "AMARILIS CO", "AMBO", "ANCON", "ANDAHUAYLAS", "AÑO NUEVO", "ANT PANAM SUR CDRA 11", "ANTA IZCUCHACA", "APLAO", "ASOC LAS FLORES -  AV 54", "ASOC. NUEVO HORIZONTE - AV. 54", "ATAHUALPA", "ATOCONGO", "AUCAYACU", "AUTOPISTA LA JOYA", "AV  4 DE NOVIEMBRE CO", "AV  BALTA CDRA. 36", "AV  BOLIVAR", "AV  CENTRAL  SMP", "AV  ESPERANZA", "AV  FLORA TRISTAN", "AV  INDEPENDENCIA", "AV  JOSE GALVEZ", "AV  LA FONTANA", "AV  MARCO PUENTE", "AV  NICOLAS DUEÑAS CDRA. 5", "AV  QUILCA", "AV  SAN JUAN PAMPLONA ALTA", "AV  SANTA ROSA - STA ANITA", "AV  TUPAC AMARU KM. 19", "AV  VIGIL", "AV 15 DE AGOSTO", "AV ABRAHAM VALDELOMAR CO", "AV ALAMEDA DEL CORREGIDOR", "AV ANTONIO LORENA", "AV AUGUSTO SALAZAR BONDY", "AV BERTELLO CALLAO", "AV BUENOS AIRES", "AV CENTRAL SJL", "AV CHARCANI", "AV CIRCUNVALACIÓN CRUCE CON MARIATEGUI", "AV CIRCUNVALACION NAZCA", "AV CIRCUNVALACION SJL", "AV COLONIZADORES  CO", "AV COSTANERA", "AV EJERCITO", "AV EL SOL", "AV ENRIQUE MEIGGS", "AV FERNANDO BELAUNDE", "AV HERMANOS ANGULO", "AV HEROES DEL PACIFICO CO", "AV HNOS UCEDA - AMERICA NORTE", "AV HUANDOY CON AV CENTRAL", "AV HUANDOY CON MARAÑON", "AV JESUS", "AV JOSE A. QUIÑONES", "AV JOSE GRANDA CDRA 38", "AV JOSE GRANDA CDRA. 25", "AV JOSE LEAL CDRA 6", "AV JOSE SACO ROJAS", "AV LARCO", "AV LAS AMERICAS", "AV LIMA", "AV LOS INCAS", "AV LOS PRECURSORES / LAS AMERICAS", "AV MALECON  CHECA CDRA. 1", "AV MANUEL VALLE", "AV MARISCAL CASTILLA  PARQ INDUSTRIAL", "AV MEXICO CO", "AV MIGUEL GRAU  PAMPLONA ALTA", "AV PACHACUTEC", "AV PARRA 379", "AV PARTICIPACION PARCELA", "AV PUMACAHUA", "AV RAUL MATA LA CRUZ- DOS GRIFOS", "AV REVOLUCIÓN", "AV SAENZ PEÑA", "AV SANTA ROSA URB LOS ALAMOS", "AV SOCABAYA - LOS TORITOS", "AV TACNA", "AV TAHUANTINSUYO", "AV TOMAS MARSANO - LA BOLICHERA", "AV UNIV.  RETABLO", "AV UNIVERSITARIA CON IZAGUIRRE", "AV VENEZUELA", "AV VICTOR R. HAYA CO", "AV. 12 DE NOVIEMBRE", "AV. 13 DE ENERO", "AV. 27 DE NOVIEMBRE CO", "AV. ANGAMOS", "AV. ANGELICA GAMARRA", "AV. ARIAS ARAGUEZ", "AV. CANADA", "AV. CANEVARO", "AV. CANTA CALLAO  CON ALISOS", "AV. CANTA CALLAO CON IZAGUIRRE", "AV. CARLOS IZAGUIRRE CDRA. 14", "AV. CARLOS IZAGUIRRE CUADRA 23", "AV. CESAR VALLEJO", "AV. DEL MERCADO", "AV. DOMINICOS CDRA 14", "AV. DOS DE OCTUBRE", "AV. GERARDO UNGER CDRA 64", "AV. GRAU", "AV. GULLMAN", "AV. HORACIO ZEVALLOS", "AV. HUANCANE CDRA. 9", "AV. HUAROCHIRÍ", "AV. LA MARINA", "AV. LA MOLINA CDRA. 35", "AV. LAMPA", "AV. LAS MAGNOLIAS", "AV. LAS PALMERAS", "AV. LIMA - VMT", "AV. LIMA CDRA 38", "AV. LOS PESCADORES CO", "AV. LOS PLATINOS", "AV. LUIS EGUIGUREN", "AV. MODESTO BORDA", "AV. MUNICIPAL", "AV. PACÍFICO BELEN", "AV. PASTOR SEVILLA", "AV. PERU 15", "AV. PRINCIPAL", "AV. SAN LORENZO", "AV. SANTA ROSA CRUCE AV. EL SOL", "AV. TRAPICHE", "AV. TUPAC AMARU KM. 23.5", "AV. UNIV. PARQUE SINCHI ROCA", "AV. UNIVERSITARIA CDRA. 16", "AV. VILLA MARIA", "AVIACION 2819", "AYABACA", "AYACUCHO CO", "AYAVIRI", "AZANGARO", "BAGUA CAPITAL", "BAGUA GRANDE", "BAMBAMARCA", "BAÑOS DEL INCA", "BARRANCA", "BARRIO SAN JOSE", "BARRIO SAN MARTÍN", "BARRIO STA ANA CO", "BARRIO YANANACO", "BAYOVAR", "BELLAVISTA CALLAO", "BELLAVISTA SULLANA", "CACHIMAYO - SAN SEBASTIAN", "CAJABAMBA", "CAJAMARCA CO", "CAJAMARCA HORACIO ZEVALLOS", "CALLAO FAUCETT", "CALLE A  CON AV INDUSTRIAL", "CALLE EMAÚS", "CALLE LIMA", "CALLE LIVERPOOL", "CALLE LOS ANGELES", "CALLE SANTA CRUZ - AMERICA SUR", "CALLE TACNA", "CALLE TAHUANTINSUYO", "CALLE YARABAMBA", "CALLERIA AV SAENZ PEÑA", "CALLERIA JR JOSE GALVEZ", "CAMANA", "CAMPOY", "CAÑETE IMPERIAL", "CAÑETE SAN VICENTE", "CANTO GRANDE", "CARABAYLLO ESTABLO", "CARAZ", "CARHUAZ", "CARMEN ALTO", "CASA GRANDE", "CASMA", "CATACAOS", "CELENDIN", "CERRO DE PASCO", "CHACHAPOYAS CO DOS DE MAYO", "CHACHAPOYAS JR GRAU", "CHALA", "CHALLHUAHUACHO", "CHANCAY", "CHAO", "CHEN CHEN", "CHEPEN", "CHILCA CO LEONCIO PRADO", "CHILCA HUANCAYO", "CHILETE - AGENTE", "CHINCHA PUEBLO NUEVO", "CHINCHERO", "CHONGOYAPE", "CHORRILLOS CO", "CHORRILLOS LOS FAISANES", "CHOSICA", "CHOTA", "CHULUCANAS", "CHUPACA", "CHURÍN", "CIENEGUILLA KM. 14.5", "CIUDAD DE DIOS", "CIUDAD MUNICIPAL", "CIUDAD UNIVERSITARIA", "COCACHACRA", "COMBAPATA", "CONCEPCION", "CONGATA", "CORRALES", "CRUZ DE MOTUPE", "CTRA IQUITOS NAUTA", "CUSCO CALCA", "CUSCO CO VIA EVITAMIENTO", "CUSCO PARQUE INDUSTRIAL", "CUSCO URUBAMBA", "CUTERVO", "DESAGUADERO", "EL ALTO", "EL CRUCE LA JOYA", "EL MILAGRO", "EL PROGRESO KM 22", "EL RETAMAL", "EL TRIUNFO", "ESPINAR", "FERREÑAFE", "FIORI", "GARATEA", "GERMÁN AGUIRRE", "GUADALUPE LA LIBERTAD", "HIGUERETA", "HUACHO AV  INDACOCHEA", "HUAMACHUCO", "HUAMBOCANCHA BAJA", "HUANCABAMBA", "HUANCARO", "HUANCAYO JR. ICA", "HUANTA", "HUARACLLA", "HUARAL", "HUARAZ INDEPENDENCIA", "HUARMEY", "HUAURA", "HUAYCAN  EL DESCANSO", "HUAYCAN AV HORACIO ZEVALLOS", "HUAYCAN AV JOSE C MARIATEGUI", "HUAYCAN ENTRADA", "HUAYLLAY", "IBERIA", "ICA AV. JJ ELIAS", "ICA SAN JOAQUIN", "ICA SANTIAGO", "ICA SUBTANJALLA CO", "ICA URB. MANZANILLA", "IGNACIO ESCUDERO", "ILAVE", "ILO CO PAMPA INALAMBRICA", "ILO PACOCHA", "ILO PUERTO", "IQUITOS  AV TUPAC AMARU", "IQUITOS CO JR. BOLOGNESI", "IQUITOS JR PABLO ROSSEL", "JACOBO HUNTER", "JAEN CO", "JAUJA", "JAYANCA", "JESUS MARIA", "JESUS NAZARENO", "JICAMARCA", "JIRON ANCASH", "JR  FREDY ALIAGA CO", "JR AGUSTIN GAMARRA", "JR CASANOVA CON PETIT THOUARS", "JR CHINCHAYSUYO CDRA 4", "JR LEONCIO PRADO", "JR MAYRO", "JR. CAHUIDE", "JR. HUARAZ -  BREÑA", "JR. MAMA OCLLO", "JR. RAMÓN CASTILLA", "JR. RAYMONDI", "JR. TAHUANTINSUYO", "JUANJUI  CENTRO", "JUANJUÍ FERNANDO BELAUNDE TERRY CO", "LA CINCUENTA", "LA CRUZ  TUMBES", "LA CURVA DE MANCHAY", "LA MERCED", "LA OROYA", "LA TABLADA ZONA NUEVA", "LA TINGUIÑA", "LA UNION", "LA VILLA  CRUCE PISCO", "LAMAS", "LAMBAYEQUE CENTRO", "LAMBAYEQUE PANAMERICANA", "LARCOMAR", "LAS CONCHITAS", "LAS DELICIAS DE VILLA", "LAS LOMAS", "LAS MERCEDES", "LIMA AV TINGO MARÍA", "LOS FRESNOS", "LOS ORGANOS", "LOS PINOS", "LOS SAUCES", "LUYA", "MAGDALENA DEL MAR", "MALA", "MALL LAMBRAMANI", "MALVINAS - JR. GARCIA VILLóN", "MALVINAS - JR. RICARDO TRENEMAN", "MANANTAY  AV AGUAYTIA", "MANANTAY AV TUPAC AMARU", "MANCHAY TRES MARIAS", "MÁNCORA", "MARIA AUXILIADORA", "MARIANO MELGAR", "MATARANI", "MAZAMARI", "MAZUKO", "MEGAPLAZA CHORRILLOS", "MEGAPLAZA INDEPENDENCIA", "MI PERU", "MIRAFLORES AREQUIPA", "MIRAFLORES CHICLAYO", "MOCHE", "MOLLENDO CO", "MONSEFU", "MORROPE", "MORROPON", "MOTUPE", "MOYOBAMBA  CENTRO", "MOYOBAMBA  CO", "NUEVA CAJAMARCA", "NUEVA ESPERANZA VMT", "NUEVO IMPERIAL CO", "NUEVO LURIN", "OCONGATE", "OLMOS", "OROPESA", "OTUZCO", "OVALO DE LA FAMILIA", "OVALO HUANCHACO CO", "OVALO LA PERLA", "ÓVALO MARIÁTEGUI", "OVALO PAPAL", "OVALO PUENTE PIEDRA", "OXAPAMPA", "PACANGUILLA", "PACASMAYO CENTRO", "PACASMAYO LAS PALMERAS", "PACHACUTEC  AV 150", "PACHACUTEC PDRO CHINITAS", "PACHACUTEC PDRO VC", "PAIJAN", "PAIMAS", "PAITA", "PAMPA GRANDE TUMBES", "PANGOA", "PARAD.  LOS LICENCIADOS", "PARAMONGA", "PARCONA", "PARDO MIGUEL NARANJOS", "PARQUE INDUSTRIAL CO PIURA FUTURA", "PARQUE LA MOLINA", "PATAPO", "PEDRO RUIZ", "PERENE", "PESQUERO", "PICHANAKI", "PICHARI", "PICOTA", "PILCOMAYO", "PIMENTEL", "PIO  PATA", "PISAC", "PLAZA LA TOMILLA", "PLAZA NORTE ENTREGAS", "POCOLLAY", "POMALCA", "PRO", "PROLONG LUIS MASSARO", "PUCALLPA CO FEDERICO BASADRE", "PUENTE ARICA", "PUENTE LURIN", "PUENTE NUEVO", "PUENTE SANTA ANITA", "PUENTE VIRU", "PUNCHANA", "PUNTA HERMOSA", "QUEBRADA LAS LECHUZAS CO", "QUILLABAMBA", "REAL PLAZA SALAVERRY", "REP. DE PANAMA", "REQUE", "RIMAC AV. AMANCAES", "RIMAC GUARDIA REPUBLICANA CDRA. 9", "RIOJA", "SALAS ICA", "SALAVERRY HUACHO CO", "SALCEDO", "SAN AGUSTIN DE CAJAS", "SAN ANTONIO", "SAN CARLOS HUANCAYO", "SAN CLEMENTE", "SAN IGNACIO", "SAN JERONIMO", "SAN JOSE DE SISA", "SAN JUAN BAUTISTA", "SAN JUAN DE MARCONA", "SAN MARCOS", "SAN MARTIN BELLAVISTA", "SAN MIGUEL CAJAMARCA", "SAN PABLO  CAJAMARCA", "SAN PEDRO DE LLOC", "SAN RAMÓN", "SANTA", "SANTA CLARA", "SANTA MARÍA DE HUACHIPA", "SANTA ROSA", "SANTO DOMINGO", "SANTO TOMAS", "SAPALLANGA", "SAPOSOA", "SATIPO", "SAYAN", "SECHURA", "SEGUNDA DE PRO", "SEGUNDA JERUSALEN", "SICUANI AV CONFEDERACION CO", "SICUANI AV MANUEL CALLO", "SJL- LAS FLORES", "SJL-AV.PROCERES", "SMP AV BERTELLO", "SMP AV PACASMAYO", "SMP-AV. PROCERES", "SORITOR", "SULLANA CO ZONA INDUSTRIAL", "SULLANA SANTA ROSA", "SUNAMPE  CO", "SUPE", "SURCO MATEO PUMACAHUA", "TACALA", "TACNA CIUDAD NUEVA", "TACNA CO AV. JORGE BASADRE", "TALARA  CO ASOC CALIFORNIA", "TALARA ALTA 9 DE OCTUBRE", "TALARA BAJA PARQUE 22", "TAMBO GRANDE", "TAMBOPATA AV CIRCUNVALACION", "TAMBOPATA AV UCAYALI  CO", "TARAPOTO CO JR ALFONSO UGARTE", "TARAPOTO JR. SARGENTO LOREZ", "TARAPOTO LA BANDA DE SHILCAYO", "TARMA", "TEMBLADERA  CAJAMARCA", "TERMINAL JAUJA", "TERMINAL LOS ANDES", "TICA TICA", "TRES DE OCTUBRE", "TRUJILLO LA PERLA", "TUCUME", "TUMAN", "TUMBES - AV ARICA", "TUMBES CO - PANAMERICANA NORTE KM 2360", "TUMBES PUYANGO", "TUNGASUCA", "UCHIZA", "URB MANUEL PRADO", "URB SANTA ELVIRA", "URB UNIVERSAL", "URB. BANCOPATA AV. INDUSTRIAL", "URB. REPARTICIÓN", "URCOS", "VARIANTE UCHUMAYO CO", "VELASCO ASTETE", "VIA EXPRESA SUR", "VILLA RICA", "VILLA SAN FRANCISCO", "VIÑANIS", "VIRU CENTRO", "VISTA ALEGRE CO", "WICHANZAO", "YARINACOCHA  AV UNIVERSITARIA", "YARINACOCHA CENTRO", "YUNGAY", "YURA", "YURIMAGUAS", "ZAMACOLA", "ZAPALLAL", "ZARUMILLA", "ZORRITOS", "01 DE MAYO"];
 const SHALOM_PRO_ORIGENES = ["AAHH SANTA ROSA PIURA", "ABANCAY CO", "AGUAS VERDES", "AGUAYTÍA", "ALTO PUNO", "ALTO TRUJILLO", "AMARILIS CO", "AMBO", "ANCON", "ANDAHUAYLAS", "AÑO NUEVO", "ANT PANAM SUR CDRA 11", "ANTA IZCUCHACA", "APLAO", "ASOC LAS FLORES -  AV 54", "ASOC. NUEVO HORIZONTE - AV. 54", "ATAHUALPA", "ATOCONGO", "AUCAYACU", "AUTOPISTA LA JOYA", "AV  4 DE NOVIEMBRE CO", "AV  BALTA CDRA. 36", "AV  BOLIVAR", "AV  CENTRAL  SMP", "AV  ESPERANZA", "AV  FLORA TRISTAN", "AV  INDEPENDENCIA", "AV  JOSE GALVEZ", "AV  LA FONTANA", "AV  MARCO PUENTE", "AV  NICOLAS DUEÑAS CDRA. 5", "AV  QUILCA", "AV  SAN JUAN PAMPLONA ALTA", "AV  SANTA ROSA - STA ANITA", "AV  TUPAC AMARU KM. 19", "AV  VIGIL", "AV 15 DE AGOSTO", "AV ABRAHAM VALDELOMAR CO", "AV ALAMEDA DEL CORREGIDOR", "AV ANTONIO LORENA", "AV AUGUSTO SALAZAR BONDY", "AV BERTELLO CALLAO", "AV BUENOS AIRES", "AV CENTRAL SJL", "AV CHARCANI", "AV CIRCUNVALACIÓN CRUCE CON MARIATEGUI", "AV CIRCUNVALACION NAZCA", "AV CIRCUNVALACION SJL", "AV COLONIZADORES  CO", "AV COSTANERA", "AV EJERCITO", "AV EL SOL", "AV ENRIQUE MEIGGS", "AV FERNANDO BELAUNDE", "AV HERMANOS ANGULO", "AV HEROES DEL PACIFICO CO", "AV HNOS UCEDA - AMERICA NORTE", "AV HUANDOY CON AV CENTRAL", "AV HUANDOY CON MARAÑON", "AV HUAROCHIRI ENVIOS", "AV JESUS", "AV JOSE A. QUIÑONES", "AV JOSE GRANDA CDRA 38", "AV JOSE GRANDA CDRA. 25", "AV JOSE LEAL CDRA 6", "AV JOSE SACO ROJAS", "AV LARCO", "AV LAS AMERICAS", "AV LIMA", "AV LOS INCAS", "AV LOS PRECURSORES / LAS AMERICAS", "AV MALECON  CHECA CDRA. 1", "AV MANUEL VALLE", "AV MARISCAL CASTILLA  PARQ INDUSTRIAL", "AV MEXICO CO", "AV MIGUEL GRAU  PAMPLONA ALTA", "AV PACHACUTEC", "AV PARRA 379", "AV PARTICIPACION PARCELA", "AV PUMACAHUA", "AV RAUL MATA LA CRUZ- DOS GRIFOS", "AV REVOLUCIÓN", "AV SAENZ PEÑA", "AV SANTA ROSA URB LOS ALAMOS", "AV SOCABAYA - LOS TORITOS", "AV TACNA", "AV TAHUANTINSUYO", "AV TOMAS MARSANO - LA BOLICHERA", "AV TUPAC AMARU CDRA. 57", "AV UNIV.  RETABLO", "AV UNIVERSITARIA CON IZAGUIRRE", "AV VENEZUELA", "AV VICTOR R. HAYA CO", "AV. 12 DE NOVIEMBRE", "AV. 13 DE ENERO", "AV. 27 DE NOVIEMBRE CO", "AV. ALFREDO BENAVIDES", "AV. ANGAMOS", "AV. ANGELICA GAMARRA", "AV. ARAMBURU", "AV. ARIAS ARAGUEZ", "AV. CANADA", "AV. CANEVARO", "AV. CANTA CALLAO  CON ALISOS", "AV. CANTA CALLAO CON IZAGUIRRE", "AV. CARLOS IZAGUIRRE CDRA. 14", "AV. CARLOS IZAGUIRRE CUADRA 23", "AV. CESAR VALLEJO", "AV. COMANDANTE ESPINAR", "AV. DEL MERCADO", "AV. DOMINICOS CDRA 14", "AV. DOS DE OCTUBRE", "AV. GERARDO UNGER CDRA 64", "AV. GRAU", "AV. GULLMAN", "AV. HORACIO ZEVALLOS", "AV. HUANCANE CDRA. 9", "AV. HUAROCHIRÍ", "AV. JOSE PARDO", "AV. LA MARINA", "AV. LA MOLINA CDRA. 35", "AV. LAMPA", "AV. LAS MAGNOLIAS", "AV. LAS PALMERAS", "AV. LIMA - VMT", "AV. LIMA CDRA 38", "AV. LOS PESCADORES CO", "AV. LOS PLATINOS", "AV. LUIS EGUIGUREN", "AV. MODESTO BORDA", "AV. MUNICIPAL", "AV. PACÍFICO BELEN", "AV. PASTOR SEVILLA", "AV. PERU 15", "AV. PRIMAVERA 120", "AV. PRINCIPAL", "AV. SAN FELIPE", "AV. SAN LORENZO", "AV. SANTA ROSA CRUCE AV. EL SOL", "AV. TRAPICHE", "AV. TUPAC AMARU KM. 23.5", "AV. UNIV. PARQUE SINCHI ROCA", "AV. UNIVERSITARIA CDRA. 16", "AV. VILLA MARIA", "AVIACION 2819", "AYABACA", "AYACUCHO CO", "AYAVIRI", "AZANGARO", "BAGUA CAPITAL", "BAGUA GRANDE", "BAMBAMARCA", "BAÑOS DEL INCA", "BARRANCA", "BARRIO SAN JOSE", "BARRIO SAN MARTÍN", "BARRIO STA ANA CO", "BARRIO YANANACO", "BAYOVAR", "BELLAVISTA CALLAO", "BELLAVISTA SULLANA", "CACHIMAYO - SAN SEBASTIAN", "CAJABAMBA", "CAJAMARCA CO", "CAJAMARCA HORACIO ZEVALLOS", "CALLAO FAUCETT", "CALLE A  CON AV INDUSTRIAL", "CALLE EMAÚS", "CALLE LIMA", "CALLE LIVERPOOL", "CALLE LOS ANGELES", "CALLE MIGUEL DASSO", "CALLE SANTA CRUZ - AMERICA SUR", "CALLE TACNA", "CALLE TAHUANTINSUYO", "CALLE YARABAMBA", "CALLERIA AV SAENZ PEÑA", "CALLERIA JR JOSE GALVEZ", "CAMANA", "CAMPOY", "CAÑETE IMPERIAL", "CAÑETE SAN VICENTE", "CANTO GRANDE", "CARABAYLLO ESTABLO", "CARAZ", "CARHUAZ", "CARMEN ALTO", "CASA GRANDE", "CASMA", "CATACAOS", "CELENDIN", "CERRO DE PASCO", "CHACHAPOYAS CO DOS DE MAYO", "CHACHAPOYAS JR GRAU", "CHALA", "CHALLHUAHUACHO", "CHANCAY", "CHAO", "CHEN CHEN", "CHEPEN", "CHILCA CO LEONCIO PRADO", "CHILCA HUANCAYO", "CHILETE - AGENTE", "CHINCHA PUEBLO NUEVO", "CHINCHERO", "CHONGOYAPE", "CHORRILLOS CO", "CHORRILLOS LOS FAISANES", "CHOSICA", "CHOTA", "CHULUCANAS", "CHUPACA", "CHURÍN", "CIENEGUILLA KM. 14.5", "CIUDAD DE DIOS", "CIUDAD MUNICIPAL", "CIUDAD UNIVERSITARIA", "COCACHACRA", "COMBAPATA", "CONCEPCION", "CONGATA", "CORPAC", "CORRALES", "CRUZ DE MOTUPE", "CTRA IQUITOS NAUTA", "CUSCO CALCA", "CUSCO CO VIA EVITAMIENTO", "CUSCO PARQUE INDUSTRIAL", "CUSCO URUBAMBA", "CUTERVO", "DESAGUADERO", "EL ALTO", "EL CRUCE LA JOYA", "EL MILAGRO", "EL PROGRESO KM 22", "EL RETAMAL", "EL TRIUNFO", "ESPINAR", "FERREÑAFE", "FIORI", "GARATEA", "GERMÁN AGUIRRE", "GUADALUPE LA LIBERTAD", "HIGUERETA", "HUACHO AV  INDACOCHEA", "HUAMACHUCO", "HUAMBOCANCHA BAJA", "HUANCABAMBA", "HUANCARO", "HUANCAYO JR. ICA", "HUANTA", "HUARACLLA", "HUARAL", "HUARAZ INDEPENDENCIA", "HUARMEY", "HUAURA", "HUAYCAN  EL DESCANSO", "HUAYCAN AV HORACIO ZEVALLOS", "HUAYCAN AV JOSE C MARIATEGUI", "HUAYCAN ENTRADA", "HUAYLLAY", "IBERIA", "ICA AV. JJ ELIAS", "ICA SAN JOAQUIN", "ICA SANTIAGO", "ICA SUBTANJALLA CO", "ICA URB. MANZANILLA", "IGNACIO ESCUDERO", "ILAVE", "ILO CO PAMPA INALAMBRICA", "ILO PACOCHA", "ILO PUERTO", "IQUITOS  AV TUPAC AMARU", "IQUITOS CO JR. BOLOGNESI", "IQUITOS JR PABLO ROSSEL", "JACOBO HUNTER", "JAEN CO", "JAUJA", "JAYANCA", "JESUS MARIA", "JESUS NAZARENO", "JICAMARCA", "JIRON ANCASH", "JR  FREDY ALIAGA CO", "JR AGUSTIN GAMARRA", "JR CASANOVA CON PETIT THOUARS", "JR CHINCHAYSUYO CDRA 4", "JR LEONCIO PRADO", "JR MAYRO", "JR. CAHUIDE", "JR. HUARAZ -  BREÑA", "JR. LUNA PIZARRO", "JR. MAMA OCLLO", "JR. RAMÓN CASTILLA", "JR. RAYMONDI", "JR. TAHUANTINSUYO", "JUANJUI  CENTRO", "JUANJUÍ FERNANDO BELAUNDE TERRY CO", "LA CINCUENTA", "LA CRUZ  TUMBES", "LA CURVA DE MANCHAY", "LA MERCED", "LA OROYA", "LA TABLADA ZONA NUEVA", "LA TINGUIÑA", "LA UNION", "LA VILLA  CRUCE PISCO", "LAMAS", "LAMBAYEQUE CENTRO", "LAMBAYEQUE PANAMERICANA", "LARCOMAR", "LAS CONCHITAS", "LAS DELICIAS DE VILLA", "LAS LOMAS", "LAS MERCEDES", "LIMA AV TINGO MARÍA", "LOS FRESNOS", "LOS ORGANOS", "LOS PINOS", "LOS SAUCES", "LUYA", "MAGDALENA DEL MAR", "MALA", "MALL LAMBRAMANI", "MALVINAS - JR. GARCIA VILLóN", "MALVINAS - JR. RICARDO TRENEMAN", "MANANTAY  AV AGUAYTIA", "MANANTAY AV TUPAC AMARU", "MANCHAY TRES MARIAS", "MÁNCORA", "MARIA AUXILIADORA", "MARIANO MELGAR", "MATARANI", "MAZAMARI", "MAZUKO", "MEGAPLAZA CHORRILLOS", "MEGAPLAZA INDEPENDENCIA", "MI PERU", "MIRAFLORES AREQUIPA", "MIRAFLORES CHICLAYO", "MOCHE", "MOLLENDO CO", "MONSEFU", "MORROPE", "MORROPON", "MOTUPE", "MOYOBAMBA  CENTRO", "MOYOBAMBA  CO", "NUEVA CAJAMARCA", "NUEVA ESPERANZA VMT", "NUEVO IMPERIAL CO", "NUEVO LURIN", "OCONGATE", "OLMOS", "OROPESA", "OTUZCO", "OUTLET ARAUCO FAUCETT", "OVALO DE LA FAMILIA", "OVALO HUANCHACO CO", "OVALO LA PERLA", "ÓVALO MARIÁTEGUI", "OVALO PAPAL", "OVALO PUENTE PIEDRA", "OXAPAMPA", "PACANGUILLA", "PACASMAYO CENTRO", "PACASMAYO LAS PALMERAS", "PACHACUTEC  AV 150", "PACHACUTEC PDRO CHINITAS", "PACHACUTEC PDRO VC", "PAIJAN", "PAIMAS", "PAITA", "PAMPA GRANDE TUMBES", "PANGOA", "PARAD.  LOS LICENCIADOS", "PARAMONGA", "PARCONA", "PARDO MIGUEL NARANJOS", "PARQUE INDUSTRIAL CO PIURA FUTURA", "PARQUE LA MOLINA", "PATAPO", "PEDRO RUIZ", "PERENE", "PESQUERO", "PICHANAKI", "PICHARI", "PICOTA", "PILCOMAYO", "PIMENTEL", "PIO  PATA", "PISAC", "PLAZA LA TOMILLA", "PLAZA NORTE ENTREGAS", "PLAZA NORTE S. EXPRESS", "POCOLLAY", "POMALCA", "PRO", "PROLONG LUIS MASSARO", "PUCALLPA CO FEDERICO BASADRE", "PUENTE ARICA", "PUENTE LURIN", "PUENTE NUEVO", "PUENTE SANTA ANITA", "PUENTE VIRU", "PUNCHANA", "PUNTA HERMOSA", "QUEBRADA LAS LECHUZAS CO", "QUILLABAMBA", "REAL PLAZA SALAVERRY", "REP. DE PANAMA", "REQUE", "RIMAC AV. AMANCAES", "RIMAC GUARDIA REPUBLICANA CDRA. 9", "RIOJA", "RIV. NAVARRETE", "SALAS ICA", "SALAVERRY HUACHO CO", "SALCEDO", "SAN AGUSTIN DE CAJAS", "SAN ANTONIO", "SAN CARLOS HUANCAYO", "SAN CLEMENTE", "SAN IGNACIO", "SAN JERONIMO", "SAN JOSE DE SISA", "SAN JUAN BAUTISTA", "SAN JUAN DE MARCONA", "SAN MARCOS", "SAN MARTIN BELLAVISTA", "SAN MIGUEL CAJAMARCA", "SAN PABLO  CAJAMARCA", "SAN PEDRO DE LLOC", "SAN RAMÓN", "SANTA", "SANTA CLARA", "SANTA MARÍA DE HUACHIPA", "SANTA ROSA", "SANTO DOMINGO", "SANTO TOMAS", "SAPALLANGA", "SAPOSOA", "SATIPO", "SAYAN", "SECHURA", "SEGUNDA DE PRO", "SEGUNDA JERUSALEN", "SICUANI AV CONFEDERACION CO", "SICUANI AV MANUEL CALLO", "SJL- LAS FLORES", "SJL-AV.PROCERES", "SMP AV BERTELLO", "SMP AV PACASMAYO", "SMP-AV. PROCERES", "SORITOR", "SULLANA CO ZONA INDUSTRIAL", "SULLANA SANTA ROSA", "SUNAMPE  CO", "SUPE", "SURCO MATEO PUMACAHUA", "TACALA", "TACNA CIUDAD NUEVA", "TACNA CO AV. JORGE BASADRE", "TALARA  CO ASOC CALIFORNIA", "TALARA ALTA 9 DE OCTUBRE", "TALARA BAJA PARQUE 22", "TAMBO GRANDE", "TAMBOPATA AV CIRCUNVALACION", "TAMBOPATA AV UCAYALI  CO", "TARAPOTO CO JR ALFONSO UGARTE", "TARAPOTO JR. SARGENTO LOREZ", "TARAPOTO LA BANDA DE SHILCAYO", "TARMA", "TEMBLADERA  CAJAMARCA", "TERMINAL JAUJA", "TERMINAL LOS ANDES", "TICA TICA", "TINGO MARÍA - LEONCIO PRADO", "TINGO MARIA CO BUENOS AIRES", "TRES DE OCTUBRE", "TRUJILLO LA PERLA", "TUCUME", "TUMAN", "TUMBES - AV ARICA", "TUMBES CO - PANAMERICANA NORTE KM 2360", "TUMBES PUYANGO", "TUNGASUCA", "UCHIZA", "URB MANUEL PRADO", "URB SANTA ELVIRA", "URB UNIVERSAL", "URB. BANCOPATA AV. INDUSTRIAL", "URB. REPARTICIÓN", "URCOS", "VARIANTE UCHUMAYO CO", "VELASCO ASTETE", "VIA EXPRESA SUR", "VILLA RICA", "VILLA SAN FRANCISCO", "VIÑANIS", "VIRU CENTRO", "VISTA ALEGRE CO", "WICHANZAO", "YARINACOCHA  AV UNIVERSITARIA", "YARINACOCHA CENTRO", "YUNGAY", "YURA", "YURIMAGUAS", "ZAMACOLA", "ZAPALLAL", "ZARUMILLA", "ZORRITOS", "01 DE MAYO"];
+// ══════════ Buscador de agencias Shalom (lista oficial de shalom.com.pe guardada en Supabase: tabla shalom_agencias) ══════════
+// El nombre de cada agencia es exactamente el que pide el Excel de Shalom PRO, así el registro masivo sale directo.
+let AG_OFICIAL = null;
+const agSel = {}, agManualOn = {};
+async function agCargarOficial(){
+  if(AG_OFICIAL && AG_OFICIAL.length) return AG_OFICIAL;
+  try {
+    AG_OFICIAL = await dbGet('shalom_agencias?destino=eq.true&select=nombre,departamento,provincia,distrito,direccion&order=departamento.asc,provincia.asc,distrito.asc,nombre.asc');
+    AG_OFICIAL.forEach(a=>{
+      a._lugar = agNorm([a.nombre,a.departamento,a.provincia,a.distrito].join(' '));
+      a._todo = a._lugar+' '+agNorm(a.direccion);
+    });
+  } catch(e){ console.error('No se pudo cargar agencias Shalom', e); AG_OFICIAL = []; }
+  return AG_OFICIAL;
+}
+function agTitulo(s){ return String(s||'').toLowerCase().replace(/(^|[\s\-\/(])([a-záéíóúñ])/g,(m,a,b)=>a+b.toUpperCase()); }
+let agBuscarT = null;
+function agBuscar(P){ clearTimeout(agBuscarT); agBuscarT = setTimeout(()=>agBuscarYa(P), 150); }
+async function agBuscarYa(P){
+  const q = document.getElementById(P+'-sh-buscar').value;
+  const box = document.getElementById(P+'-sh-res');
+  const toks = agNorm(q).split(/\s+/).filter(t=>t.length>1);
+  if(!toks.length){ box.innerHTML=''; return; }
+  box.innerHTML = '<div class="sh-vacio">Buscando…</div>';
+  const lista = await agCargarOficial();
+  if(!lista.length){ box.innerHTML = '<div class="sh-vacio">No se pudo cargar la lista de agencias. Toca "No encuentro mi agencia" y escríbela.</div>'; return; }
+  const res = [];
+  lista.forEach((a,i)=>{
+    if(!toks.every(t=>a._todo.includes(t))) return;
+    const sc = toks.filter(t=>a._lugar.includes(t)).length;
+    res.push([sc,i]);
+  });
+  res.sort((x,y)=>y[0]-x[0]);
+  box.innerHTML = res.length
+    ? res.slice(0,40).map(([,i])=>{ const a=lista[i]; return `<button type="button" class="sh-item" onclick="agElegir('${P}',${i})"><b>${agEsc(a.nombre)}</b><small>📍 ${agEsc(agTitulo(a.departamento))} · ${agEsc(agTitulo(a.provincia))} · ${agEsc(agTitulo(a.distrito))}<br>${agEsc(a.direccion)}</small></button>`; }).join('')
+      + (res.length>40 ? `<div class="sh-vacio">Hay ${res.length} resultados — escribe algo más para acotar (ej. tu distrito).</div>` : '')
+    : '<div class="sh-vacio">Sin resultados. Prueba con el nombre de tu provincia o distrito.</div>';
+}
+function agElegir(P, i){
+  agSel[P] = AG_OFICIAL[i];
+  agManual(P, false);
+  const a = agSel[P];
+  document.getElementById(P+'-sh-buscador').style.display='none';
+  const sel = document.getElementById(P+'-sh-sel');
+  sel.style.display='block';
+  sel.innerHTML = `<div style="border:1.5px solid #B3184A;border-radius:10px;padding:10px 12px;background:#FFF7FA">
+    <div style="font-size:11px;color:#B3184A;font-weight:600;margin-bottom:2px">✓ Tu agencia de recojo</div>
+    <div style="font-size:13.5px;font-weight:600">${agEsc(a.nombre)}</div>
+    <div style="font-size:11.5px;color:#6B6A64;line-height:1.4;margin-top:2px">${agEsc(agTitulo(a.departamento))} · ${agEsc(agTitulo(a.provincia))} · ${agEsc(agTitulo(a.distrito))}<br>${agEsc(a.direccion)}</div>
+    <a href="#" onclick="agCambiar('${P}');return false" style="display:inline-block;margin-top:6px;font-size:12px;color:#B3184A">Cambiar agencia</a></div>`;
+}
+function agCambiar(P){
+  agSel[P] = null;
+  document.getElementById(P+'-sh-sel').style.display='none';
+  document.getElementById(P+'-sh-buscador').style.display='block';
+  const inp = document.getElementById(P+'-sh-buscar'); inp.focus();
+  agBuscarYa(P);
+}
+function agManual(P, on){
+  agManualOn[P] = !!on;
+  const m = document.getElementById(P+'-agencia-manual'); if(m) m.style.display = on ? 'block' : 'none';
+  if(on){ agSel[P]=null; document.getElementById(P+'-sh-sel').style.display='none'; }
+  document.getElementById(P+'-sh-buscador').style.display = on ? 'none' : (agSel[P] ? 'none' : 'block');
+}
+function agReset(P){
+  agSel[P] = null; agManualOn[P] = false;
+  const inp = document.getElementById(P+'-sh-buscar'); if(inp) inp.value='';
+  const r = document.getElementById(P+'-sh-res'); if(r) r.innerHTML='';
+  const s = document.getElementById(P+'-sh-sel'); if(s){ s.style.display='none'; s.innerHTML=''; }
+  const m = document.getElementById(P+'-agencia-manual'); if(m) m.style.display='none';
+  const b = document.getElementById(P+'-sh-buscador'); if(b) b.style.display='block';
+}
+// Devuelve {ciudad, agencia, oficial} — oficial = nombre exacto de Shalom PRO (null si la escribió a mano)
+function agGetAgencia(P){
+  if(agManualOn[P]){
+    return { ciudad: document.getElementById(P+'-ciudad-manual')?.value.trim()||'', agencia: document.getElementById(P+'-agencia-manual-input')?.value.trim()||'', oficial: null };
+  }
+  const a = agSel[P];
+  if(!a) return { ciudad:'', agencia:'', oficial:null };
+  return { ciudad: agTitulo(a.departamento), agencia: `${a.nombre} — ${a.direccion}`, oficial: a.nombre };
+}
+async function agPrefill(P, cli){
+  agReset(P);
+  if(cli?.shalom_agencia){
+    const lista = await agCargarOficial();
+    const i = lista.findIndex(a=>a.nombre===cli.shalom_agencia);
+    if(i>=0){ agElegir(P, i); return; }
+  }
+  if(cli?.direccion){
+    const inp = document.getElementById(P+'-sh-buscar');
+    document.getElementById(P+'-sh-res').innerHTML = `<div class="sh-vacio">Tenías guardada: <b>${agEsc(cli.direccion)}</b>. Búscala aquí arriba para confirmarla.</div>`;
+  }
+}
+
 // ══════════ Excel Shalom PRO (registro masivo) ══════════
 // Listas oficiales tomadas del "Formato Pro Masivo" de pro.shalom.pe (Hoja2). Si Shalom abre/cierra agencias, actualizar aquí.
 // Medidas por tipo de paquete: mismas fórmulas que trae la plantilla oficial (alto, ancho, largo en m; peso en kg)
@@ -5348,23 +5438,37 @@ const SHALOM_PRO_PAQUETES = {
 let shProFilas = [];
 let shProMapa = {};
 
-function shEsc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function shNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9ñ ]/g,' '); }
-const SH_STOP = new Set('av avenida jr jiron calle ca co de del la las los el y mz mza lt lte n nro cdra urb sec zona asoc prolong prol carretera km s lima con en a e'.split(' '));
-function shToks(s){ return shNorm(s).split(/\s+/).filter(t=>t.length>1 && !SH_STOP.has(t)); }
+function agEsc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function agNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9ñ ]/g,' '); }
+const AG_STOP = new Set('av avenida jr jiron calle ca co de del la las los el y mz mza lt lte n nro cdra urb sec zona asoc prolong prol carretera km s lima con en a e'.split(' '));
+function agToks(s){ return agNorm(s).split(/\s+/).filter(t=>t.length>1 && !AG_STOP.has(t)); }
 function shProClave(c){ return ((c.distrito||'')+'|'+(c.direccion||'')).trim(); }
 
 // Sugerencias de destino PRO para la agencia que eligió la clienta (solo sugerencias: siempre se revisan a mano la 1ra vez)
 function shProSugerir(c){
+  if(AG_OFICIAL && AG_OFICIAL.length){
+    const ct = new Set(agToks(c.direccion||''));
+    const dep = agNorm(c.distrito||'').trim();
+    if(ct.size){
+      const out = AG_OFICIAL.map(a=>{
+        const at = new Set(agToks(a.direccion+' '+a.distrito+' '+a.nombre));
+        let n=0; at.forEach(t=>{ if(ct.has(t)) n++; });
+        let sc = n/Math.sqrt(at.size*ct.size||1);
+        if(dep && agNorm(a.departamento).trim()===dep) sc += 0.15;
+        return [sc, a.nombre];
+      }).filter(x=>x[0]>0.2).sort((x,y)=>y[0]-x[0]).slice(0,4).map(x=>x[1]);
+      if(out.length) return out;
+    }
+  }
   const dir = String(c.direccion||'');
   const partes = dir.split(' — ');
   const dist = partes.length>1 ? partes[0] : '';
-  const hay = new Set(shToks(dir+' '+(c.distrito||'')));
-  const inicio = shToks(partes.length>1 ? partes.slice(1).join(' ') : dir).slice(0,5);
-  const dt = new Set(shToks(dist));
+  const hay = new Set(agToks(dir+' '+(c.distrito||'')));
+  const inicio = agToks(partes.length>1 ? partes.slice(1).join(' ') : dir).slice(0,5);
+  const dt = new Set(agToks(dist));
   const out = [];
   SHALOM_PRO_DESTINOS.forEach(p=>{
-    const pt = shToks(p); if(!pt.length) return;
+    const pt = agToks(p); if(!pt.length) return;
     const cov = pt.filter(t=>hay.has(t)).length/pt.length; if(!cov) return;
     const sc = cov + 0.2*pt.filter(t=>inicio.includes(t)).length/pt.length + 0.15*pt.filter(t=>dt.has(t)).length/pt.length + 0.01*pt.length;
     out.push([sc,p]);
@@ -5392,10 +5496,10 @@ async function abrirExcelShalomPro(lista){
   if(!lista.length){ toast('Selecciona al menos un pedido de Shalom'); return; }
   const dl = document.getElementById('shp-dest-list');
   if(!dl.options.length){
-    dl.innerHTML = SHALOM_PRO_DESTINOS.map(d=>`<option value="${shEsc(d)}">`).join('');
-    document.getElementById('shp-orig-list').innerHTML = SHALOM_PRO_ORIGENES.map(d=>`<option value="${shEsc(d)}">`).join('');
+    dl.innerHTML = SHALOM_PRO_DESTINOS.map(d=>`<option value="${agEsc(d)}">`).join('');
+    document.getElementById('shp-orig-list').innerHTML = SHALOM_PRO_ORIGENES.map(d=>`<option value="${agEsc(d)}">`).join('');
   }
-  await shProCargarMapa();
+  await Promise.all([shProCargarMapa(), agCargarOficial()]);
   // Una fila por clienta (si tiene 2 pedidos seleccionados, va 1 solo paquete)
   const vistos = new Set();
   shProFilas = [];
@@ -5403,9 +5507,10 @@ async function abrirExcelShalomPro(lista){
     const k = (c.telefono||'')+'|'+(c.dni||'');
     if(vistos.has(k)) return; vistos.add(k);
     const clave = shProClave(c);
-    const guardado = shProMapa[clave] && SHALOM_PRO_DESTINOS.includes(shProMapa[clave]) ? shProMapa[clave] : '';
-    const sug = shProSugerir(c);
-    shProFilas.push({...c, clave, sug, destino: guardado, guardado: !!guardado});
+    const deClienta = c.shalom_agencia && SHALOM_PRO_DESTINOS.includes(c.shalom_agencia) ? c.shalom_agencia : '';
+    const guardado = deClienta || (shProMapa[clave] && SHALOM_PRO_DESTINOS.includes(shProMapa[clave]) ? shProMapa[clave] : '');
+    const sug = deClienta ? [] : shProSugerir(c);
+    shProFilas.push({...c, clave, sug, destino: guardado, guardado: !!guardado, deClienta: !!deClienta});
   });
   const origen = shProMapa['__origen__']||'';
   const merc = shProMapa['__mercaderia__']||'PAQUETE S';
@@ -5423,17 +5528,18 @@ function shProRender(){
     const ok = SHALOM_PRO_DESTINOS.includes(f.destino);
     const estado = !f.destino ? '<span class="badge badge-warn">Elige la agencia</span>'
       : !ok ? '<span class="badge badge-warn">No está en la lista de Shalom</span>'
+      : f.deClienta && f.destino===f.shalom_agencia ? '<span class="badge badge-ok">✓ La eligió ella</span>'
       : f.guardado ? '<span class="badge badge-ok">✓ Ya confirmada antes</span>' : '<span class="badge badge-info">✓ Elegida</span>';
     const chips = (!f.guardado && f.sug.length) ? `<div style="font-size:11px;color:var(--text3);margin:6px 0 4px">¿Es alguna de estas? Tócala:</div><div class="pill-row">`
-      + f.sug.map(s=>`<button type="button" class="btn btn-xs" style="${s===f.destino?'background:var(--primary);color:#fff':''}" onclick="shProElegir(${i}, this.dataset.v)" data-v="${shEsc(s)}">${shEsc(s)}</button>`).join('') + '</div>' : '';
+      + f.sug.map(s=>`<button type="button" class="btn btn-xs" style="${s===f.destino?'background:var(--primary);color:#fff':''}" onclick="shProElegir(${i}, this.dataset.v)" data-v="${agEsc(s)}">${agEsc(s)}</button>`).join('') + '</div>' : '';
     return `<div class="card" style="padding:10px 12px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;align-items:center">
-        <strong style="font-size:13px">${shEsc(f.nombre||'(sin nombre)')}</strong>${estado}</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">DNI ${dniOk?shEsc(f.dni):'<span style="color:var(--red,#c0392b);font-weight:600">'+(f.dni?shEsc(f.dni)+' (inválido)':'FALTA')+'</span>'}
-        · Cel ${celOk?shEsc(f.telefono):'<span style="color:var(--red,#c0392b);font-weight:600">'+(f.telefono?shEsc(f.telefono)+' (inválido)':'FALTA')+'</span>'}</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:4px;background:var(--gray-light);border-radius:6px;padding:6px 8px">📍 Ella eligió: <strong>${shEsc(f.distrito||'')}</strong> · ${shEsc(f.direccion||'(sin agencia)')}</div>
+        <strong style="font-size:13px">${agEsc(f.nombre||'(sin nombre)')}</strong>${estado}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">DNI ${dniOk?agEsc(f.dni):'<span style="color:var(--red,#c0392b);font-weight:600">'+(f.dni?agEsc(f.dni)+' (inválido)':'FALTA')+'</span>'}
+        · Cel ${celOk?agEsc(f.telefono):'<span style="color:var(--red,#c0392b);font-weight:600">'+(f.telefono?agEsc(f.telefono)+' (inválido)':'FALTA')+'</span>'}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px;background:var(--gray-light);border-radius:6px;padding:6px 8px">📍 Ella eligió: <strong>${agEsc(f.distrito||'')}</strong> · ${agEsc(f.direccion||'(sin agencia)')}</div>
       ${chips}
-      <input list="shp-dest-list" value="${shEsc(f.destino)}" placeholder="Buscar agencia destino en la lista de Shalom…" oninput="shProEscribir(${i}, this.value)" onchange="shProRender()" style="width:100%;margin-top:6px" autocomplete="off">
+      <input list="shp-dest-list" value="${agEsc(f.destino)}" placeholder="Buscar agencia destino en la lista de Shalom…" oninput="shProEscribir(${i}, this.value)" onchange="shProRender()" style="width:100%;margin-top:6px" autocomplete="off">
       <select onchange="shProFilas[${i}].merc=this.value" style="width:100%;margin-top:6px">${Object.keys(SHALOM_PRO_PAQUETES).map(m=>`<option ${m===(f.merc||merc)?'selected':''}>${m}</option>`).join('')}</select>
     </div>`;
   }).join('');
@@ -6287,7 +6393,6 @@ function poblarAgenciaDesdeDistritoGenerico(deptoId, distritoId, agenciaId){
   selAg.innerHTML = '<option value="">— seleccionar agencia —</option>'
     + SHALOM_AGENCIAS[dep][dist].map(nombre=>`<option value="${dist} — ${nombre}">${nombre}</option>`).join('');
 }
-f5PoblarDepartamentos();
 
 
 function f5InitProgress(){
@@ -6341,16 +6446,7 @@ function f5HandleFile(input){
 }
 
 // Devuelve {agencia, ciudad} tanto si vino del select (departamento con lista) como del fallback manual
-function f5GetAgenciaShalom(){
-  const dep = document.getElementById('f5-depto')?.value||'';
-  if(dep==='__otro__'){
-    return {
-      ciudad: document.getElementById('f5-ciudad-manual')?.value.trim()||'',
-      agencia: document.getElementById('f5-agencia-manual-input')?.value.trim()||''
-    };
-  }
-  return { ciudad: dep, agencia: document.getElementById('f5-agencia')?.value||'' };
-}
+function f5GetAgenciaShalom(){ return agGetAgencia('f5'); }
 
 
 function f5Next(){
@@ -6371,8 +6467,7 @@ function f5Next(){
     if(!dni || dni.length < 8){ errEl.textContent='Ingresa tu DNI (8 dígitos).'; errEl.style.display='block'; return; }
     if(f5Courier==='shalom'){
       const {agencia, ciudad} = f5GetAgenciaShalom();
-      if(!document.getElementById('f5-depto').value){ errEl.textContent='Selecciona tu departamento.'; errEl.style.display='block'; return; }
-      if(!agencia){ errEl.textContent='Selecciona (o escribe) la agencia Shalom de recojo.'; errEl.style.display='block'; return; }
+      if(!agencia){ errEl.textContent='Busca y toca tu agencia Shalom de recojo (o escríbela en "No encuentro mi agencia").'; errEl.style.display='block'; return; }
       if(!ciudad){ errEl.textContent='Ingresa tu ciudad o provincia.'; errEl.style.display='block'; return; }
     }
     if(f5Courier==='motorizado'){
@@ -6461,7 +6556,8 @@ async function f5Confirmar(){
     // Actualizar clienta
     await dbPatch(`clientes?id=eq.${ped.cliente_id}`, {
       nombre, dni, distrito, direccion:dir, referencia:ref,
-      costo_envio:costoEnvio
+      costo_envio:costoEnvio,
+      shalom_agencia: f5Courier==='shalom' ? (f5GetAgenciaShalom().oficial||null) : null
     });
     // Actualizar pedido
     await dbPatch(`pedidos?id=eq.${ped.id}`, {
@@ -6661,8 +6757,7 @@ function rgMostrarFormNuevo(tel){
   document.getElementById('rg-direccion').value='';
   document.getElementById('rg-referencia').value='';
   document.getElementById('rg-distrito').value='';
-  document.getElementById('rg-depto').value='';
-  poblarDistritoShalomGenerico('rg-depto','rg-shalom-distrito','rg-agencia','rg-agencia-manual');
+  agReset('rg');
   rgCourier = null;
   document.getElementById('rg-opt-motorizado').classList.remove('selected');
   document.getElementById('rg-opt-shalom').classList.remove('selected');
@@ -6679,16 +6774,7 @@ function rgSelCourier(tipo){
   document.getElementById('rg-campos-shalom').style.display = tipo==='shalom' ? 'block' : 'none';
 }
 
-function rgGetAgenciaShalom(){
-  const dep = document.getElementById('rg-depto').value;
-  if(dep==='__otro__'){
-    return {
-      ciudad: document.getElementById('rg-ciudad-manual')?.value.trim()||'',
-      agencia: document.getElementById('rg-agencia-manual-input')?.value.trim()||''
-    };
-  }
-  return { ciudad: dep, agencia: document.getElementById('rg-agencia')?.value||'' };
-}
+function rgGetAgenciaShalom(){ return agGetAgencia('rg'); }
 
 async function rgGuardar(){
   const nombre = document.getElementById('rg-nombre').value.trim();
@@ -6711,14 +6797,14 @@ async function rgGuardar(){
     if(!dir){ errEl.textContent='Ingresa tu dirección de entrega.'; errEl.style.display='block'; return; }
   } else {
     const {agencia, ciudad} = rgGetAgenciaShalom();
-    if(!document.getElementById('rg-depto').value){ errEl.textContent='Selecciona tu departamento.'; errEl.style.display='block'; return; }
-    if(!agencia){ errEl.textContent='Selecciona (o escribe) la agencia Shalom de recojo.'; errEl.style.display='block'; return; }
+    if(!agencia){ errEl.textContent='Busca y toca tu agencia Shalom de recojo (o escríbela en "No encuentro mi agencia").'; errEl.style.display='block'; return; }
+    if(!ciudad){ errEl.textContent='Escribe tu ciudad.'; errEl.style.display='block'; return; }
     distrito = ciudad; dir = agencia; costoEnv = 0; tipoEnvio = 'shalom';
   }
   errEl.style.display='none';
   try {
     const existe = await dbGet(`clientes?telefono=eq.${tel}`);
-    const patch = {nombre, distrito, direccion:dir, referencia:ref, dni, costo_envio:costoEnv, tipo_envio_preferido:tipoEnvio};
+    const patch = {nombre, distrito, direccion:dir, referencia:ref, dni, costo_envio:costoEnv, tipo_envio_preferido:tipoEnvio, shalom_agencia: rgCourier==='shalom' ? (rgGetAgenciaShalom().oficial||null) : null};
     if(existe && existe.length){
       await dbPatch(`clientes?telefono=eq.${tel}`, patch);
       rgClienteActual = {...existe[0], ...patch};
@@ -6773,13 +6859,7 @@ function rgEditar(){
     const esShalom = !!rgClienteActual.tipo_envio_preferido && rgClienteActual.tipo_envio_preferido.startsWith('shalom');
     rgSelCourier(esShalom?'shalom':'motorizado');
     if(esShalom){
-      document.getElementById('rg-depto').value = rgClienteActual.distrito||'';
-      const agenciaGuardada = rgClienteActual.direccion||'';
-      const distritoGuardado = agenciaGuardada.includes(' — ') ? agenciaGuardada.split(' — ')[0] : '';
-      poblarDistritoShalomGenerico('rg-depto','rg-shalom-distrito','rg-agencia','rg-agencia-manual');
-      document.getElementById('rg-shalom-distrito').value = distritoGuardado;
-      poblarAgenciaDesdeDistritoGenerico('rg-depto','rg-shalom-distrito','rg-agencia');
-      document.getElementById('rg-agencia').value = agenciaGuardada;
+      agPrefill('rg', rgClienteActual);
     } else {
       document.getElementById('rg-distrito').value = rgClienteActual.distrito||'';
       document.getElementById('rg-direccion').value = rgClienteActual.direccion||'';
