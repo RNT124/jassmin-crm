@@ -1558,7 +1558,7 @@ td.empty-state{padding:20px;text-align:center}
       <button class="btn btn-primary btn-sm" onclick="brEtqPdf()">📄 Compartir PDF (todas en un archivo)</button>
       <button class="btn btn-sm" onclick="brEtqCompartir()">🖼 Imágenes sueltas</button>
       <button class="btn btn-sm" onclick="brEtqImprimirPC()">🖨 Imprimir (computador)</button>
-      <button class="btn btn-sm" onclick="brEtqMarcar()">✅ Marcar como impresas</button>
+      <button class="btn btn-sm" id="etq-btn-marcar" onclick="brEtqMarcar()">✅ Marcar como impresas</button>
       <button class="btn btn-sm" onclick="closeModal('modal-br-etq')">Cerrar</button>
     </div>
   </div>
@@ -5117,9 +5117,9 @@ async function loadDespacho(){
   document.getElementById('despacho-courier').innerHTML='<div class="loading">Cargando...</div>';
   try {
     // Listos para empaquetar: pago_completo
-    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
+    const empaquetar = await dbGet('pedidos?estado=eq.pago_completo&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
     // Empaquetados listos para courier
-    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
+    const courier = await dbGet('pedidos?estado=eq.empaquetado&select=id,numero,total,monto_pagado,tipo_envio,courier_codigo,notas,creado_en,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,direccion,referencia,tipo_envio_preferido,envio_urgente_en)&order=creado_en.asc');
 
     despachoActual = [...empaquetar,...courier];
     despachoActual.forEach(p=>{ p._tipo = empaquetar.includes(p) ? 'empaquetar' : 'courier'; });
@@ -5187,7 +5187,7 @@ function actualizarBulkDespacho(){
 function despachoSeleccionados(tipoEsperado){
   const checks = [...document.querySelectorAll('.desp-check:checked')];
   const ids = checks.map(c=>c.dataset.id);
-  const noCoincide = checks.some(c=>c.dataset.envio!==tipoEsperado);
+  const noCoincide = tipoEsperado ? checks.some(c=>c.dataset.envio!==tipoEsperado) : false;
   return {ids, noCoincide};
 }
 
@@ -5273,32 +5273,20 @@ function bulkExportarCSV(){
   marcarDespachadosSiSeConfirma(ids);
 }
 
-function bulkImprimirEtiquetas(){
-  const {ids, noCoincide} = despachoSeleccionados('shalom');
-  if(!ids.length){ toast('Selecciona al menos un pedido de Shalom'); return; }
-  if(noCoincide){ toast('⚠️ Solo selecciona pedidos de Shalom para imprimir etiquetas'); return; }
+async function bulkImprimirEtiquetas(){
+  const {ids} = despachoSeleccionados('');
+  if(!ids.length){ toast('Selecciona al menos un pedido'); return; }
   const lista = despachoActual.filter(p=>ids.includes(p.id));
-  const win = window.open('', '_blank');
-  const etiquetas = lista.map(p=>{
-    const c=p.clientes||{};
-    return `<div style="width:340px;border:2px solid #000;border-radius:8px;padding:16px;margin:0 0 16px;page-break-inside:avoid;font-family:Arial,sans-serif">
-      <div style="font-size:11px;letter-spacing:.1em;color:#666;margin-bottom:6px">JASSMIN — ENVÍO SHALOM</div>
-      <div style="font-size:18px;font-weight:700;margin-bottom:10px">${p.numero}</div>
-      <div style="font-size:13px;line-height:1.9">
-        <div><strong>Nombre:</strong> ${c.nombre||'—'}</div>
-        <div><strong>DNI:</strong> ${c.dni||'—'}</div>
-        <div><strong>Teléfono:</strong> ${c.telefono||'—'}</div>
-        <div><strong>Agencia destino:</strong> ${c.direccion||'—'}</div>
-        <div><strong>Ciudad/Distrito:</strong> ${c.distrito||'—'}</div>
-      </div>
-    </div>`;
-  }).join('');
-  win.document.write(`<html><head><title>Etiquetas Shalom</title></head>
-    <body style="margin:20px">${etiquetas}
-    <script>window.onload=()=>window.print()<\/script>
-    </body></html>`);
-  win.document.close();
-  marcarDespachadosSiSeConfirma(ids);
+  const carritoIds = lista.map(p=>p.carrito_id).filter(Boolean);
+  let items = [];
+  try { if(carritoIds.length) items = await dbGet(`carrito_items?carrito_id=in.(${carritoIds.join(',')})&estado_bolsa=neq.eliminado&select=carrito_id`); }
+  catch(e){ toast('Error: '+e.message); return; }
+  const peds = lista.map(p=>{
+    const c = p.clientes||{};
+    const n = items.filter(i=>i.carrito_id===p.carrito_id).length;
+    return {id:p.id, codigo:p.numero, cli:{...c, tipo_envio_preferido:c.tipo_envio_preferido||p.tipo_envio||''}, usuario_wa:'', items:Array.from({length:n||1},()=>({cantidad:1})), tieneDatos:true};
+  });
+  brEtqMostrar(peds, false);
 }
 
 function renderDespachoCard(p, tipo){
@@ -7840,18 +7828,31 @@ async function showPedidoEmpaque(id){
   const body = document.getElementById('emp-body');
   try {
     if(!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Código inválido');
-    const peds = await dbGet(`brasil_pedidos?id=eq.${id}&select=*`);
+    let peds = await dbGet(`brasil_pedidos?id=eq.${id}&select=*`);
+    let items, cli = {}, codigo = id.slice(0,4).toUpperCase(), pe = false;
+    if(!peds.length){
+      peds = await dbGet(`pedidos?id=eq.${id}&select=id,numero,carrito_id,cliente_id,tipo_envio,estado`);
+      pe = true;
+    }
     if(!peds.length){ body.innerHTML = '<div style="text-align:center;padding:30px;color:#6b6a65">No encontramos este pedido.</div>'; return; }
     const p = peds[0];
-    const items = await dbGet(`brasil_items?pedido_id=eq.${id}&select=*&order=creado_en.asc`);
-    let cli = {}; if(p.cliente_id){ const cs = await dbGet(`clientes?id=eq.${p.cliente_id}&select=nombre,tipo_envio_preferido`); cli = cs[0]||{}; }
+    if(pe){
+      codigo = p.numero || codigo;
+      const its = p.carrito_id ? await dbGet(`carrito_items?carrito_id=eq.${p.carrito_id}&estado_bolsa=neq.eliminado&select=talla,color,prendas(nombre)&order=agregado_en.asc`) : [];
+      items = its.map(i=>({cantidad:1, producto:(i.prendas&&i.prendas.nombre)||'Prenda', variante:[i.talla,i.color].filter(Boolean).join(' · ')}));
+      if(p.cliente_id){ const cs = await dbGet(`clientes?id=eq.${p.cliente_id}&select=nombre,tipo_envio_preferido`); cli = cs[0]||{}; }
+      if(!cli.tipo_envio_preferido && p.tipo_envio) cli.tipo_envio_preferido = p.tipo_envio;
+    } else {
+      items = await dbGet(`brasil_items?pedido_id=eq.${id}&select=*&order=creado_en.asc`);
+      if(p.cliente_id){ const cs = await dbGet(`clientes?id=eq.${p.cliente_id}&select=nombre,tipo_envio_preferido`); cli = cs[0]||{}; }
+    }
     const shalom = (cli.tipo_envio_preferido||'').startsWith('shalom');
     const nombre = cli.nombre || p.usuario_wa || 'Sin nombre';
     empTotal = items.length;
     const nPren = items.reduce((a,i)=>a+(i.cantidad||1),0);
     body.innerHTML = `<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <div style="font-size:20px;font-weight:700">Pedido #${rgBrEsc(id.slice(0,4).toUpperCase())}</div>
+        <div style="font-size:20px;font-weight:700">Pedido #${rgBrEsc(codigo)}</div>
         <div style="background:#1A1A18;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:14px">${cli.tipo_envio_preferido ? (shalom?'SHALOM':'MOTORIZADO') : 'SIN ENVÍO AÚN'}</div></div>
       <div style="font-size:18px;font-weight:600;margin:10px 0 2px">${rgBrEsc(nombre)}</div>
       <div style="font-size:13px;color:#6b6a65;margin-bottom:12px">${nPren} prenda${nPren===1?'':'s'}${p.empacado_en?' · 📦 ya empacado':''}</div>
@@ -7892,7 +7893,7 @@ async function brEtqCanvas(p){
   const nPren = p.items.reduce((a,i)=>a+(i.cantidad||1),0);
   const tel = c.telefono ? rgBrNormTel(c.telefono) : '';
   ctx.font = `bold 22px ${FONT}`; ctx.textAlign='right';
-  ctx.fillText('#'+String(p.id).slice(0,4).toUpperCase(), W-M, 14);
+  ctx.fillText('#'+String(p.codigo||p.id).slice(0,8).toUpperCase(), W-M, 14);
   ctx.font = `20px ${FONT}`; ctx.fillText(nPren+' prenda'+(nPren===1?'':'s'), W-M, 42);
   ctx.textAlign='left';
   ctx.fillRect(M, 82, W-2*M, 3);
@@ -7949,19 +7950,23 @@ async function brEtqCanvas(p){
   ctx.putImageData(img,0,0);
   return cv;
 }
-async function brAbrirEtiquetas(ids){
+function brAbrirEtiquetas(ids){
   const lista = brEnvLista.filter(p=>ids.includes(p.id) && p.tieneDatos);
   if(!lista.length){ toast('Selecciona pedidos que ya tengan datos de envío'); return; }
+  brEtqMostrar(lista, true);
+}
+async function brEtqMostrar(lista, puedeMarcar){
   brEtqItems = [];
   const box = document.getElementById('etq-lista');
   box.innerHTML = '<div class="loading">Generando etiquetas...</div>';
+  const bm = document.getElementById('etq-btn-marcar'); if(bm) bm.style.display = puedeMarcar ? '' : 'none';
   document.getElementById('modal-br-etq').classList.add('open');
   try {
     for(const p of lista){
       const cv = await brEtqCanvas(p);
       const blob = await new Promise(r=>cv.toBlob(r,'image/png'));
       const nom = String(p.cli.nombre||p.usuario_wa||'cliente').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').slice(0,24);
-      brEtqItems.push({p, cv, url:cv.toDataURL('image/png'), file:new File([blob], 'etiqueta-'+nom+'-'+String(p.id).slice(0,4)+'.png', {type:'image/png'})});
+      brEtqItems.push({p, cv, url:cv.toDataURL('image/png'), file:new File([blob], 'etiqueta-'+nom+'-'+String(p.codigo||p.id).slice(0,8)+'.png', {type:'image/png'})});
     }
     document.getElementById('etq-titulo').textContent = '🖨 '+brEtqItems.length+' etiqueta(s) · 76×50 mm';
     box.innerHTML = brEtqItems.map(x=>`<div style="text-align:center"><img src="${x.url}" style="width:100%;max-width:300px;border:1px solid var(--border);border-radius:4px"><div class="text-hint" style="font-size:11px">${brEsc(x.p.cli.nombre||x.p.usuario_wa||'')}${x.p.etiqueta_en?' · 🏷 ya impresa':''}</div></div>`).join('');
