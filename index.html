@@ -2154,7 +2154,8 @@ function inicioSemanaLunes(fecha){
 const USERS = {
   admin: { pass:'jassmin2025', nombre:'Renato', rol:'Admin', initials:'R' },
   operador: { pass:'tienda123', nombre:'Operador', rol:'Operador', initials:'O' },
-  ximena: { pass:'ximenita.com', nombre:'Ximena', rol:'Trabajador', initials:'X' }
+  ximena: { pass:'ximenita.com', nombre:'Ximena', rol:'Trabajador', initials:'X' },
+  micaela: { pass:'micaela2025', nombre:'Micaela', rol:'Trabajador', initials:'M' }
 };
 
 // Pago por día trabajado (Control de Asistencia)
@@ -2238,7 +2239,7 @@ async function doLogin(){
   if(currentUser.rol!=='admin') document.getElementById('sb-catalogo').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-stock').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-config').style.display='none';
-  if(currentUser.rol!=='admin') document.getElementById('sb-item-brasil').style.display='none';
+  if(currentUser.rol!=='admin' && currentUser.key!=='micaela') document.getElementById('sb-item-brasil').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-admin-section').style.display='none';
   if(currentUser.rol==='trabajador') document.getElementById('sb-item-dashboard').style.display='none';
   if(currentUser.rol==='trabajador') document.getElementById('btn-nuevo-corte').style.display='none';
