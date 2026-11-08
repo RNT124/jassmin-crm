@@ -1440,7 +1440,7 @@ td.empty-state{padding:20px;text-align:center}
           <div id="sh-lista"></div>
         </div>
         <div id="sh-sec-avisar" style="display:none">
-          <div id="sh-av-resumen" style="font-size:12.5px;margin-bottom:8px"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><div id="sh-av-resumen" style="font-size:12.5px"></div><button class="btn btn-sm" onclick="shMarcarTodasAvisadas()">✓ Marcar todas como avisadas</button></div>
           <div class="tabs" id="sh-av-filtros" style="margin:0 0 10px;border:none"><div class="tab active" data-f="faltan" onclick="shAvFiltrar('faltan')">Faltan por avisar</div><div class="tab" data-f="avisadas" onclick="shAvFiltrar('avisadas')">Avisadas</div><div class="tab" data-f="todas" onclick="shAvFiltrar('todas')">Todas</div></div>
           <div id="sh-av-lista"></div>
         </div>
@@ -9333,21 +9333,32 @@ function shTab(t){
 }
 function shInit(){ shTab(shTabActual); }
 function shAvisados(){ try { return JSON.parse(localStorage.getItem('sh_avisados')||'{}'); } catch(e){ return {}; } }
-function shGuardarAvisado(id){ try { const a=shAvisados(); a[id]=new Date().toISOString(); localStorage.setItem('sh_avisados', JSON.stringify(a)); } catch(e){} }
+function shAvTabla(p){ return p.tabla||'pedidos'; }
+async function shGuardarAvisado(id, quitar){
+  const p = shAvLista.find(x=>x.id===id); if(!p) return;
+  const val = quitar ? null : new Date().toISOString();
+  p.shalom_avisado_en = val;
+  try { await dbPatch(`${shAvTabla(p)}?id=eq.${id}`, {shalom_avisado_en:val}); }
+  catch(e){ toast('No se pudo guardar el aviso: '+e.message); }
+}
 async function shCargarAvisar(){
   const box = document.getElementById('sh-av-lista'); box.innerHTML='<div class="loading">Cargando...</div>';
   try {
-    const sel='id,shalom_orden,shalom_clave,shalom_foto,cliente_id';
+    const sel='id,shalom_orden,shalom_clave,shalom_foto,cliente_id,shalom_avisado_en';
     const [pe, br] = await Promise.all([
       dbGet(`pedidos?shalom_orden=not.is.null&select=${sel},numero,actualizado_en&order=actualizado_en.desc&limit=300`),
       dbGet(`brasil_pedidos?shalom_orden=not.is.null&select=${sel},despachado_en&order=despachado_en.desc&limit=300`)
     ]);
     const ids = [...new Set(pe.concat(br).map(p=>p.cliente_id).filter(Boolean))];
     let clis=[]; for(let i=0;i<ids.length;i+=100){ clis = clis.concat(await dbGet(`clientes?id=in.(${ids.slice(i,i+100).join(',')})&select=id,nombre,telefono,direccion,distrito`)); }
-    const L = pe.map(p=>({id:p.id, fecha:p.actualizado_en, ref:'Pedido '+p.numero, ...p, cli:clis.find(c=>c.id===p.cliente_id)||{}}))
-      .concat(br.map(p=>({id:p.id, fecha:p.despachado_en, ref:'Brasil #'+String(p.id).slice(0,4).toUpperCase(), ...p, cli:clis.find(c=>c.id===p.cliente_id)||{}})));
+    const L = pe.map(p=>({id:p.id, tabla:'pedidos', fecha:p.actualizado_en, ref:'Pedido '+p.numero, ...p, cli:clis.find(c=>c.id===p.cliente_id)||{}}))
+      .concat(br.map(p=>({id:p.id, tabla:'brasil_pedidos', fecha:p.despachado_en, ref:'Brasil #'+String(p.id).slice(0,4).toUpperCase(), ...p, cli:clis.find(c=>c.id===p.cliente_id)||{}})));
     L.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
-    shAvLista = L; shAvRender();
+    shAvLista = L;
+    // Migrar los avisos que estaban guardados solo en este navegador
+    const loc = shAvisados();
+    for(const p of L){ if(!p.shalom_avisado_en && loc[p.id]){ p.shalom_avisado_en = loc[p.id]; try{ await dbPatch(`${shAvTabla(p)}?id=eq.${p.id}`, {shalom_avisado_en:loc[p.id]}); }catch(e){} } }
+    shAvRender();
   } catch(e){ box.innerHTML='<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
 function shMensaje(p){
@@ -9357,7 +9368,7 @@ function shMensaje(p){
 }
 function shAvFiltrar(f){ shAvFiltro=f; shAvRender(); }
 function shAvRender(){
-  const box=document.getElementById('sh-av-lista'), av=shAvisados();
+  const box=document.getElementById('sh-av-lista'), av={}; shAvLista.forEach(p=>{ if(p.shalom_avisado_en) av[p.id]=p.shalom_avisado_en; });
   const faltan = shAvLista.filter(p=>!av[p.id]).length;
   document.getElementById('sh-av-resumen').innerHTML = `Faltan por avisar <strong>${faltan}</strong> · Avisadas <strong>${shAvLista.length-faltan}</strong>`;
   document.querySelectorAll('#sh-av-filtros .tab').forEach(t=>t.classList.toggle('active', t.dataset.f===shAvFiltro));
@@ -9365,11 +9376,21 @@ function shAvRender(){
   box.innerHTML = vis.length ? vis.map(p=>{
     const c=p.cli||{}, tel=c.telefono?rgBrNormTel(c.telefono):'', hecho=!!av[p.id];
     const btn = tel ? `<a class="btn btn-sm ${hecho?'':'btn-primary'}" target="_blank" href="https://wa.me/51${tel}?text=${encodeURIComponent(shMensaje(p))}" onclick="shMarcarAvisado('${p.id}')">${hecho?'💬 Volver a enviar':'💬 Enviar por WhatsApp'}</a>` : '<span class="badge badge-warn">sin celular</span>';
+    const fAv = hecho ? new Date(av[p.id]).toLocaleString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    const btnMarca = hecho ? `<button class="btn btn-xs" onclick="shToggleAvisado('${p.id}',true)" title="Quitar la marca">↩</button>` : `<button class="btn btn-xs" onclick="shToggleAvisado('${p.id}',false)">✓ Ya la envié</button>`;
     return `<div class="card sh-av-row ${hecho?'':'pendiente'}" id="sh-av-${p.id}" style="margin-bottom:8px;display:flex;gap:10px;align-items:center;border-left:3px solid ${hecho?'var(--green)':'#E8A33D'}">
       ${p.shalom_foto?`<a href="${brEsc(p.shalom_foto)}" target="_blank" style="flex:none"><img src="${brEsc(p.shalom_foto)}" style="width:44px;height:60px;object-fit:cover;border-radius:5px;border:1px solid var(--border)"></a>`:''}
-      <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600">${brEsc(c.nombre||'Sin nombre')} ${hecho?'<span class="badge badge-ok" style="font-size:10px">✓ avisada</span>':''}</div>
-      <div class="text-hint" style="font-size:11.5px">${brEsc(p.ref)} · Orden ${brEsc(p.shalom_orden)} · ${brEsc(p.shalom_clave)}</div></div>${btn}</div>`;
+      <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600">${brEsc(c.nombre||'Sin nombre')} ${hecho?`<span class="badge badge-ok" style="font-size:10px">✓ avisada ${fAv}</span>`:''}</div>
+      <div class="text-hint" style="font-size:11.5px">${brEsc(p.ref)} · Orden ${brEsc(p.shalom_orden)} · ${brEsc(p.shalom_clave)}</div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:stretch">${btn}${btnMarca}</div></div>`;
   }).join('') : '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">'+(shAvLista.length?'Nada en este filtro 🎉':'Aún no hay envíos con boleta')+'</div>';
+}
+async function shToggleAvisado(id, quitar){ await shGuardarAvisado(id, quitar); shAvRender(); }
+async function shMarcarTodasAvisadas(){
+  const pend = shAvLista.filter(p=>!p.shalom_avisado_en);
+  if(!pend.length){ toast('No hay pendientes'); return; }
+  if(!confirm(`¿Marcar las ${pend.length} pendientes como ya avisadas? (Solo úsalo si ya les enviaste el mensaje)`)) return;
+  for(const p of pend) await shGuardarAvisado(p.id,false);
+  shAvRender(); toast('✓ Marcadas como avisadas');
 }
 function shMarcarAvisado(id){
   shGuardarAvisado(id);
