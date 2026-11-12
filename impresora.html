@@ -13,6 +13,9 @@ button.sec{background:#555}label{display:block;margin:10px 0;font-size:14px}
 <script>
 const $=id=>document.getElementById(id);
 function log(t){ $('log').textContent += '\n'+t; }
+function errTxt(e){ try{ if(e&&(e.name||e.message)) return (e.name||'')+': '+(e.message||''); return 'tipo '+typeof e+' → '+(typeof e==='string'?e:JSON.stringify(e)); }catch(x){ return String(e); } }
+const U16=n=>('0000'+n.toString(16)).slice(-4)+'-0000-1000-8000-00805f9b34fb';
+log('Navegador: '+navigator.userAgent.slice(0,90)); log('Bluetooth disponible: '+(!!navigator.bluetooth)+' · Serial: '+(!!navigator.serial));
 function canvasPrueba(){
   const c=document.createElement('canvas'); c.width=608; c.height=400; const x=c.getContext('2d');
   x.fillStyle='#fff'; x.fillRect(0,0,608,400); x.fillStyle='#000';
@@ -42,11 +45,13 @@ function tspl(canvas, inv){
 $('bBle').onclick=async()=>{
   try{
     if(!navigator.bluetooth){ log('❌ Este navegador no permite Bluetooth. En iPhone abre esta página en la app "Bluefy".'); return; }
-    const dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:[
-      0xFFE0,0xFF00,0xFFF0,0xFFE5,0xAE30,0x18F0,0xFEE7,0xFE59,
-      '49535343-fe7d-4ae5-8fa9-9fafd205e455','e7810a71-73ae-499d-8c15-faa9aef0c3f2','0000ff00-0000-1000-8000-00805f9b34fb',
-      '000018f0-0000-1000-8000-00805f9b34fb','00001101-0000-1000-8000-00805f9b34fb','0000fff0-0000-1000-8000-00805f9b34fb']});
-    log('Conectando a '+(dev.name||'(sin nombre)')+'...');
+    log('1) Buscando dispositivos... (debe salir una lista)');
+    const svcs=[0xFFE0,0xFF00,0xFFF0,0xFFE5,0xAE30,0x18F0,0xFEE7,0xFE59,0x1800,0x1801].map(U16).concat(['49535343-fe7d-4ae5-8fa9-9fafd205e455','e7810a71-73ae-499d-8c15-faa9aef0c3f2']);
+    let dev;
+    try{ dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:svcs}); }
+    catch(e1){ log('Falló con servicios ('+errTxt(e1)+'). Reintento simple...'); dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true}); }
+    log('2) Elegido: '+(dev&&dev.name||'(sin nombre)'));
+    log('3) Conectando...');
     const srv=await dev.gatt.connect(); const ss=await srv.getPrimaryServices(); let ch=null;
     for(const s of ss){ log('Servicio '+s.uuid); const cs=await s.getCharacteristics();
       for(const c of cs){ const p=c.properties; log('  • '+c.uuid+' '+(p.write?'write ':'')+(p.writeWithoutResponse?'writeNoResp':'')); if(!ch&&(p.write||p.writeWithoutResponse)) ch=c; } }
@@ -54,7 +59,7 @@ $('bBle').onclick=async()=>{
     const data=tspl(canvasPrueba(), $('inv').checked); log('Enviando '+data.length+' bytes...');
     for(let i=0;i<data.length;i+=100){ const part=data.slice(i,i+100); if(ch.properties.writeWithoutResponse) await ch.writeValueWithoutResponse(part); else await ch.writeValue(part); await new Promise(r=>setTimeout(r,15)); }
     log('✅ Enviado. Revisa si salió la etiqueta.');
-  }catch(e){ log('❌ '+e.name+': '+e.message); }
+  }catch(e){ log('❌ '+errTxt(e)); }
 };
 $('bSer').onclick=async()=>{
   try{
@@ -63,6 +68,6 @@ $('bSer').onclick=async()=>{
     const w=port.writable.getWriter(); const data=tspl(canvasPrueba(), $('inv').checked);
     for(let i=0;i<data.length;i+=512){ await w.write(data.slice(i,i+512)); await new Promise(r=>setTimeout(r,10)); }
     w.releaseLock(); await port.close(); log('✅ Enviado. Revisa si salió la etiqueta.');
-  }catch(e){ log('❌ '+e.name+': '+e.message); }
+  }catch(e){ log('❌ '+errTxt(e)); }
 };
 </script></body></html>
