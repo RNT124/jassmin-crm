@@ -1,0 +1,68 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prueba de impresora</title>
+<style>body{font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:16px;color:#222}
+button{display:block;width:100%;padding:14px;margin:10px 0;font-size:16px;border:0;border-radius:10px;background:#C2185B;color:#fff}
+button.sec{background:#555}label{display:block;margin:10px 0;font-size:14px}
+#log{white-space:pre-wrap;background:#f4f4f4;border-radius:8px;padding:10px;font:12px monospace;min-height:80px}</style></head><body>
+<h2>🖨️ Prueba de impresora XP-365B</h2>
+<p style="font-size:14px">Etiqueta 76×50 mm. Enciende la impresora y tenla con papel puesto.</p>
+<button id="bBle">📱 Conectar por Bluetooth (BLE) e imprimir</button>
+<button id="bSer" class="sec">💻 Conectar por puerto COM (PC) e imprimir</button>
+<label><input type="checkbox" id="inv"> Si la etiqueta sale en negativo (fondo negro), marca esto</label>
+<div id="log">Esperando...</div>
+<script>
+const $=id=>document.getElementById(id);
+function log(t){ $('log').textContent += '\n'+t; }
+function canvasPrueba(){
+  const c=document.createElement('canvas'); c.width=608; c.height=400; const x=c.getContext('2d');
+  x.fillStyle='#fff'; x.fillRect(0,0,608,400); x.fillStyle='#000';
+  x.lineWidth=6; x.strokeStyle='#000'; x.strokeRect(6,6,596,388);
+  x.font='bold 54px Arial'; x.fillText('JASSMIN',40,90);
+  x.font='32px Arial'; x.fillText('Prueba de impresion',40,150); x.fillText('76 x 50 mm',40,200);
+  x.font='bold 28px Arial'; x.fillText('Si lees esto, funciona :)',40,270);
+  x.fillText(new Date().toLocaleString('es-PE'),40,330);
+  return c;
+}
+function tspl(canvas, inv){
+  const w=canvas.width,h=canvas.height,wb=Math.ceil(w/8);
+  const d=canvas.getContext('2d').getImageData(0,0,w,h).data, bm=new Uint8Array(wb*h);
+  for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++){
+    const i=(y*w+xx)*4, negro=(d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11)<140;
+    // TSPL: bit 0 = punto negro (modo normal)
+    const bit = inv ? (negro?0:1) : (negro?0:1);
+    if(inv ? negro : !negro) bm[y*wb+(xx>>3)] |= (0x80>>(xx&7));
+  }
+  const enc=new TextEncoder();
+  const head=enc.encode('SIZE 76 mm,50 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 1\r\nCLS\r\nBITMAP 0,0,'+wb+','+h+',0,');
+  const tail=enc.encode('\r\nPRINT 1,1\r\n');
+  const out=new Uint8Array(head.length+bm.length+tail.length);
+  out.set(head,0); out.set(bm,head.length); out.set(tail,head.length+bm.length);
+  return out;
+}
+$('bBle').onclick=async()=>{
+  try{
+    if(!navigator.bluetooth){ log('❌ Este navegador no permite Bluetooth. En iPhone abre esta página en la app "Bluefy".'); return; }
+    const dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:[
+      0xFFE0,0xFF00,0xFFF0,0xFFE5,0xAE30,0x18F0,0xFEE7,0xFE59,
+      '49535343-fe7d-4ae5-8fa9-9fafd205e455','e7810a71-73ae-499d-8c15-faa9aef0c3f2','0000ff00-0000-1000-8000-00805f9b34fb',
+      '000018f0-0000-1000-8000-00805f9b34fb','00001101-0000-1000-8000-00805f9b34fb','0000fff0-0000-1000-8000-00805f9b34fb']});
+    log('Conectando a '+(dev.name||'(sin nombre)')+'...');
+    const srv=await dev.gatt.connect(); const ss=await srv.getPrimaryServices(); let ch=null;
+    for(const s of ss){ log('Servicio '+s.uuid); const cs=await s.getCharacteristics();
+      for(const c of cs){ const p=c.properties; log('  • '+c.uuid+' '+(p.write?'write ':'')+(p.writeWithoutResponse?'writeNoResp':'')); if(!ch&&(p.write||p.writeWithoutResponse)) ch=c; } }
+    if(!ch){ log('❌ No encontré por dónde escribir. Mándame una captura de este texto.'); return; }
+    const data=tspl(canvasPrueba(), $('inv').checked); log('Enviando '+data.length+' bytes...');
+    for(let i=0;i<data.length;i+=100){ const part=data.slice(i,i+100); if(ch.properties.writeWithoutResponse) await ch.writeValueWithoutResponse(part); else await ch.writeValue(part); await new Promise(r=>setTimeout(r,15)); }
+    log('✅ Enviado. Revisa si salió la etiqueta.');
+  }catch(e){ log('❌ '+e.name+': '+e.message); }
+};
+$('bSer').onclick=async()=>{
+  try{
+    if(!navigator.serial){ log('❌ Usa Chrome o Edge en la PC.'); return; }
+    const port=await navigator.serial.requestPort(); await port.open({baudRate:115200});
+    const w=port.writable.getWriter(); const data=tspl(canvasPrueba(), $('inv').checked);
+    for(let i=0;i<data.length;i+=512){ await w.write(data.slice(i,i+512)); await new Promise(r=>setTimeout(r,10)); }
+    w.releaseLock(); await port.close(); log('✅ Enviado. Revisa si salió la etiqueta.');
+  }catch(e){ log('❌ '+e.name+': '+e.message); }
+};
+</script></body></html>
