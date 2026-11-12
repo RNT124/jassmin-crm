@@ -8330,9 +8330,14 @@ async function etqConectar(){
     const svcs=[0xFFE0,0xFF00,0xFFF0,0xFFE5,0xAE30,0x18F0,0xFEE7,0xFE59,0x1800,0x1801].map(U16).concat(['49535343-fe7d-4ae5-8fa9-9fafd205e455','e7810a71-73ae-499d-8c15-faa9aef0c3f2']);
     let dev; try{ dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:svcs}); } catch(e1){ if(e1&&e1.name==='NotFoundError') throw e1; dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true}); }
     const srv=await dev.gatt.connect(); let ch=null;
-    for(const sv of await srv.getPrimaryServices()){ for(const c of await sv.getCharacteristics()){ if(!ch&&(c.properties.write||c.properties.writeWithoutResponse)) ch=c; } }
-    if(!ch) throw new Error('No encontré cómo escribir en la impresora');
-    etqConn = { vivo:()=>dev.gatt.connected, async enviar(u8){ for(let i=0;i<u8.length;i+=100){ const part=u8.slice(i,i+100); if(ch.properties.writeWithoutResponse) await ch.writeValueWithoutResponse(part); else await ch.writeValue(part); await new Promise(r=>setTimeout(r,15)); } } };
+    let chSin=null;
+    for(const sv of await srv.getPrimaryServices()){ for(const c of await sv.getCharacteristics()){ if(!ch&&c.properties.write) ch=c; if(!chSin&&c.properties.writeWithoutResponse) chSin=c; } }
+    if(!ch && !chSin) throw new Error('No encontré cómo escribir en la impresora');
+    // Con confirmación (write) no se pierden datos; sin confirmación se envía más lento y en trozos chicos
+    etqConn = { vivo:()=>dev.gatt.connected, async enviar(u8){
+      if(ch){ for(let i=0;i<u8.length;i+=120){ const part=u8.slice(i,i+120); if(ch.writeValueWithResponse) await ch.writeValueWithResponse(part); else await ch.writeValue(part); } }
+      else { for(let i=0;i<u8.length;i+=20){ await chSin.writeValueWithoutResponse(u8.slice(i,i+20)); await new Promise(r=>setTimeout(r,12)); } }
+    } };
     return etqConn;
   }
   if(navigator.serial){
@@ -8347,7 +8352,7 @@ async function brEtqDirecto(){
   const btn=document.getElementById('etq-btn-directo'), txt=btn.textContent; btn.disabled=true;
   try {
     btn.textContent='Conectando...'; const c=await etqConectar(); let n=0;
-    for(const it of brEtqItems){ n++; btn.textContent='Imprimiendo '+n+'/'+brEtqItems.length+'...'; await c.enviar(etqTspl(it.cv)); await new Promise(r=>setTimeout(r,900)); }
+    for(const it of brEtqItems){ n++; btn.textContent='Imprimiendo '+n+'/'+brEtqItems.length+'...'; await c.enviar(etqTspl(it.cv)); await new Promise(r=>setTimeout(r,1500)); }
     toast('✓ '+n+' etiqueta(s) enviada(s) a la impresora');
     const bm=document.getElementById('etq-btn-marcar');
     if(bm && bm.style.display!=='none' && confirm('¿Se imprimieron bien? ¿Marcarlas como impresas?')) await brEtqMarcar();
