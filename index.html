@@ -8741,6 +8741,10 @@ function brAduMensaje(p){
     + 'Sabemos que es mucho tiempo de espera, por eso te damos 2 opciones por los productos en aduanas:\n\n'
     + '1️⃣ Devolución del dinero (S/ '+tNo+') en 5 días hábiles\n'
     + '2️⃣ Saldo a favor para cualquier producto en stock de Jassmin con 10% de descuento, válido hasta el '+brAduHasta(p)+'\n\n'
+    + '⚠️ Importante:\n'
+    + '• Revisa que los productos y montos de tu pedido estén correctos. Si ves algo distinto, escríbenos antes de llenar el formulario.\n'
+    + '• La devolución o el saldo a favor se aplica solo sobre los productos que validemos como pagados.\n'
+    + '• Para atenderte necesitamos que llenes el formulario: sin él no podemos registrar tu opción.\n\n'
     + 'Elige tu opción aquí (toma 1 minuto):\n👉 '+BR_URL_BASE+'?aduana='+p.id+'\n\n'
     + 'Mil disculpas por el inconveniente y gracias por tu paciencia 🙏';
   return m;
@@ -8844,7 +8848,7 @@ function aduRender(){
   if(si.length) h += caja('1. Los productos que ya tenemos', op('adu-env','ya','Envíenmelos ya','Te los despachamos con tus datos de envío.') + op('adu-env','acumular','Prefiero acumularlos con mis próximas compritas','Los guardamos y los enviamos junto con lo que compres aprovechando tu 10% de descuento.'));
   h += caja((si.length?'2. ':'')+'Los productos en aduanas (S/ '+tNo+')', op('adu-op','devolucion','Devolución del dinero','Te devolvemos S/ '+tNo+' en 5 días hábiles.') + op('adu-op','saldo','Saldo a favor con 10% de descuento','Usa S/ '+tNo+' en cualquier producto en stock de Jassmin, con 10% de descuento, hasta el '+brAduHasta(p)+'.')
     + `<div id="adu-yape-box" style="display:none;margin-top:10px"><div style="font-size:13px;font-weight:600;margin-bottom:4px">¿A qué Yape o Plin te devolvemos?</div><input id="adu-yape" inputmode="numeric" maxlength="9" placeholder="Número de celular (9 dígitos)" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #d9d5cd;border-radius:10px;font-size:15px;margin-bottom:6px"><input id="adu-titular" placeholder="Nombre del titular" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #d9d5cd;border-radius:10px;font-size:15px"></div>`);
-  h += `<div id="adu-err" style="color:#b3184a;font-size:13px;margin-bottom:8px"></div><button id="adu-btn" onclick="aduEnviar()" style="width:100%;padding:14px;border:0;border-radius:12px;background:#B3184A;color:#fff;font-size:16px;font-weight:700">Enviar mi respuesta</button>`;
+  h += `<div style="font-size:12.5px;color:#6b6a65;margin-bottom:10px">Revisa que tus productos y montos estén correctos. La devolución o el saldo a favor se aplica sobre los productos validados como pagados.</div><div id="adu-err" style="color:#b3184a;font-size:13px;margin-bottom:8px"></div><button id="adu-btn" onclick="aduEnviar()" style="width:100%;padding:14px;border:0;border-radius:12px;background:#B3184A;color:#fff;font-size:16px;font-weight:700">Enviar mi respuesta</button>`;
   body.innerHTML = h;
 }
 function aduCambio(){ document.getElementById('adu-err').textContent=''; const o = document.querySelector('input[name="adu-op"]:checked'); document.getElementById('adu-yape-box').style.display = o && o.value==='devolucion' ? 'block' : 'none'; }
