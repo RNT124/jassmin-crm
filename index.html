@@ -8093,7 +8093,9 @@ function rgBrAbrirWA(){
     ? `Shalom — ${c.direccion||''} · ${c.distrito||''}${c.dni?`\nDNI: ${c.dni}`:''}`
     : `Motorizado — ${c.direccion||''}${c.referencia?' ('+c.referencia+')':''} · ${c.distrito||''}${c.dni?`\nDNI: ${c.dni}`:''}`;
   const nPren = rgBrItems.reduce((a,i)=>a+(i.cantidad||1),0);
-  const msg = `Hola! Soy ${c.nombre||''} (WA: ${c.telefono||''}).\nYa completé mis datos de envío ✅${nPren?`\nMi pedido: ${nPren} prenda(s)/producto(s)`:''}\n\n${envioTxt}`;
+  let msg = `Hola! Soy ${c.nombre||''} (WA: ${c.telefono||''}).\nYa completé mis datos de envío ✅${nPren?`\nMi pedido: ${nPren} prenda(s)/producto(s)`:''}\n\n${envioTxt}`;
+  const pa = rgBrSoloEnMano ? rgBrPeds.find(x=>x.aduana_opcion) : null;
+  if(pa) msg += '\n\nFormulario de aduanas ✅\n'+aduLineas(pa, pa.aduana_monto!=null?Number(pa.aduana_monto):0, true);
   window.location.href = `https://wa.me/${BR_WA_NEGOCIO}?text=${encodeURIComponent(msg)}`;
 }
 
@@ -8821,6 +8823,20 @@ async function showAduana(id){
     aduPub = p; aduRender();
   } catch(e){ body.innerHTML='<div style="text-align:center;padding:30px;color:#b3184a">No se pudo cargar: '+rgBrEsc(e.message)+'</div>'; }
 }
+function aduLineas(p, monto, haySi){
+  let t = 'Productos en aduanas (S/ '+monto+'): '+(p.aduana_opcion==='devolucion' ? 'Devolución del dinero' : 'Saldo a favor con 10% de descuento');
+  if(p.aduana_opcion==='devolucion' && p.aduana_yape) t += '\nYape/Plin: '+p.aduana_yape+(p.aduana_titular?' ('+p.aduana_titular+')':'');
+  if(haySi) t += '\nLo que ya tienen: '+(p.aduana_enviar_disponible===false ? 'acumular con mis próximas compras' : 'envíenmelo ya');
+  return t;
+}
+function aduFaltanDatos(p){ return p.items.some(i=>i.en_mano===true) && p.aduana_enviar_disponible!==false && !(p.cli && p.cli.direccion && p.cli.tipo_envio_preferido); }
+function aduAbrirWA(){
+  const p = aduPub; if(!p || !p.aduana_opcion) return;
+  const nom = String((p.cli&&p.cli.nombre)||'').trim() || brAduNombre(p);
+  const monto = p.items.filter(i=>i.en_mano===false).reduce((t,i)=>t+i.precio_venta*i.cantidad,0);
+  const msg = 'Hola! Soy '+(nom||'clienta de Jassmin')+(p.usuario_wa?' (usuario: '+p.usuario_wa+')':'')+'.\nYa llené el formulario de aduanas ✅\n\n'+aduLineas(p, monto, p.items.some(i=>i.en_mano===true));
+  window.location.href = 'https://wa.me/'+BR_WA_NEGOCIO+'?text='+encodeURIComponent(msg);
+}
 function aduRender(){
   const p = aduPub, body = document.getElementById('adu-body');
   const si = p.items.filter(i=>i.en_mano===true), no = p.items.filter(i=>i.en_mano===false);
@@ -8842,6 +8858,7 @@ function aduRender(){
         h += caja('📦 Falta un paso: tus datos de envío', `<div style="font-size:14px;color:#4a4943">Para enviarte lo que ya tenemos necesitamos tu dirección (motorizado) o tu agencia Shalom.</div><a href="${link}" style="${bst}background:#B3184A;color:#fff">Completar mis datos de envío 📦</a>`);
       }
     }
+    if(!aduFaltanDatos(p)) h += `<button onclick="aduAbrirWA()" style="width:100%;padding:13px;border:0;border-radius:12px;background:#25D366;color:#fff;font-size:15px;font-weight:700">Enviar confirmación por WhatsApp 💬</button>`;
     body.innerHTML = h; return;
   }
   const op = (name,val,t,sub)=>`<label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #e6e2db;border-radius:10px;margin-top:8px;cursor:pointer"><input type="radio" name="${name}" value="${val}" style="margin-top:3px;width:18px;height:18px;flex:none" onchange="aduCambio()"><span><strong style="font-size:14px">${t}</strong><br><span style="font-size:12.5px;color:#6b6a65">${sub}</span></span></label>`;
@@ -8868,7 +8885,7 @@ async function aduEnviar(){
   }
   if(!p.aduana_avisado_en) d.aduana_avisado_en = d.aduana_respuesta_en;
   err.textContent = ''; btn.disabled = true; btn.textContent = 'Enviando...';
-  try { await dbPatch(`brasil_pedidos?id=eq.${p.id}`, d); Object.assign(p, d); aduRender(); window.scrollTo(0,0); }
+  try { await dbPatch(`brasil_pedidos?id=eq.${p.id}`, d); Object.assign(p, d); aduRender(); window.scrollTo(0,0); if(!aduFaltanDatos(p)) setTimeout(aduAbrirWA, 1800); }
   catch(e){ btn.disabled = false; btn.textContent = 'Enviar mi respuesta'; err.textContent = 'No se pudo enviar: '+e.message; }
 }
 function brArmCopiarFaltan(){
