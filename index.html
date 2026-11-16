@@ -8151,6 +8151,7 @@ async function showPedidoEmpaque(id){
       if(!cli.tipo_envio_preferido && p.tipo_envio) cli.tipo_envio_preferido = p.tipo_envio;
     } else {
       items = await dbGet(`brasil_items?pedido_id=eq.${id}&select=*&order=creado_en.asc`);
+      items = items.filter(i=>i.en_mano!==false); // los ❌ (en aduanas / faltantes) no van en la bolsa
       if(p.cliente_id){ const cs = await dbGet(`clientes?id=eq.${p.cliente_id}&select=nombre,tipo_envio_preferido`); cli = cs[0]||{}; }
     }
     const shalom = (cli.tipo_envio_preferido||'').startsWith('shalom');
@@ -8197,7 +8198,7 @@ async function brEtqCanvas(p){
   const logo = await brEtqLogo();
   if(logo) ctx.drawImage(logo, M, 14, 300, Math.round(logo.height*300/logo.width));
   const c = p.cli||{}, shalom = brEnvEsShalom(p);
-  const nPren = p.items.reduce((a,i)=>a+(i.cantidad||1),0);
+  const nPren = p.items.filter(i=>i.en_mano!==false).reduce((a,i)=>a+(i.cantidad||1),0);
   const tel = c.telefono ? rgBrNormTel(c.telefono) : '';
   ctx.font = `bold 22px ${FONT}`; ctx.textAlign='right';
   ctx.fillText('#'+String(p.codigo||p.id).slice(0,8).toUpperCase(), W-M, 14);
