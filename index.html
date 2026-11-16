@@ -734,6 +734,14 @@ td.empty-state{padding:20px;text-align:center}
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════ ADUANAS: OPCIÓN DE LA CLIENTA (público) ═══ -->
+<div id="aduana-page" style="display:none;min-height:100vh;background:#F7F5F2;padding:16px;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#1A1A18">
+  <div style="max-width:480px;margin:0 auto">
+    <div style="text-align:center;letter-spacing:3px;font-weight:700;font-size:15px;margin:6px 0 14px">JASSMIN</div>
+    <div id="adu-body"><div style="text-align:center;padding:30px;color:#6b6a65">Cargando tu pedido...</div></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════ ENVÍO SHALOM PARA LA CLIENTA (público) ═══ -->
 <div id="envio-page" style="display:none;min-height:100vh;background:#F7F5F2;padding:16px;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#1A1A18">
   <div style="max-width:480px;margin:0 auto">
@@ -5920,6 +5928,7 @@ function hideAllRootPages(){
   document.getElementById('registro-page').style.display='none';
   document.getElementById('seguimiento-page').style.display='none';
   document.getElementById('envio-page').style.display='none';
+  const ap=document.getElementById('aduana-page'); if(ap) ap.style.display='none';
   const ep=document.getElementById('empaque-page'); if(ep) ep.style.display='none';
 }
 
@@ -8401,8 +8410,8 @@ function brEnvEsShalom(p){ return (p.cli?.tipo_envio_preferido||'').startsWith('
 function brEnvEtapaDe(p){
   p.tieneDatos = !!(p.cli && p.cli.direccion && String(p.cli.direccion).trim());
   if(p.empacado_en) return p.tieneDatos ? 'listo' : 'sindatos';
-  if(p.items.length && p.items.every(i=>i.en_mano===true)) return 'enlima';
-  if(p.items.some(i=>i.en_mano===false)) return 'faltan';
+  if(p.items.some(i=>i.en_mano===true) && p.items.every(i=>brAduItemOk(p,i))) return 'enlima';
+  if(p.items.some(i=>i.en_mano===false && !p.aduana_opcion)) return 'faltan';
   if(p.estado==='por_comprar') return 'comprar';
   return 'camino';
 }
@@ -8565,9 +8574,10 @@ async function brLoadArmado(){
   box.innerHTML = '<div class="loading">Cargando...</div>';
   try {
     await brSincronizarEstados();
-    const peds = await dbGet('brasil_pedidos?estado=neq.despachado&order=creado_en.asc');
+    const peds = await dbGet('brasil_pedidos?or=(estado.neq.despachado,and(aduana_avisado_en.not.is.null,aduana_cerrado_en.is.null))&order=creado_en.asc');
     if(!peds.length){ box.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--text2)">No hay pedidos por armar</div>'; return; }
-    const items = await dbGet(`brasil_items?pedido_id=in.(${peds.map(p=>p.id).join(',')})&order=creado_en.asc`);
+    let items = [];
+    for(let k=0;k<peds.length;k+=80) items = items.concat(await dbGet(`brasil_items?pedido_id=in.(${peds.slice(k,k+80).map(p=>p.id).join(',')})&order=creado_en.asc`));
     const idsC = [...new Set(peds.map(p=>p.cliente_id).filter(Boolean))];
     const clis = idsC.length ? await dbGet(`clientes?id=in.(${idsC.join(',')})&select=*`) : [];
     brArmLista = peds.map(p=>({...p, items:items.filter(i=>i.pedido_id===p.id), cli: p.cliente_id ? (clis.find(c=>c.id===p.cliente_id)||{}) : {nombre:p.usuario_wa, sinCelular:true}}));
@@ -8575,7 +8585,7 @@ async function brLoadArmado(){
   } catch(e){ box.innerHTML = '<div style="color:var(--red)">Error: '+brEsc(e.message)+'</div>'; }
 }
 function brArmObjetivo(p, tipo){
-  const noOk = p.items.filter(i=>i.en_mano!==true);
+  const noOk = p.items.filter(i=>i.en_mano!==true && !(i.en_mano===false && p.aduana_opcion));
   if(tipo==='mixto'){
     const ro = noOk.filter(i=>!brEsCuidado(i.producto));
     if(ro.length) return {ids:ro.map(i=>i.id), label:'✅ Toda la ropa'};
@@ -8587,13 +8597,15 @@ function brArmRender(){
   const box = document.getElementById('br-view-armado'); if(!box) return;
   const todos = brArmLista.map(p=>({p, tipo:brArmTipoDe(p)}));
   const cnt = {ropa:0, mixto:0, cuidado:0};
-  todos.forEach(x=>cnt[x.tipo]++);
-  const chips = [['ropa','👗 Solo ropa ('+cnt.ropa+')'],['mixto','🔀 Mixtos ('+cnt.mixto+')'],['cuidado','🧴 Solo cuidado ('+cnt.cuidado+')'],['todos','Todos ('+todos.length+')']]
+  todos.forEach(x=>{ if(x.p.estado!=='despachado' && !brAduOculto(x.p)) cnt[x.tipo]++; });
+  const chips = [['ropa','👗 Solo ropa ('+cnt.ropa+')'],['mixto','🔀 Mixtos ('+cnt.mixto+')'],['cuidado','🧴 Solo cuidado ('+cnt.cuidado+')'],['todos','Todos ('+(cnt.ropa+cnt.mixto+cnt.cuidado)+')']]
+    .concat([['aduana','🛃 Aduanas ('+todos.filter(x=>brAduEs(x.p)).length+')']])
     .map(([k,t])=>`<button type="button" class="btn btn-sm ${brArmTipo===k?'btn-primary':''}" onclick="brArmTipo='${k}';brArmRender()">${t}</button>`).join('');
-  const enTipo = todos.filter(x=>brArmTipo==='todos' || x.tipo===brArmTipo);
+  const esAdu = brArmTipo==='aduana';
+  const enTipo = todos.filter(x=> esAdu ? brAduEs(x.p) : ((brArmTipo==='todos' || x.tipo===brArmTipo) && !brAduOculto(x.p) && x.p.estado!=='despachado'));
   const emp = enTipo.filter(x=>x.p.empacado_en).length;
-  const listos = enTipo.filter(x=>!x.p.empacado_en && x.p.items.every(i=>i.en_mano===true)).length;
-  const incomp = enTipo.filter(x=>!x.p.empacado_en && x.p.items.some(i=>i.en_mano===false)).length;
+  const listos = enTipo.filter(x=>!x.p.empacado_en && x.p.items.every(i=>brAduItemOk(x.p,i))).length;
+  const incomp = enTipo.filter(x=>!x.p.empacado_en && x.p.items.some(i=>i.en_mano===false && !x.p.aduana_opcion)).length;
   const resto = enTipo.length - emp - listos - incomp;
   // Faltan en Lima: todo lo marcado ❌ (de todos los pedidos no despachados)
   const falt = {};
@@ -8616,15 +8628,15 @@ function brArmRender(){
     <div class="card" style="margin-bottom:12px;font-size:12.5px">
       <div>📦 Empacados <strong>${emp}</strong> de ${enTipo.length} &nbsp;·&nbsp; 🟢 Listos para empacar <strong>${listos}</strong></div>
       <div style="margin-top:2px">🔴 Incompletos <strong>${incomp}</strong> &nbsp;·&nbsp; ⚪ Por revisar <strong>${resto}</strong></div>
-      <label style="display:block;margin-top:6px"><input type="checkbox" ${brArmVerEmp?'checked':''} onchange="brArmVerEmp=this.checked;brArmRender()"> Ver también los ya empacados</label>
+      <label style="display:block;margin-top:6px"><input type="checkbox" ${brArmVerEmp?'checked':''} onchange="brArmVerEmp=this.checked;brArmRender()"> ${esAdu?'Ver también los casos terminados':'Ver también los ya empacados'}</label>
     </div>`;
-  const vis = enTipo.filter(x=>brArmVerEmp || !x.p.empacado_en)
+  const vis = enTipo.filter(x=>esAdu ? (brArmVerEmp || !x.p.aduana_cerrado_en) : (brArmVerEmp || !x.p.empacado_en))
     .sort((a,b)=>String(a.p.cli.nombre||'').localeCompare(String(b.p.cli.nombre||'')));
   const cards = vis.map(({p,tipo})=>{
     const c = p.cli;
     const total = p.items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
-    const todoOk = p.items.every(i=>i.en_mano===true);
-    const hayNo = p.items.some(i=>i.en_mano===false);
+    const todoOk = p.items.some(i=>i.en_mano===true) && p.items.every(i=>brAduItemOk(p,i));
+    const hayNo = p.items.some(i=>i.en_mano===false && !p.aduana_opcion);
     const obj = brArmObjetivo(p, tipo);
     const bloqueado = !!p.empacado_en;
     const qPed = brNorm([c.nombre, c.telefono, p.usuario_wa].concat(p.items.map(i=>i.producto+' '+(i.variante||''))).join(' '));
@@ -8648,12 +8660,13 @@ function brArmRender(){
         <div style="font-size:14px;font-weight:600">${brEsc(c.nombre||'Sin nombre')} ${c.sinCelular?'<span class="badge badge-warn">sin celular</span>':`<span class="text-hint" style="font-weight:400;font-size:12px">· ${brEsc(c.telefono||'')}</span>`} <button class="btn btn-xs" onclick="brAbrirIdent('${p.id}')" title="Corregir usuario o celular">✏️</button></div>
         ${estadoBadge}</div>
       ${filas}
+      ${brAduBloque(p)}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
         <label style="font-size:12.5px"><input type="checkbox" ${p.pagado?'checked':''} onchange="brArmPagado('${p.id}',this.checked)"> 💰 Pagó · <strong>${brSoles(total)}</strong></label>
         <div style="display:flex;gap:6px;flex-wrap:wrap">${acciones}</div></div>
     </div>`;
   }).join('');
-  box.innerHTML = faltHtml + head + (cards || '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">No hay pedidos en esta lista 🎉</div>');
+  box.innerHTML = faltHtml + head + (esAdu ? brAduResumen() : '') + (cards || '<div class="card" style="text-align:center;padding:24px;color:var(--text2)">No hay pedidos en esta lista 🎉</div>');
   brAplicarFiltro();
 }
 function brArmBuscar(pid){ return brArmLista.find(p=>p.id===pid); }
@@ -8675,7 +8688,7 @@ async function brArmTodo(pid){
 }
 async function brArmEmpacar(pid){
   const p = brArmBuscar(pid); if(!p) return;
-  if(!p.items.every(i=>i.en_mano===true)){ toast('Faltan prendas por marcar ✅'); return; }
+  if(!(p.items.some(i=>i.en_mano===true) && p.items.every(i=>brAduItemOk(p,i)))){ toast('Faltan prendas por marcar ✅'); return; }
   const ahora = new Date().toISOString();
   try { await dbPatch(`brasil_pedidos?id=eq.${pid}`, {empacado_en:ahora, estado:'listo_lima'}); p.empacado_en = ahora; p.estado='listo_lima'; toast('📦 Pedido empacado'); brArmRender(); }
   catch(e){ toast('Error: '+e.message); }
@@ -8689,6 +8702,145 @@ async function brArmPagado(pid, v){
   const p = brArmBuscar(pid);
   try { await dbPatch(`brasil_pedidos?id=eq.${pid}`, {pagado:v}); if(p) p.pagado = v; toast(v?'✓ Marcado como pagado':'Pago desmarcado'); }
   catch(e){ toast('Error: '+e.message); }
+}
+// ── Aduanas: productos retenidos (❌) → mensaje a la clienta, su respuesta y cierre del caso ──
+function brAduItemOk(p,i){ return i.en_mano===true || (i.en_mano===false && !!p.aduana_opcion); }
+function brAduEs(p){ return p.items.some(i=>i.en_mano===false); }
+function brAduOculto(p){ return !!p.aduana_cerrado_en && !p.items.some(i=>i.en_mano===true); } // caso cerrado y nada que enviar
+function brAduMonto(p){ return p.items.filter(i=>i.en_mano===false).reduce((a,i)=>a+i.precio_venta*i.cantidad,0); }
+function brAduHasta(p){ const d = new Date(p.aduana_avisado_en||Date.now()); d.setDate(d.getDate()+30); return d.toLocaleDateString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'2-digit',year:'numeric'}); }
+function brAduNombre(p){
+  let n = String((p.cli&&!p.cli.sinCelular&&p.cli.nombre)||'').trim().split(/\s+/)[0];
+  if(!n){ const m = String(p.usuario_wa||'').replace(/^@/,'').match(/^[a-zA-ZáéíóúñÁÉÍÓÚÑ]{3,}/); n = m ? m[0] : ''; } // sin nombre: usa el inicio del usuario (melissa.pv → Melissa)
+  return n ? n.charAt(0).toUpperCase()+n.slice(1).toLowerCase() : '';
+}
+function brAduMensaje(p){
+  const lin = i=>'• '+(i.cantidad>1?i.cantidad+'× ':'')+i.producto+(i.variante?' '+i.variante:'')+' — S/ '+(i.precio_venta*i.cantidad);
+  const si = p.items.filter(i=>i.en_mano===true), no = p.items.filter(i=>i.en_mano===false);
+  const tSi = si.reduce((a,i)=>a+i.precio_venta*i.cantidad,0), tNo = brAduMonto(p), nom = brAduNombre(p);
+  let m = 'Hola'+(nom?' '+nom:'')+' 🌸 Te escribimos de JASSMIN.\n\n'
+    + 'Queremos contarte con total transparencia: una parte de los productos que trajimos de Brasil se encuentra en canal rojo en aduanas de Perú, y el trámite para poder retirar nuestra mercadería puede demorar entre 60 y 90 días hábiles.\n\nDe tu pedido:\n\n';
+  if(si.length) m += '✅ YA LOS TENEMOS (listos para enviarte):\n'+si.map(lin).join('\n')+'\nSubtotal: S/ '+tSi+'\n\n';
+  m += '⏳ EN ADUANAS:\n'+no.map(lin).join('\n')+'\nSubtotal: S/ '+tNo+'\n\n'
+    + 'Sabemos que es mucho tiempo de espera, por eso te damos 2 opciones por los productos en aduanas:\n\n'
+    + '1️⃣ Devolución del dinero (S/ '+tNo+') en 5 días hábiles\n'
+    + '2️⃣ Saldo a favor para cualquier producto en stock de Jassmin con 10% de descuento, válido hasta el '+brAduHasta(p)+'\n\n'
+    + 'Elige tu opción aquí (toma 1 minuto):\n👉 '+BR_URL_BASE+'?aduana='+p.id+'\n\n'
+    + 'Mil disculpas por el inconveniente y gracias por tu paciencia 🙏';
+  return m;
+}
+async function brAduAvisar(pid, porWa){
+  const p = brArmBuscar(pid); if(!p) return;
+  if(p.items.some(i=>i.en_mano==null)){ toast('Primero marca ✅ o ❌ todos los productos de este pedido'); return; }
+  const w = porWa ? window.open('', '_blank') : null;
+  try {
+    if(!p.aduana_avisado_en){ const ahora = new Date().toISOString(), monto = brAduMonto(p); await dbPatch(`brasil_pedidos?id=eq.${pid}`, {aduana_avisado_en:ahora, aduana_monto:monto}); p.aduana_avisado_en = ahora; p.aduana_monto = monto; }
+    const msg = brAduMensaje(p);
+    if(porWa){ const u = 'https://wa.me/51'+rgBrNormTel(p.cli.telefono)+'?text='+encodeURIComponent(msg); if(w) w.location.href = u; else window.location.href = u; }
+    else { await navigator.clipboard.writeText(msg); toast('✓ Mensaje copiado — pégalo en el chat de la clienta'); }
+    brArmRender();
+  } catch(e){ if(w) w.close(); toast('Error: '+e.message); }
+}
+async function brAduCerrar(pid, deshacer){
+  const p = brArmBuscar(pid); if(!p) return;
+  if(!deshacer && !confirm(p.aduana_opcion==='devolucion' ? `¿Confirmas que ya devolviste S/ ${brAduMonto(p)} a esta clienta?` : '¿Confirmas que la clienta ya usó su saldo a favor?')) return;
+  const v = deshacer ? null : new Date().toISOString();
+  try { await dbPatch(`brasil_pedidos?id=eq.${pid}`, {aduana_cerrado_en:v}); p.aduana_cerrado_en = v; toast(deshacer?'Caso reabierto':'✓ Caso terminado'); brArmRender(); }
+  catch(e){ toast('Error: '+e.message); }
+}
+async function brAduQuitarAviso(pid){
+  const p = brArmBuscar(pid); if(!p) return;
+  if(!confirm('¿Borrar el aviso y la respuesta de aduanas de este pedido? (Vuelve a "sin avisar")')) return;
+  const d = {aduana_avisado_en:null, aduana_respuesta_en:null, aduana_enviar_disponible:null, aduana_opcion:null, aduana_yape:null, aduana_titular:null, aduana_monto:null, aduana_cerrado_en:null};
+  try { await dbPatch(`brasil_pedidos?id=eq.${pid}`, d); Object.assign(p, d); brArmRender(); } catch(e){ toast('Error: '+e.message); }
+}
+function brAduBloque(p){
+  if(!brAduEs(p)) return '';
+  const f = iso=>new Date(iso).toLocaleDateString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'2-digit'});
+  const monto = brAduMonto(p), tel = p.cli && !p.cli.sinCelular && p.cli.telefono;
+  let est, det = '', btn = '';
+  const bMsg = `<button class="btn btn-xs ${p.aduana_avisado_en?'':'btn-primary'}" onclick="brAduAvisar('${p.id}',false)">📋 Copiar mensaje aduanas</button>` + (tel ? `<button class="btn btn-xs" onclick="brAduAvisar('${p.id}',true)">💬 WhatsApp</button>` : '');
+  if(p.aduana_cerrado_en){ est = '<span class="badge badge-ok">✓ Caso terminado '+f(p.aduana_cerrado_en)+'</span>'; btn = `<button class="btn btn-xs" onclick="brAduCerrar('${p.id}',true)">↩ Reabrir</button>`; }
+  else if(p.aduana_opcion){ est = '<span class="badge badge-ok">Respondió '+f(p.aduana_respuesta_en)+'</span>'; btn = `<button class="btn btn-xs btn-primary" onclick="brAduCerrar('${p.id}',false)">${p.aduana_opcion==='devolucion'?'✓ Dinero devuelto':'✓ Saldo usado'}</button>`; }
+  else if(p.aduana_avisado_en){ est = '<span class="badge badge-warn">Avisada '+f(p.aduana_avisado_en)+' · sin responder</span>'; btn = bMsg + `<a class="btn btn-xs" target="_blank" href="${BR_URL_BASE}?aduana=${p.id}">🔗 Llenar por ella</a>`; }
+  else { est = '<span class="badge badge-gray">Sin avisar</span>'; btn = bMsg; }
+  if(p.aduana_opcion){
+    det = p.aduana_opcion==='devolucion'
+      ? `💸 <strong>Devolución de ${brSoles(monto)}</strong>${p.aduana_yape?' · Yape/Plin '+brEsc(p.aduana_yape):''}${p.aduana_titular?' ('+brEsc(p.aduana_titular)+')':''}`
+      : `🎁 <strong>Saldo a favor ${brSoles(monto)}</strong> + 10% dscto. hasta el ${brAduHasta(p)}`;
+    if(p.items.some(i=>i.en_mano===true)) det += '<br>' + (p.aduana_enviar_disponible===false ? '🕒 Lo que ya tenemos: <strong>acumular con sus próximas compras</strong>' : '📦 Lo que ya tenemos: <strong>enviar ya</strong>');
+  }
+  return `<div style="margin-top:8px;padding:8px 10px;border:1px dashed var(--border);border-radius:8px;font-size:12.5px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><span>🛃 <strong>Aduanas</strong> · ${brSoles(monto)} retenido</span>${est}</div>
+    ${det?`<div style="margin-top:4px">${det}</div>`:''}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${btn}${p.aduana_avisado_en?`<button class="btn btn-xs" onclick="brAduQuitarAviso('${p.id}')" title="Borrar aviso y respuesta">🗑</button>`:''}</div></div>`;
+}
+function brAduResumen(){
+  const L = brArmLista.filter(brAduEs), ab = L.filter(p=>!p.aduana_cerrado_en);
+  const sinAv = ab.filter(p=>!p.aduana_avisado_en), sinResp = ab.filter(p=>p.aduana_avisado_en && !p.aduana_opcion);
+  const dev = ab.filter(p=>p.aduana_opcion==='devolucion'), sal = ab.filter(p=>p.aduana_opcion==='saldo');
+  const sum = a=>brSoles(a.reduce((t,p)=>t+brAduMonto(p),0));
+  return `<div class="card" style="margin-bottom:12px;font-size:12.5px">
+    <div>⚪ Sin avisar <strong>${sinAv.length}</strong> &nbsp;·&nbsp; 🟡 Avisadas sin responder <strong>${sinResp.length}</strong></div>
+    <div style="margin-top:2px">💸 Devoluciones por hacer <strong>${dev.length}</strong> (${sum(dev)}) &nbsp;·&nbsp; 🎁 Saldos a favor <strong>${sal.length}</strong> (${sum(sal)})</div>
+    <div style="margin-top:2px">✓ Casos terminados <strong>${L.length-ab.length}</strong> &nbsp;·&nbsp; Total retenido en casos abiertos <strong>${sum(ab)}</strong></div></div>`;
+}
+// Página pública: ?aduana=<id del pedido Brasil> (la llena la clienta)
+let aduPub = null;
+async function showAduana(id){
+  hideAllRootPages();
+  document.getElementById('aduana-page').style.display='block';
+  const body = document.getElementById('adu-body');
+  try {
+    if(!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Código inválido');
+    const rows = await dbGet(`brasil_pedidos?id=eq.${id}&select=id,cliente_id,usuario_wa,aduana_avisado_en,aduana_respuesta_en,aduana_enviar_disponible,aduana_opcion,aduana_cerrado_en`);
+    if(!rows.length){ body.innerHTML='<div style="text-align:center;padding:30px;color:#6b6a65">No encontramos este pedido.</div>'; return; }
+    const p = rows[0];
+    p.items = await dbGet(`brasil_items?pedido_id=eq.${id}&select=producto,variante,cantidad,precio_venta,en_mano&order=creado_en.asc`);
+    p.cli = {}; if(p.cliente_id){ const cs = await dbGet(`clientes?id=eq.${p.cliente_id}&select=nombre`); p.cli = cs[0]||{}; }
+    aduPub = p; aduRender();
+  } catch(e){ body.innerHTML='<div style="text-align:center;padding:30px;color:#b3184a">No se pudo cargar: '+rgBrEsc(e.message)+'</div>'; }
+}
+function aduRender(){
+  const p = aduPub, body = document.getElementById('adu-body');
+  const si = p.items.filter(i=>i.en_mano===true), no = p.items.filter(i=>i.en_mano===false);
+  const tot = a=>a.reduce((t,i)=>t+i.precio_venta*i.cantidad,0), tNo = tot(no), nom = brAduNombre(p);
+  const lin = i=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid #f0ede8;font-size:14px"><span>${i.cantidad>1?i.cantidad+'× ':''}${rgBrEsc(i.producto)}${i.variante?' · '+rgBrEsc(i.variante):''}</span><strong>S/ ${i.precio_venta*i.cantidad}</strong></div>`;
+  const caja = (t,h)=>`<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px"><div style="font-size:15px;font-weight:700;margin-bottom:6px">${t}</div>${h}</div>`;
+  if(!no.length){ body.innerHTML = caja('Tu pedido no tiene productos en aduanas 🌸','<div style="color:#6b6a65;font-size:14px">Si tienes alguna duda, escríbenos por WhatsApp.</div>'); return; }
+  let h = `<div style="font-size:20px;font-weight:700;margin-bottom:4px">Hola${nom?' '+rgBrEsc(nom):''} 🌸</div><div style="font-size:14px;color:#4a4943;margin-bottom:14px">Parte de tu pedido está en aduanas (canal rojo) y el trámite puede demorar entre 60 y 90 días hábiles. Elige cómo prefieres resolverlo.</div>`;
+  if(si.length) h += caja('✅ Ya los tenemos', si.map(lin).join('')+`<div style="text-align:right;font-size:13px;color:#6b6a65;margin-top:6px">Subtotal S/ ${tot(si)}</div>`);
+  h += caja('⏳ En aduanas', no.map(lin).join('')+`<div style="text-align:right;font-size:13px;color:#6b6a65;margin-top:6px">Subtotal S/ ${tNo}</div>`);
+  if(p.aduana_opcion){
+    h += caja('✓ Ya registramos tu respuesta', `<div style="font-size:14px">${p.aduana_opcion==='devolucion'?'💸 Devolución de <strong>S/ '+tNo+'</strong> en 5 días hábiles.':'🎁 Saldo a favor de <strong>S/ '+tNo+'</strong> con 10% de descuento en productos en stock, válido hasta el '+brAduHasta(p)+'.'}${si.length?'<br>'+(p.aduana_enviar_disponible===false?'🕒 Guardaremos lo que ya tenemos para enviarlo con tus próximas compras.':'📦 Te enviaremos lo que ya tenemos.'):''}</div><div style="font-size:13px;color:#6b6a65;margin-top:8px">¿Quieres cambiarla? <a href="https://wa.me/${BR_WA_NEGOCIO}" style="color:#B3184A;font-weight:600">Escríbenos por WhatsApp</a></div>`);
+    body.innerHTML = h; return;
+  }
+  const op = (name,val,t,sub)=>`<label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #e6e2db;border-radius:10px;margin-top:8px;cursor:pointer"><input type="radio" name="${name}" value="${val}" style="margin-top:3px;width:18px;height:18px;flex:none" onchange="aduCambio()"><span><strong style="font-size:14px">${t}</strong><br><span style="font-size:12.5px;color:#6b6a65">${sub}</span></span></label>`;
+  if(si.length) h += caja('1. Los productos que ya tenemos', op('adu-env','ya','Envíenmelos ya','Te los despachamos con tus datos de envío.') + op('adu-env','acumular','Prefiero acumularlos con mis próximas compritas','Los guardamos y los enviamos junto con lo que compres aprovechando tu 10% de descuento.'));
+  h += caja((si.length?'2. ':'')+'Los productos en aduanas (S/ '+tNo+')', op('adu-op','devolucion','Devolución del dinero','Te devolvemos S/ '+tNo+' en 5 días hábiles.') + op('adu-op','saldo','Saldo a favor con 10% de descuento','Usa S/ '+tNo+' en cualquier producto en stock de Jassmin, con 10% de descuento, hasta el '+brAduHasta(p)+'.')
+    + `<div id="adu-yape-box" style="display:none;margin-top:10px"><div style="font-size:13px;font-weight:600;margin-bottom:4px">¿A qué Yape o Plin te devolvemos?</div><input id="adu-yape" inputmode="numeric" maxlength="9" placeholder="Número de celular (9 dígitos)" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #d9d5cd;border-radius:10px;font-size:15px;margin-bottom:6px"><input id="adu-titular" placeholder="Nombre del titular" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #d9d5cd;border-radius:10px;font-size:15px"></div>`);
+  h += `<div id="adu-err" style="color:#b3184a;font-size:13px;margin-bottom:8px"></div><button id="adu-btn" onclick="aduEnviar()" style="width:100%;padding:14px;border:0;border-radius:12px;background:#B3184A;color:#fff;font-size:16px;font-weight:700">Enviar mi respuesta</button>`;
+  body.innerHTML = h;
+}
+function aduCambio(){ document.getElementById('adu-err').textContent=''; const o = document.querySelector('input[name="adu-op"]:checked'); document.getElementById('adu-yape-box').style.display = o && o.value==='devolucion' ? 'block' : 'none'; }
+async function aduEnviar(){
+  const p = aduPub, err = document.getElementById('adu-err'), btn = document.getElementById('adu-btn');
+  const hayEnv = !!document.querySelector('input[name="adu-env"]');
+  const e1 = document.querySelector('input[name="adu-env"]:checked'), e2 = document.querySelector('input[name="adu-op"]:checked');
+  if(hayEnv && !e1){ err.textContent = 'Elige qué hacemos con los productos que ya tenemos.'; return; }
+  if(!e2){ err.textContent = 'Elige una opción para los productos en aduanas.'; return; }
+  const d = {aduana_respuesta_en:new Date().toISOString(), aduana_opcion:e2.value, aduana_enviar_disponible: hayEnv ? e1.value==='ya' : null, aduana_yape:null, aduana_titular:null,
+    aduana_monto: p.items.filter(i=>i.en_mano===false).reduce((t,i)=>t+i.precio_venta*i.cantidad,0)};
+  if(e2.value==='devolucion'){
+    const y = rgBrNormTel(document.getElementById('adu-yape').value), t = document.getElementById('adu-titular').value.trim();
+    if(!/^9\d{8}$/.test(y)){ err.textContent = 'Escribe el número de Yape o Plin (9 dígitos, empieza con 9).'; return; }
+    if(t.length<3){ err.textContent = 'Escribe el nombre del titular del Yape o Plin.'; return; }
+    d.aduana_yape = y; d.aduana_titular = t;
+  }
+  if(!p.aduana_avisado_en) d.aduana_avisado_en = d.aduana_respuesta_en;
+  err.textContent = ''; btn.disabled = true; btn.textContent = 'Enviando...';
+  try { await dbPatch(`brasil_pedidos?id=eq.${p.id}`, d); Object.assign(p, d); aduRender(); window.scrollTo(0,0); }
+  catch(e){ btn.disabled = false; btn.textContent = 'Enviar mi respuesta'; err.textContent = 'No se pudo enviar: '+e.message; }
 }
 function brArmCopiarFaltan(){
   const f = {};
@@ -9476,12 +9628,14 @@ async function showEnvio(id){
   const dat=params.get('datos');
   const pedQ=params.get('pedido');
   const envQ=params.get('envio');
+  const aduQ=params.get('aduana');
   if(trk){ showTracking(trk); }
   else if(reg!==null){ showRegistro(); }
   else if(seg!==null){ showSeguimiento(); }
   else if(dat!==null){ showDatosBrasil(); }
   else if(pedQ){ showPedidoEmpaque(pedQ); }
   else if(envQ){ showEnvio(envQ); }
+  else if(aduQ){ showAduana(aduQ); }
 })();
 </script>
 <script>/* qrcode-generator 1.4.4 (MIT) */
