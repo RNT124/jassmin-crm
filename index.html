@@ -8648,7 +8648,7 @@ function brArmRender(){
       <div style="margin-top:2px">🔴 Incompletos <strong>${incomp}</strong> &nbsp;·&nbsp; ⚪ Por revisar <strong>${resto}</strong></div>
       <label style="display:block;margin-top:6px"><input type="checkbox" ${brArmVerEmp?'checked':''} onchange="brArmVerEmp=this.checked;brArmRender()"> ${esAdu?'Ver también los casos terminados':'Ver también los ya empacados'}</label>
     </div>`;
-  const vis = enTipo.filter(x=>esAdu ? (brArmVerEmp || !x.p.aduana_cerrado_en) : (brArmVerEmp || !x.p.empacado_en))
+  const vis = enTipo.filter(x=>esAdu ? (brAduSub==='todos' ? (brArmVerEmp || !x.p.aduana_cerrado_en) : brAduEnSub(x.p, brAduSub)) : (brArmVerEmp || !x.p.empacado_en))
     .sort((a,b)=>String(a.p.cli.nombre||'').localeCompare(String(b.p.cli.nombre||'')));
   const cards = vis.map(({p,tipo})=>{
     const c = p.cli;
@@ -8797,6 +8797,22 @@ function brAduBloque(p){
     ${det?`<div style="margin-top:4px">${det}</div>`:''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${btn}${p.aduana_avisado_en?`<button class="btn btn-xs" onclick="brAduQuitarAviso('${p.id}')" title="Borrar aviso y respuesta">🗑</button>`:''}</div></div>`;
 }
+let brAduSub = 'todos';
+const BR_ADU_SUBS = [['todos','Todos'],['sinavisar','⚪ Sin avisar'],['sinresp','🟡 Sin responder'],['devol','💸 Devoluciones por hacer'],['saldo','🎁 Saldos a favor'],['enviar','📦 Enviar ya'],['sindatos','⚠️ Enviar ya sin datos'],['acumular','🕒 Acumular'],['terminados','✓ Terminados']];
+function brAduEnSub(p, k){
+  const ab = !p.aduana_cerrado_en, tiene = p.items.some(i=>i.en_mano===true);
+  const env = !!p.aduana_opcion && tiene && p.aduana_enviar_disponible!==false && !p.empacado_en && p.estado!=='despachado';
+  if(k==='todos') return ab;
+  if(k==='sinavisar') return ab && !p.aduana_avisado_en;
+  if(k==='sinresp') return ab && !!p.aduana_avisado_en && !p.aduana_opcion;
+  if(k==='devol') return ab && p.aduana_opcion==='devolucion';
+  if(k==='saldo') return ab && p.aduana_opcion==='saldo';
+  if(k==='enviar') return env;
+  if(k==='sindatos') return env && !(p.cli && p.cli.direccion && String(p.cli.direccion).trim());
+  if(k==='acumular') return !!p.aduana_opcion && tiene && p.aduana_enviar_disponible===false && p.estado!=='despachado';
+  if(k==='terminados') return !ab;
+  return true;
+}
 function brAduResumen(){
   const L = brArmLista.filter(brAduEs), ab = L.filter(p=>!p.aduana_cerrado_en);
   const sinAv = ab.filter(p=>!p.aduana_avisado_en), sinResp = ab.filter(p=>p.aduana_avisado_en && !p.aduana_opcion);
@@ -8805,7 +8821,8 @@ function brAduResumen(){
   return `<div class="card" style="margin-bottom:12px;font-size:12.5px">
     <div>⚪ Sin avisar <strong>${sinAv.length}</strong> &nbsp;·&nbsp; 🟡 Avisadas sin responder <strong>${sinResp.length}</strong></div>
     <div style="margin-top:2px">💸 Devoluciones por hacer <strong>${dev.length}</strong> (${sum(dev)}) &nbsp;·&nbsp; 🎁 Saldos a favor <strong>${sal.length}</strong> (${sum(sal)})</div>
-    <div style="margin-top:2px">✓ Casos terminados <strong>${L.length-ab.length}</strong> &nbsp;·&nbsp; Total retenido en casos abiertos <strong>${sum(ab)}</strong></div></div>`;
+    <div style="margin-top:2px">✓ Casos terminados <strong>${L.length-ab.length}</strong> &nbsp;·&nbsp; Total retenido en casos abiertos <strong>${sum(ab)}</strong></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${BR_ADU_SUBS.map(([k,t])=>`<button type="button" class="btn btn-xs ${brAduSub===k?'btn-primary':''}" onclick="brAduSub='${k}';brArmRender()">${t} (${L.filter(p=>brAduEnSub(p,k)).length})</button>`).join('')}</div></div>`;
 }
 // Página pública: ?aduana=<id del pedido Brasil> (la llena la clienta)
 let aduPub = null;
