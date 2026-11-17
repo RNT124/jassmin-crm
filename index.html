@@ -8656,9 +8656,10 @@ function brArmRender(){
     const todoOk = p.items.some(i=>i.en_mano===true) && p.items.every(i=>brAduItemOk(p,i));
     const hayNo = p.items.some(i=>i.en_mano===false && !p.aduana_opcion);
     const obj = brArmObjetivo(p, tipo);
-    const bloqueado = !!p.empacado_en;
+    const desp = p.estado==='despachado';
+    const bloqueado = !!p.empacado_en || desp;
     const qPed = brNorm([c.nombre, c.telefono, p.usuario_wa].concat(p.items.map(i=>i.producto+' '+(i.variante||''))).join(' '));
-    const estadoBadge = p.empacado_en ? '<span class="badge badge-ok">📦 Empacado</span>' : todoOk ? '<span class="badge badge-ok">🟢 Listo</span>' : hayNo ? '<span class="badge badge-warn">🔴 Incompleto</span>' : '<span class="badge badge-gray">⚪ Por revisar</span>';
+    const estadoBadge = desp ? `<span class="badge badge-ok">🚚 Despachado${p.despachado_en?' '+new Date(p.despachado_en).toLocaleDateString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'2-digit'}):''}</span>` : p.empacado_en ? '<span class="badge badge-ok">📦 Empacado</span>' : todoOk ? '<span class="badge badge-ok">🟢 Listo</span>' : hayNo ? '<span class="badge badge-warn">🔴 Incompleto</span>' : '<span class="badge badge-gray">⚪ Por revisar</span>';
     const filas = p.items.map(i=>{
       const cu = brEsCuidado(i.producto);
       const bOk = i.en_mano===true ? 'btn-primary' : '';
@@ -8668,7 +8669,8 @@ function brArmRender(){
         <div style="flex:1;font-size:13px;min-width:0">${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''} ${cu?'<span class="badge badge-gray">cuidado</span>':''}</div>${btns}</div>`;
     }).join('');
     let acciones = '';
-    if(bloqueado) acciones = `<button class="btn btn-xs" onclick="brArmDeshacer('${p.id}')">↩ Deshacer empaque</button>`;
+    if(desp) acciones = '';
+    else if(bloqueado) acciones = `<button class="btn btn-xs" onclick="brArmDeshacer('${p.id}')">↩ Deshacer empaque</button>`;
     else {
       if(obj.ids.length) acciones += `<button class="btn btn-xs" onclick="brArmTodo('${p.id}')">${obj.label}</button>`;
       if(todoOk) acciones += `<button class="btn btn-sm btn-primary" onclick="brArmEmpacar('${p.id}')">📦 Empacado</button>`;
@@ -8790,7 +8792,7 @@ function brAduBloque(p){
     det = p.aduana_opcion==='devolucion'
       ? `💸 <strong>Devolución de ${brSoles(monto)}</strong>${p.aduana_yape?' · Yape/Plin '+brEsc(p.aduana_yape):''}${p.aduana_titular?' ('+brEsc(p.aduana_titular)+')':''}`
       : `🎁 <strong>Saldo a favor ${brSoles(monto)}</strong> + 10% dscto. hasta el ${brAduHasta(p)}`;
-    if(p.items.some(i=>i.en_mano===true)) det += '<br>' + (p.aduana_enviar_disponible===false ? '🕒 Lo que ya tenemos: <strong>acumular con sus próximas compras</strong>' : '📦 Lo que ya tenemos: <strong>enviar ya</strong> · ' + (p.cli && p.cli.direccion && String(p.cli.direccion).trim() ? '✓ con datos de envío' : '<span style="color:var(--red)">⚠️ sin datos de envío</span>'));
+    if(p.items.some(i=>i.en_mano===true)) det += '<br>' + (p.aduana_enviar_disponible===false ? '🕒 Lo que ya tenemos: <strong>acumular con sus próximas compras</strong>' : (p.estado==='despachado' ? '🚚 Lo que ya tenemos: <strong>ya despachado</strong>' : '📦 Lo que ya tenemos: <strong>enviar ya</strong> · ' + (p.cli && p.cli.direccion && String(p.cli.direccion).trim() ? '✓ con datos de envío' : '<span style="color:var(--red)">⚠️ sin datos de envío</span>')));
   }
   return `<div style="margin-top:8px;padding:8px 10px;border:1px dashed var(--border);border-radius:8px;font-size:12.5px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><span>🛃 <strong>Aduanas</strong> · ${brSoles(monto)} retenido</span>${est}</div>
