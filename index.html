@@ -1438,6 +1438,12 @@ td.empty-state{padding:20px;text-align:center}
             <div style="font-size:13px;font-weight:600;margin-bottom:4px">Sube las fotos de las boletas de Shalom</div>
             <div class="text-hint" style="font-size:12px;line-height:1.6;margin-bottom:10px">Toma la foto de frente, con luz pareja y la boleta estirada. Puedes elegir varias a la vez. El sistema lee el DNI, el N.º de orden y el código, busca a la clienta y su pedido, y te muestra todo. Los números de orden y códigos <strong>debes compararlos con la foto</strong> (a veces se confunden 8, 9 o 0) y marcar la casilla de cada una. Nada se marca solo.</div>
             <label class="btn btn-primary btn-sm" style="cursor:pointer;display:inline-block">📸 Elegir fotos o PDF<input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="shSubir(this)"></label>
+            <button class="btn btn-sm" style="margin-left:6px" onclick="document.getElementById('sh-lista-box').style.display=document.getElementById('sh-lista-box').style.display==='none'?'block':'none'">📋 Pegar lista de Shalom</button>
+            <div id="sh-lista-box" style="display:none;margin-top:10px">
+              <div class="text-hint" style="font-size:12px;line-height:1.6;margin-bottom:6px">En Shalom Pro usa el marcador <strong>📋 Copiar lista</strong> (instrucciones en <a href="herramientas-shalom.html" target="_blank">herramientas-shalom.html</a>) y pega aquí. También sirve pegar la tabla tal cual la copias de la página.</div>
+              <textarea id="sh-lista-txt" rows="5" placeholder="104616514;DPP9;70681776;Annie Taboada;2026-11-19" style="width:100%;font-size:12px"></textarea>
+              <button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="shLeerLista()">Leer lista</button>
+            </div>
             <div id="sh-prog" class="text-hint" style="display:none;margin-top:10px;font-size:12.5px"></div>
           </div>
           <div id="sh-resumen" style="font-size:12.5px;margin-bottom:8px"></div>
@@ -9472,6 +9478,49 @@ async function shLeerFoto(file, textoPdf){
   const blob = await new Promise(r=>cvF.toBlob(r,'image/jpeg',0.78));
   return { parsed: shParse(texts), blob };
 }
+// ── Lista copiada de Shalom Pro (orden;código;dni;nombre;fecha) o tabla pegada tal cual ──
+function shParseLista(txt){
+  const out=[], vistos=new Set();
+  const add=(o,c,d,n,f)=>{ if(!o||!c||vistos.has(o)) return; vistos.add(o); out.push({orden:o, clave:c.toUpperCase(), dni:String(d||'').replace(/\D/g,''), nombre:(n||'').trim(), fecha:f||''}); };
+  String(txt||'').split(/\r?\n/).forEach(l=>{ const p=l.split(';').map(x=>x.trim()); if(p.length>=3 && /^\d{9}$/.test(p[0]) && /^[A-Za-z0-9]{4}$/.test(p[1])) add(p[0],p[1],p[2],p[3],p[4]); });
+  if(!out.length){
+    const re=/(\d{9})\s*Cod:\s*([A-Z0-9]{4})[\s\S]*?(\d{2})-(\d{2})-(\d{4})\s*([\s\S]*?)DNI:\s*(\d{6,9})/gi; let m;
+    while((m=re.exec(txt))) add(m[1],m[2],m[7],m[6].replace(/\s+/g,' '),m[5]+'-'+m[4]+'-'+m[3]);
+  }
+  return out;
+}
+async function shYaRegistrada(orden){
+  if(!/^\d{9}$/.test(orden||'')) return [];
+  const [a,b] = await Promise.all([dbGet(`pedidos?shalom_orden=eq.${orden}&select=id,shalom_foto`), dbGet(`brasil_pedidos?shalom_orden=eq.${orden}&select=id,shalom_foto`)]);
+  return a.map(p=>({tipo:'pe',id:p.id,foto:p.shalom_foto})).concat(b.map(p=>({tipo:'br',id:p.id,foto:p.shalom_foto})));
+}
+async function shLeerLista(){
+  const items = shParseLista(document.getElementById('sh-lista-txt').value);
+  const box = document.getElementById('sh-prog'); box.style.display='block';
+  if(!items.length){ box.textContent='No encontré boletas en lo que pegaste.'; return; }
+  if(shLeyendo) return; shLeyendo = true;
+  try {
+    await shCargarClientes();
+    let n=0, dup=0;
+    for(const it of items){
+      n++; box.textContent='🔎 Relacionando '+n+' de '+items.length+'…';
+      if(shRows.some(r=>r.orden===it.orden)){ dup++; continue; }
+      if((await shYaRegistrada(it.orden)).length){ dup++; continue; }
+      const row = {k:'r'+Date.now()+Math.random().toString(36).slice(2,6), url:null, lista:true, estado:'revisar', pedidos:[], prob:[], orden:it.orden, clave:it.clave, emision:null, fechaLista:it.fecha, nombreLista:it.nombre, dniLista:it.dni};
+      const dniN = it.dni.replace(/^0+/,'');
+      let cli = shClientes.find(c=>String(c.dni||'').replace(/\D/g,'').replace(/^0+/,'')===dniN && dniN.length>=7);
+      if(!cli){
+        const toks = shNorm(it.nombre).split(/[^A-Z]+/).filter(x=>x.length>=3);
+        const cand = toks.length ? shClientes.filter(c=>{ const nn=shNorm(c.nombre||''); return toks.every(t=>nn.includes(t)); }) : [];
+        if(cand.length===1) row.sugerida = cand[0];
+      }
+      await shAsignar(row, cli||null);
+      shRows.push(row); shRender();
+    }
+    box.textContent = '✓ '+(items.length-dup)+' boleta(s) nuevas'+(dup?' · '+dup+' ya estaban registradas (omitidas)':'')+'. Revisa y confirma.';
+  } catch(e){ box.textContent='Error: '+e.message; }
+  shLeyendo = false; shRender();
+}
 async function shCargarClientes(){
   if(shClientes) return shClientes;
   let all=[], off=0;
@@ -9493,6 +9542,7 @@ async function shAsignar(row, cli){
 function shEstadoFila(row){
   if(row.estado==='confirmado'||row.estado==='leyendo'||row.estado==='error') return row.estado;
   const prob=[];
+  if(row.ya && row.ya.length){ if(!/^\d{9}$/.test(row.orden||'')) prob.push('No pude leer el N.º de orden: escríbelo'); row.prob=prob; return prob.length?'revisar':'listo'; }
   if(!row.cli) prob.push('No encontré a la clienta');
   else if(!row.pedidos.length) prob.push('La clienta no tiene pedido pendiente');
   else if(row.pedidos.length>1 && !(row.sel||[]).length) prob.push('Tiene varios pedidos: marca uno o los dos');
@@ -9519,6 +9569,7 @@ async function shSubir(input){
       try {
         const r = await shLeerFoto(row.file, row.texto);
         row.blob = r.blob; row.orden = r.parsed.orden; row.ordenOk = r.parsed.ordenOk; row.clave = r.parsed.clave; row.claveN = r.parsed.claveN; row.emision = r.parsed.emision;
+        row.ya = await shYaRegistrada(row.orden);
         const cruce = shCruzar(r.parsed, shClientes), best = cruce[0], second = cruce[1];
         row.cruce = cruce.slice(0,4);
         const seguro = best && best.score>=3 && (!second || best.score - second.score >= 1.5);
@@ -9549,15 +9600,16 @@ function shRender(){
 function shFilaHtml(r, st){
   const col = st==='listo'?'var(--green)':st==='confirmado'?'var(--blue)':st==='leyendo'?'var(--text3)':'#E8A33D';
   const badge = st==='listo'?'<span class="badge badge-ok">✅ lista</span>':st==='confirmado'?'<span class="badge badge-info">📦 confirmada</span>':st==='leyendo'?'<span class="badge badge-gray">🔎 leyendo…</span>':st==='error'?'<span class="badge badge-warn">⚠️ no se pudo leer</span>':'<span class="badge badge-warn">⚠️ revisar</span>';
-  const thumb = `<a href="${r.url}" target="_blank" style="flex:none"><img src="${r.url}" style="width:70px;height:96px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></a>`;
+  const thumb = r.url ? `<a href="${r.url}" target="_blank" style="flex:none"><img src="${r.url}" style="width:70px;height:96px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"></a>` : `<div style="flex:none;width:70px;height:96px;border-radius:6px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text3);text-align:center">📋 lista<br>sin foto</div>`;
   if(st==='leyendo') return `<div class="card" style="margin-bottom:8px;display:flex;gap:10px;border-left:3px solid ${col}">${thumb}<div style="padding-top:6px">${badge}</div></div>`;
   if(st==='error') return `<div class="card" style="margin-bottom:8px;display:flex;gap:10px;border-left:3px solid ${col}">${thumb}<div style="flex:1">${badge}<div class="text-hint" style="font-size:11.5px;margin:4px 0">${brEsc(r.err||'')}</div><button class="btn btn-xs" onclick="shQuitar('${r.k}')">Quitar</button></div></div>`;
   const c = r.cli, sel = r.sel||[];
   let cliHtml;
   if(c) cliHtml = `<div style="font-size:13.5px;font-weight:600">${brEsc(c.nombre||'')}</div><div class="text-hint" style="font-size:11.5px">DNI ${brEsc(c.dni||'')} · ${brEsc(c.telefono||'')}</div>`;
-  else cliHtml = `<div style="font-size:13px;color:var(--red);font-weight:600">Clienta no identificada</div>` + (r.sugerida?`<button class="btn btn-xs" style="margin-top:4px" onclick="shElegirCli('${r.k}','${r.sugerida.id}')">¿Es ${brEsc(r.sugerida.nombre||'')}?</button>`:'');
+  else cliHtml = (r.lista?`<div class="text-hint" style="font-size:11.5px">Shalom: ${brEsc(r.nombreLista||'')} · DNI ${brEsc(r.dniLista||'')}</div>`:'')+`<div style="font-size:13px;color:var(--red);font-weight:600">Clienta no identificada</div>` + (r.sugerida?`<button class="btn btn-xs" style="margin-top:4px" onclick="shElegirCli('${r.k}','${r.sugerida.id}')">¿Es ${brEsc(r.sugerida.nombre||'')}?</button>`:'');
   let pedHtml='';
-  if(c){
+  if(r.ya && r.ya.length) pedHtml = `<div class="text-hint" style="font-size:11.5px;margin-top:2px">🧾 Ya registrada con la lista: <strong>solo agrega la foto</strong> (${r.ya.length} pedido${r.ya.length>1?'s':''})</div>`;
+  else if(c){
     if(r.pedidos.length>1) pedHtml = `<div style="margin-top:4px;font-size:12px">${st==='confirmado' ? sel.map(p=>'🧾 '+brEsc(p.lbl)).join('<br>') : '<div class="text-hint" style="font-size:11px">Marca a qué pedido(s) va esta boleta:</div>'+r.pedidos.map(p=>`<label style="display:flex;align-items:center;gap:8px;margin-top:3px;cursor:pointer"><input type="checkbox" ${sel.some(x=>x.id===p.id)?'checked':''} onchange="shElegirPed('${r.k}','${p.id}',this.checked)" style="width:18px;height:18px;flex:none;margin:0"> ${brEsc(p.lbl)}</label>`).join('')}</div>`;
     else if(sel.length) pedHtml = `<div class="text-hint" style="font-size:11.5px;margin-top:2px">🧾 ${brEsc(sel[0].lbl)}</div>`;
   }
@@ -9588,6 +9640,12 @@ async function shSubirFoto(blob){
   return `${SUPA_URL}/storage/v1/object/public/boletas-shalom/${name}`;
 }
 async function shConfirmarFila(r, saltarPreventa){
+  if(r.ya && r.ya.length){
+    if(!r.blob) throw new Error('Falta la foto');
+    const foto0 = await shSubirFoto(r.blob), up = {shalom_foto:foto0}; if(r.emision) up.shalom_emision = new Date(r.emision+'-05:00').toISOString();
+    for(const p of r.ya) await dbPatch(`${p.tipo==='pe'?'pedidos':'brasil_pedidos'}?id=eq.${p.id}`, up);
+    r.estado='confirmado'; r.fotoUrl=foto0; return;
+  }
   const peds = r.sel||[]; if(!peds.length||!r.cli) throw new Error('Falta clienta o pedido');
   for(const p of peds){
     if(p.tipo==='pe' && !saltarPreventa && p.carrito_id){
@@ -9595,8 +9653,10 @@ async function shConfirmarFila(r, saltarPreventa){
       if(pv.length && !confirm(`${r.cli.nombre}: su pedido tiene ${pv.length} prenda(s) en pre-venta sin reponer. ¿Despachar de todas formas?`)) throw new Error('omitido');
     }
   }
-  const foto = await shSubirFoto(r.blob);
-  const base = {courier_codigo:r.orden, shalom_orden:r.orden, shalom_clave:r.clave, shalom_emision:r.emision?new Date(r.emision+'-05:00').toISOString():null, shalom_foto:foto};
+  const foto = r.blob ? await shSubirFoto(r.blob) : null;
+  const base = {courier_codigo:r.orden, shalom_orden:r.orden, shalom_clave:r.clave};
+  if(r.emision) base.shalom_emision = new Date(r.emision+'-05:00').toISOString();
+  if(foto) base.shalom_foto = foto;
   for(const p of peds){
     if(p.tipo==='pe'){
       await dbPatch(`pedidos?id=eq.${p.id}`, {...base, estado:'en_camino'}); await registrarHistorialPedido(p.id, p.estado, 'en_camino', 'Boleta Shalom '+r.orden);
