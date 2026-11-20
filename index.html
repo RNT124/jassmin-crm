@@ -1437,7 +1437,7 @@ td.empty-state{padding:20px;text-align:center}
           <div class="card" style="margin-bottom:12px">
             <div style="font-size:13px;font-weight:600;margin-bottom:4px">Sube las fotos de las boletas de Shalom</div>
             <div class="text-hint" style="font-size:12px;line-height:1.6;margin-bottom:10px">Toma la foto de frente, con luz pareja y la boleta estirada. Puedes elegir varias a la vez. El sistema lee el DNI, el N.º de orden y el código, busca a la clienta y su pedido, y te muestra todo. Los números de orden y códigos <strong>debes compararlos con la foto</strong> (a veces se confunden 8, 9 o 0) y marcar la casilla de cada una. Nada se marca solo.</div>
-            <label class="btn btn-primary btn-sm" style="cursor:pointer;display:inline-block">📸 Elegir fotos<input type="file" accept="image/*" multiple style="display:none" onchange="shSubir(this)"></label>
+            <label class="btn btn-primary btn-sm" style="cursor:pointer;display:inline-block">📸 Elegir fotos o PDF<input type="file" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="shSubir(this)"></label>
             <div id="sh-prog" class="text-hint" style="display:none;margin-top:10px;font-size:12.5px"></div>
           </div>
           <div id="sh-resumen" style="font-size:12.5px;margin-bottom:8px"></div>
@@ -9415,8 +9415,48 @@ async function shCanvasDe(bmp, width){
   const sc = width/bmp.width, w=Math.round(bmp.width*sc), h=Math.round(bmp.height*sc);
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(bmp,0,0,w,h); return cv;
 }
-async function shLeerFoto(file){
+// ── PDF: se lee el texto directo (exacto); si no tiene texto, se convierte a imagen y se lee como foto ──
+const SH_PDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const SH_PDF_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+function shEsPdf(f){ return f.type==='application/pdf' || /\.pdf$/i.test(f.name||''); }
+function shCargarPdfJs(){
+  return new Promise((res,rej)=>{
+    if(window.pdfjsLib){ return res(); }
+    const s=document.createElement('script'); s.src=SH_PDF_URL;
+    s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc=SH_PDF_WORKER; res(); };
+    s.onerror=()=>rej(new Error('No se pudo cargar el lector de PDF (revisa tu internet)')); document.head.appendChild(s);
+  });
+}
+// Convierte los archivos elegidos en una lista de imágenes (cada página de PDF = una boleta), con el texto del PDF si lo tiene
+async function shExpandir(files){
+  const out=[];
+  for(const f of files){
+    if(!shEsPdf(f)){ out.push({file:f, texto:null}); continue; }
+    await shCargarPdfJs();
+    const pdf = await pdfjsLib.getDocument({data: new Uint8Array(await f.arrayBuffer())}).promise;
+    for(let n=1;n<=pdf.numPages;n++){
+      const page = await pdf.getPage(n), tc = await page.getTextContent(), lines = [];
+      tc.items.forEach(it=>{ const y=Math.round(it.transform[5]); let l=lines.find(x=>Math.abs(x.y-y)<=2); if(!l){ l={y,parts:[]}; lines.push(l); } l.parts.push({x:it.transform[4], t:it.str}); });
+      lines.sort((a,b)=>b.y-a.y);
+      const texto = lines.map(l=>l.parts.sort((a,b)=>a.x-b.x).map(p=>p.t).join(' ')).join('\n');
+      const vp0 = page.getViewport({scale:1}), sc = Math.min(3, 3000/Math.max(vp0.width,vp0.height)*1.0) , vp = page.getViewport({scale:Math.max(sc,1.5)});
+      const cv=document.createElement('canvas'); cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+      const cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height);
+      await page.render({canvasContext:cx, viewport:vp}).promise;
+      const blob = await new Promise(r=>cv.toBlob(r,'image/jpeg',0.85));
+      const nom = (f.name||'boleta').replace(/\.pdf$/i,'')+(pdf.numPages>1?'-p'+n:'')+'.jpg';
+      out.push({file:new File([blob], nom, {type:'image/jpeg'}), texto: /ORDEN/i.test(texto) && texto.length>60 ? texto : null});
+    }
+  }
+  return out;
+}
+async function shLeerFoto(file, textoPdf){
   const bmp = await createImageBitmap(file, {imageOrientation:'from-image'});
+  if(textoPdf){
+    const cvF = await shCanvasDe(bmp, Math.min(1400,bmp.width));
+    const blob = await new Promise(r=>cvF.toBlob(r,'image/jpeg',0.78));
+    return { parsed: shParse([textoPdf,textoPdf,textoPdf]), blob };
+  }
   const worker = await shGetWorker(), texts = [];
   for(const [width,win] of [[1800,14],[1400,12],[2000,16]]){
     const cv = await shCanvasDe(bmp, Math.min(width,bmp.width)), ctx = cv.getContext('2d'), w=cv.width, h=cv.height;
@@ -9463,19 +9503,21 @@ function shEstadoFila(row){
   row.prob = prob; return prob.length ? 'revisar' : 'listo';
 }
 async function shSubir(input){
-  const files = [...input.files]; input.value='';
-  if(!files.length || shLeyendo) return;
+  const files0 = [...input.files]; input.value='';
+  if(!files0.length || shLeyendo) return;
   shLeyendo = true;
   const box = document.getElementById('sh-prog'); box.style.display='block';
   try {
+    box.textContent = '📄 Preparando archivos…';
+    const files = await shExpandir(files0);
     await shCargarClientes();
-    const nuevas = files.map(f=>({k:'r'+Date.now()+Math.random().toString(36).slice(2,6), file:f, url:URL.createObjectURL(f), estado:'leyendo', pedidos:[], prob:[]}));
+    const nuevas = files.map(x=>({k:'r'+Date.now()+Math.random().toString(36).slice(2,6), file:x.file, texto:x.texto, url:URL.createObjectURL(x.file), estado:'leyendo', pedidos:[], prob:[]}));
     shRows = shRows.concat(nuevas); shRender();
     let n=0;
     for(const row of nuevas){
       n++; box.textContent = '🔎 Leyendo boleta '+n+' de '+nuevas.length+'… (deja la pantalla encendida)';
       try {
-        const r = await shLeerFoto(row.file);
+        const r = await shLeerFoto(row.file, row.texto);
         row.blob = r.blob; row.orden = r.parsed.orden; row.ordenOk = r.parsed.ordenOk; row.clave = r.parsed.clave; row.claveN = r.parsed.claveN; row.emision = r.parsed.emision;
         const cruce = shCruzar(r.parsed, shClientes), best = cruce[0], second = cruce[1];
         row.cruce = cruce.slice(0,4);
