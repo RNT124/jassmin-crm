@@ -1343,7 +1343,7 @@ td.empty-state{padding:20px;text-align:center}
           <div class="tab" id="br-tab-resumen" onclick="brTab('resumen')">📊 Resumen</div>
         </div>
         <div id="br-buscar-wrap" style="display:none;margin-bottom:12px;position:relative">
-          <input id="br-buscar" type="search" placeholder="🔍 Buscar por celular o usuario de WhatsApp (o producto)" oninput="brFiltrar(this.value)" style="width:100%" autocomplete="off">
+          <input id="br-buscar" type="search" placeholder="🔍 Buscar por celular, DNI o usuario de WhatsApp (o producto)" oninput="brFiltrar(this.value)" style="width:100%" autocomplete="off">
         </div>
         <div id="br-view-registro">
           <div class="card" style="margin-bottom:12px">
@@ -8460,7 +8460,7 @@ function brEnvCard(p, sel){
   const tel = c.telefono ? rgBrNormTel(c.telefono) : '';
   const prendas = p.items.map(i=>`${i.cantidad}× ${brEsc(i.producto)}${i.variante?' · '+brEsc(i.variante):''}`).join(' + ');
   const total = p.items.reduce((a,i)=>a+i.precio_venta*i.cantidad,0);
-  const q = brNorm([c.nombre, c.telefono, p.usuario_wa, c.distrito].concat(p.items.map(i=>i.producto+' '+(i.variante||''))).join(' '));
+  const q = brNorm([c.nombre, c.telefono, p.usuario_wa, c.dni, c.distrito].concat(p.items.map(i=>i.producto+' '+(i.variante||''))).join(' '));
   const chk = sel ? `<input type="checkbox" class="br-env-sel" data-t="${shalom?'shalom':'moto'}" value="${p.id}" style="width:auto;display:inline-block;vertical-align:middle;margin-right:6px">` : '';
   let extra = '';
   if(p.etapa==='listo'){
@@ -8664,7 +8664,7 @@ function brArmRender(){
     const obj = brArmObjetivo(p, tipo);
     const desp = p.estado==='despachado';
     const bloqueado = !!p.empacado_en || desp;
-    const qPed = brNorm([c.nombre, c.telefono, p.usuario_wa].concat(p.items.map(i=>i.producto+' '+(i.variante||''))).join(' '));
+    const qPed = brNorm([c.nombre, c.telefono, p.usuario_wa, c.dni].concat(p.items.map(i=>i.producto+' '+(i.variante||''))).join(' '));
     const estadoBadge = desp ? `<span class="badge badge-ok">🚚 Despachado${p.despachado_en?' '+new Date(p.despachado_en).toLocaleDateString('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'2-digit'}):''}</span>` : p.empacado_en ? '<span class="badge badge-ok">📦 Empacado</span>' : todoOk ? '<span class="badge badge-ok">🟢 Listo</span>' : hayNo ? '<span class="badge badge-warn">🔴 Incompleto</span>' : '<span class="badge badge-gray">⚪ Por revisar</span>';
     const filas = p.items.map(i=>{
       const cu = brEsCuidado(i.producto);
