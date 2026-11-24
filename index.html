@@ -172,7 +172,43 @@ td.empty-state{padding:20px;text-align:center}
 .avatar-md{width:34px;height:34px;border-radius:50%;background:var(--pink-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--pink-dark);flex-shrink:0}
 
 /* LIVE REGISTRO */
-.live-panel{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.live-panel{display:grid;grid-template-columns:minmax(260px,.75fr) minmax(0,1.75fr);gap:14px}
+@media (max-width:860px){.live-panel{grid-template-columns:1fr}}
+/* Registro live: filas de prendas */
+.lvr-head{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
+.lvr-hint{font-size:11.5px;color:var(--text3)}
+.lvr-cols,.lvr-row{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1.4fr) minmax(0,1.4fr) 56px 66px 24px;gap:8px;align-items:center}
+.lvr-cols{font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;padding:0 2px 4px}
+.lvr-row{padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);transition:border-color .15s,box-shadow .15s}
+.lvr-row:focus-within{border-color:var(--pink);box-shadow:0 0 0 3px var(--pink-light)}
+.lvr-row.err{border-color:var(--red,#d33);background:#fff7f7}
+.lvr-row input,.lvr-row select{width:100%;min-width:0;padding:8px 9px;font-size:13px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:#fff}
+.lvr-row select:disabled,.lvr-row input:disabled{background:var(--bg);color:var(--text3)}
+.lvr-combo{position:relative}
+.lvr-list{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:40;background:#fff;border:1px solid var(--border2);border-radius:var(--radius);box-shadow:0 10px 28px rgba(0,0,0,.14);max-height:280px;overflow:auto;min-width:260px}
+.lvr-opt{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 11px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
+.lvr-opt:last-child{border-bottom:none}
+.lvr-opt:hover,.lvr-opt.on{background:var(--pink-light)}
+.lvr-opt small{display:block;color:var(--text3);font-size:11px}
+.lvr-opt .p{font-weight:600;white-space:nowrap}
+.lvr-empty{padding:12px;font-size:12.5px;color:var(--text3)}
+.lvr-precio{font-weight:600;font-size:13px;text-align:right}
+.lvr-x{border:none;background:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px;line-height:1}
+.lvr-x:hover{color:var(--pink)}
+.lvr-add{width:100%;padding:10px;border:1.5px dashed var(--pink-mid);background:var(--pink-light);color:var(--pink-dark);border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px}
+.lvr-add:hover{background:var(--pink-mid)}
+.lvr-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px}
+.lvr-sum{display:flex;flex-direction:column;font-size:12px;color:var(--text2)}
+.lvr-sum strong{font-size:18px;color:var(--text)}
+@media (max-width:640px){
+  .lvr-cols{display:none}
+  .lvr-row{grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .lvr-row .lvr-combo{grid-column:1 / -1}
+  .lvr-precio{text-align:left;grid-column:1 / 3}
+  .lvr-x{justify-self:end}
+  .lvr-foot{flex-direction:column;align-items:stretch}
+  .lvr-foot .btn{width:100%}
+}
 .cart-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:12.5px}
 .cart-item:last-child{border-bottom:none}
 .cart-total{display:flex;justify-content:space-between;padding-top:10px;margin-top:6px;border-top:0.5px solid var(--border2);font-weight:600;font-size:14px}
@@ -1055,28 +1091,17 @@ td.empty-state{padding:20px;text-align:center}
           <!-- RIGHT: carrito -->
           <div style="display:flex;flex-direction:column;gap:12px">
             <div class="card" id="live-cart-card" style="display:none">
-              <div class="card-title">3. Agregar prenda</div>
-              <div class="form-row">
-                <label class="form-label">Buscar prenda</label>
-                <input type="text" id="lv-search" placeholder="Escribe para buscar... ej: pant" oninput="filtrarPrendas(this.value)" autocomplete="off">
+              <div class="lvr-head">
+                <div class="card-title" style="margin:0">3. Agregar prendas</div>
+                <div class="lvr-hint">Escribe para buscar · elige talla y color · entre paréntesis está el stock · si está agotado se carga como pre-venta</div>
               </div>
-              <div class="form-row">
-                <label class="form-label">Prenda</label>
-                <select id="lv-prenda" onchange="updateColorTalla()">
-                  <option value="">— seleccionar —</option>
-                </select>
+              <div class="lvr-cols"><span>Prenda</span><span>Talla</span><span>Color</span><span>Cant.</span><span>Precio</span><span></span></div>
+              <div id="lvr-rows"></div>
+              <button class="lvr-add" onclick="lvrAgregarFila(true)">＋ Agregar otra prenda</button>
+              <div class="lvr-foot">
+                <div class="lvr-sum"><span id="lvr-count">0 prendas</span><strong id="lvr-total">S/ 0</strong></div>
+                <button class="btn btn-primary" id="lvr-go" style="justify-content:center;padding:10px 18px;font-size:14px" onclick="lvrCargar()">Cargar todo al carrito</button>
               </div>
-              <div class="grid-2">
-                <div class="form-row">
-                  <label class="form-label">Talla</label>
-                  <select id="lv-talla"><option value="">— talla —</option></select>
-                </div>
-                <div class="form-row">
-                  <label class="form-label">Color</label>
-                  <select id="lv-color"><option value="">— color —</option></select>
-                </div>
-              </div>
-              <button class="btn btn-primary w-full" onclick="addToCart()">+ Agregar al carrito</button>
             </div>
 
             <div class="card" id="live-resumen-card" style="display:none">
@@ -3847,56 +3872,272 @@ function irAlLiveConCliente(clienteId){
 // ═══════════════════════════ LIVE ═══════════════════════════
 async function loadCatalogoLive(){
   try {
-    const prendas = await dbGet('prendas?activo=eq.true&order=nombre');
+    const [prendas, stockRows] = await Promise.all([
+      dbGet('prendas?activo=eq.true&order=nombre'),
+      dbGet('prenda_stock?select=prenda_id,talla,color,cantidad&limit=5000')
+    ]);
     DB.prendas = prendas;
-    renderPrendasSelect(prendas);
+    DB.stockRows = stockRows;
+    if(typeof lvrRows!=='undefined' && lvrRows.length) lvrRender();
   } catch(e){ console.error('Catalogo live error:',e); }
 }
 
-function renderPrendasSelect(prendas){
-  const sel=document.getElementById('lv-prenda');
-  if(!sel) return;
-  const current = sel.value;
-  sel.innerHTML='<option value="">— seleccionar prenda —</option>';
-  prendas.forEach(p=>{
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = `${p.nombre} — S/${p.precio}`;
-    sel.appendChild(opt);
+// ───────── Registro live: filas de prendas ─────────
+let lvrRows = [];
+let lvrSeq = 0;
+const lvrEsc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const lvrNorm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+function lvrNueva(){ return {k:++lvrSeq, prendaId:'', texto:'', talla:'', color:'', cant:1, err:false, act:0}; }
+function lvrPrenda(r){ return (DB.prendas||[]).find(x=>x.id===r.prendaId); }
+function lvrCombos(prendaId){ return (DB.stockRows||[]).filter(s=>s.prenda_id===prendaId); }
+function lvrStockQty(prendaId,talla,color){
+  const s=(DB.stockRows||[]).find(x=>x.prenda_id===prendaId&&x.talla===talla&&(x.color||'')===(color||''));
+  return s? s.cantidad : null;
+}
+function lvrStockTotal(p){ const c=lvrCombos(p.id); return c.length? c.reduce((a,s)=>a+Math.max(s.cantidad||0,0),0) : (p.stock||0); }
+function lvrTallasDe(r){
+  const p=lvrPrenda(r); if(!p) return [];
+  const c=lvrCombos(p.id);
+  if(!c.length) return (p.tallas||[]).map(t=>({v:t,q:null}));
+  const m=new Map();
+  c.forEach(s=>{ if(r.color && (s.color||'')!==r.color) return; m.set(s.talla,(m.get(s.talla)||0)+Math.max(s.cantidad||0,0)); });
+  if(!m.size) c.forEach(s=>m.set(s.talla,0));
+  const orden=(p.tallas||[]);
+  return [...m.entries()].sort((a,b)=>orden.indexOf(a[0])-orden.indexOf(b[0])).map(([v,q])=>({v,q}));
+}
+function lvrColoresDe(r){
+  const p=lvrPrenda(r); if(!p) return [];
+  const c=lvrCombos(p.id);
+  if(!c.length) return (p.colores||'').split(',').map(x=>x.trim()).filter(Boolean).map(v=>({v,q:null}));
+  const m=new Map();
+  c.forEach(s=>{ if(!(s.color||'')) return; if(r.talla && s.talla!==r.talla) return; m.set(s.color,(m.get(s.color)||0)+Math.max(s.cantidad||0,0)); });
+  return [...m.entries()].map(([v,q])=>({v,q}));
+}
+function lvrOptHtml(lista, sel, vacio){
+  const lab=o=> o.q===null? o.v : (o.q>0? `${o.v} (${o.q})` : `${o.v} (agotado)`);
+  return `<option value="">${vacio}</option>`+lista.map(o=>`<option value="${lvrEsc(o.v)}"${o.v===sel?' selected':''}>${lvrEsc(lab(o))}</option>`).join('');
+}
+function lvrRowHtml(r){
+  const p=lvrPrenda(r);
+  const tallas=lvrTallasDe(r), colores=lvrColoresDe(r);
+  const sinColor = p && !colores.length;
+  return `<div class="lvr-row${r.err?' err':''}" id="lvr-${r.k}">
+    <div class="lvr-combo">
+      <input id="lvr-q-${r.k}" type="text" placeholder="Buscar prenda… ej: pant" value="${lvrEsc(r.texto)}" autocomplete="off"
+        oninput="lvrBuscar(${r.k},this.value)" onfocus="lvrBuscar(${r.k},this.value)" onkeydown="lvrKey(event,${r.k})">
+      <div class="lvr-list" id="lvr-l-${r.k}" style="display:none"></div>
+    </div>
+    <select id="lvr-t-${r.k}" ${p?'':'disabled'} onchange="lvrSet(${r.k},'talla',this.value)">${lvrOptHtml(tallas,r.talla,'Talla')}</select>
+    <select id="lvr-c-${r.k}" ${p&&!sinColor?'':'disabled'} onchange="lvrSet(${r.k},'color',this.value)">${sinColor?'<option value="">Sin color</option>':lvrOptHtml(colores,r.color,'Color')}</select>
+    <input id="lvr-n-${r.k}" type="number" min="1" value="${r.cant}" oninput="lvrSetCant(${r.k},this.value)" onkeydown="lvrKeyCant(event,${r.k})">
+    <div class="lvr-precio" id="lvr-p-${r.k}">${p?'S/ '+(p.precio*(r.cant||0)):'—'}</div>
+    <button class="lvr-x" title="Quitar fila" onclick="lvrQuitar(${r.k})">✕</button>
+  </div>`;
+}
+function lvrRender(){
+  const c=document.getElementById('lvr-rows'); if(!c) return;
+  if(!lvrRows.length) lvrRows=[lvrNueva()];
+  c.innerHTML=lvrRows.map(lvrRowHtml).join('');
+  lvrResumen();
+}
+function lvrRefrescarFila(k){
+  const r=lvrRows.find(x=>x.k===k); if(!r) return;
+  const p=lvrPrenda(r);
+  const tallas=lvrTallasDe(r), colores=lvrColoresDe(r);
+  const sinColor=p&&!colores.length;
+  const t=document.getElementById('lvr-t-'+k), c=document.getElementById('lvr-c-'+k);
+  if(t){ t.disabled=!p; t.innerHTML=lvrOptHtml(tallas,r.talla,'Talla'); }
+  if(c){ c.disabled=!p||sinColor; c.innerHTML=sinColor?'<option value="">Sin color</option>':lvrOptHtml(colores,r.color,'Color'); }
+  const pr=document.getElementById('lvr-p-'+k); if(pr) pr.textContent=p?'S/ '+(p.precio*(r.cant||0)):'—';
+  const row=document.getElementById('lvr-'+k); if(row) row.classList.remove('err');
+  r.err=false;
+  lvrResumen();
+}
+function lvrResumen(){
+  let n=0,tot=0;
+  lvrRows.forEach(r=>{ const p=lvrPrenda(r); if(p){ n+=(r.cant||0); tot+=p.precio*(r.cant||0); } });
+  const a=document.getElementById('lvr-count'), b=document.getElementById('lvr-total');
+  if(a) a.textContent=n+(n===1?' prenda':' prendas');
+  if(b) b.textContent='S/ '+tot;
+}
+function lvrReset(){ lvrRows=[lvrNueva()]; lvrRender(); }
+function lvrAgregarFila(foco){
+  lvrRows.push(lvrNueva()); lvrRender();
+  if(foco){ const r=lvrRows[lvrRows.length-1]; const i=document.getElementById('lvr-q-'+r.k); if(i){ i.focus(); i.scrollIntoView({block:'center',behavior:'smooth'}); } }
+}
+function lvrQuitar(k){
+  lvrRows=lvrRows.filter(r=>r.k!==k);
+  lvrRender();
+}
+function lvrSet(k,campo,val){
+  const r=lvrRows.find(x=>x.k===k); if(!r) return;
+  r[campo]=val;
+  // Mantener coherencia talla/color
+  if(campo==='talla'){ if(r.color && !lvrColoresDe(r).some(o=>o.v===r.color)) r.color=''; }
+  if(campo==='color'){ if(r.talla && !lvrTallasDe(r).some(o=>o.v===r.talla)) r.talla=''; }
+  lvrAutoUnica(r);
+  lvrRefrescarFila(k);
+}
+function lvrAutoUnica(r){
+  // Si solo hay una opción posible, se elige sola
+  const ts=lvrTallasDe(r); if(!r.talla && ts.length===1) r.talla=ts[0].v;
+  const cs=lvrColoresDe(r); if(!r.color && cs.length===1) r.color=cs[0].v;
+}
+function lvrSetCant(k,v){
+  const r=lvrRows.find(x=>x.k===k); if(!r) return;
+  r.cant=Math.max(0,parseInt(v)||0);
+  const p=lvrPrenda(r); const pr=document.getElementById('lvr-p-'+k); if(pr) pr.textContent=p?'S/ '+(p.precio*r.cant):'—';
+  lvrResumen();
+}
+function lvrKeyCant(e,k){
+  if(e.key!=='Enter') return;
+  e.preventDefault();
+  const i=lvrRows.findIndex(r=>r.k===k);
+  if(i===lvrRows.length-1) lvrAgregarFila(true);
+  else { const s=document.getElementById('lvr-q-'+lvrRows[i+1].k); if(s) s.focus(); }
+}
+function lvrFiltrar(txt){
+  const todas=DB.prendas||[];
+  const t=lvrNorm(txt).split(/\s+/).filter(Boolean);
+  if(!t.length) return todas.slice(0,40);
+  return todas.filter(p=>{ const h=lvrNorm(p.nombre+' '+(p.codigo||'')+' '+(p.categoria||'')+' '+(p.colores||'')); return t.every(w=>h.includes(w)); }).slice(0,40);
+}
+function lvrBuscar(k,txt){
+  const r=lvrRows.find(x=>x.k===k); if(!r) return;
+  if(r.prendaId && txt!==r.texto){ r.prendaId=''; r.talla=''; r.color=''; lvrRefrescarFila(k); }
+  r.texto=txt; r.act=0;
+  lvrCerrarListas(k);
+  const l=document.getElementById('lvr-l-'+k); if(!l) return;
+  const res=lvrFiltrar(txt);
+  lvrLista=res;
+  l.innerHTML=res.length? res.map((p,i)=>{
+    const st=lvrStockTotal(p);
+    return `<div class="lvr-opt${i===0?' on':''}" data-i="${i}" onmousedown="event.preventDefault();lvrElegir(${k},'${p.id}')">
+      <div>${lvrEsc(p.nombre)}<small>${lvrEsc(p.codigo||'')}${p.categoria?' · '+lvrEsc(p.categoria):''} · ${st>0?st+' disp.':'agotado'}</small></div>
+      <span class="p">S/ ${p.precio}</span></div>`;
+  }).join('') : '<div class="lvr-empty">Sin resultados — prueba con otra palabra</div>';
+  l.style.display='block';
+}
+let lvrLista=[];
+function lvrCerrarListas(excepto){
+  document.querySelectorAll('.lvr-list').forEach(el=>{ if(el.id!=='lvr-l-'+excepto) el.style.display='none'; });
+}
+function lvrKey(e,k){
+  const r=lvrRows.find(x=>x.k===k); const l=document.getElementById('lvr-l-'+k); if(!r||!l) return;
+  const abierta=l.style.display!=='none';
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    if(!abierta){ lvrBuscar(k,e.target.value); return; }
+    e.preventDefault();
+    const n=lvrLista.length; if(!n) return;
+    r.act=(r.act+(e.key==='ArrowDown'?1:-1)+n)%n;
+    l.querySelectorAll('.lvr-opt').forEach((el,i)=>{ el.classList.toggle('on',i===r.act); if(i===r.act) el.scrollIntoView({block:'nearest'}); });
+  } else if(e.key==='Enter'){
+    if(abierta && lvrLista[r.act]){ e.preventDefault(); lvrElegir(k,lvrLista[r.act].id); }
+  } else if(e.key==='Escape'){ l.style.display='none'; }
+}
+function lvrElegir(k,prendaId){
+  const r=lvrRows.find(x=>x.k===k); const p=(DB.prendas||[]).find(x=>x.id===prendaId); if(!r||!p) return;
+  r.prendaId=p.id; r.texto=p.nombre; r.talla=''; r.color='';
+  lvrAutoUnica(r);
+  const i=document.getElementById('lvr-q-'+k); if(i) i.value=p.nombre;
+  const l=document.getElementById('lvr-l-'+k); if(l) l.style.display='none';
+  lvrRefrescarFila(k);
+  const sig = !r.talla ? 'lvr-t-' : (!r.color && lvrColoresDe(r).length ? 'lvr-c-' : 'lvr-n-');
+  const el=document.getElementById(sig+k); if(el){ el.focus(); if(el.select) el.select(); }
+}
+document.addEventListener('mousedown',e=>{ if(!e.target.closest || !e.target.closest('.lvr-combo')) lvrCerrarListas(); });
+
+async function lvrCargar(){
+  if(!currentLiveClient){ toast('Primero elige una clienta'); return; }
+  const btn=document.getElementById('lvr-go'); if(btn.disabled) return;
+  const validas=[]; let hayErr=false;
+  lvrRows.forEach(r=>{
+    r.err=false;
+    if(!r.prendaId && !r.texto.trim()) return;
+    const p=lvrPrenda(r);
+    const pideColor=lvrColoresDe(r).length>0;
+    if(!p||!r.talla||(pideColor&&!r.color)||!(r.cant>=1)){ r.err=true; hayErr=true; return; }
+    validas.push(r);
   });
-  if(current) sel.value = current;
-}
-
-function filtrarPrendas(texto){
-  const todas = DB.prendas || [];
-  const filtradas = texto.trim()==='' ? todas :
-    todas.filter(p=>p.nombre.toLowerCase().includes(texto.toLowerCase()) ||
-                    (p.codigo||'').toLowerCase().includes(texto.toLowerCase()) ||
-                    (p.categoria||'').toLowerCase().includes(texto.toLowerCase()));
-  renderPrendasSelect(filtradas);
-  // Limpiar talla y color al filtrar
-  document.getElementById('lv-talla').innerHTML='<option value="">— talla —</option>';
-  document.getElementById('lv-color').innerHTML='<option value="">— color —</option>';
-}
-
-function updateColorTalla(){
-  const prendaId = document.getElementById('lv-prenda').value;
-  const tallasSel = document.getElementById('lv-talla');
-  const colorSel = document.getElementById('lv-color');
-  tallasSel.innerHTML='<option value="">— talla —</option>';
-  colorSel.innerHTML='<option value="">— color —</option>';
-  if(!prendaId) return;
-  const p = DB.prendas.find(x=>x.id===prendaId);
-  if(!p) return;
-  // Tallas dinámicas según prenda
-  (p.tallas||[]).forEach(t=>{ tallasSel.innerHTML+=`<option>${t}</option>`; });
-  // Colores dinámicos según prenda
-  const colores = (p.colores||'').split(',').map(c=>c.trim()).filter(c=>c);
-  if(colores.length){
-    colores.forEach(c=>{ colorSel.innerHTML+=`<option>${c}</option>`; });
-  } else {
-    colorSel.innerHTML='<option value="">Sin colores registrados</option>';
-  }
+  lvrRows.forEach(r=>{ const el=document.getElementById('lvr-'+r.k); if(el) el.classList.toggle('err',!!r.err); });
+  if(hayErr){ toast('Completa prenda, talla, color y cantidad en las filas marcadas'); return; }
+  if(!validas.length){ toast('Agrega al menos una prenda'); return; }
+  const txtBtn=btn.textContent; btn.disabled=true; btn.textContent='Cargando…';
+  try {
+    // 1) Plan de stock (normal vs pre-venta)
+    const libre={}; const plan=[]; let hayPre=false;
+    validas.forEach(r=>{
+      const p=lvrPrenda(r); const key=p.id+'|'+r.talla+'|'+(r.color||'');
+      if(!(key in libre)) libre[key]=lvrStockQty(p.id,r.talla,r.color);
+      let normales=r.cant, pre=0;
+      if(libre[key]!==null){ normales=Math.min(r.cant,Math.max(libre[key],0)); pre=r.cant-normales; libre[key]-=r.cant; }
+      if(pre>0) hayPre=true;
+      plan.push({r,p,key,normales,pre});
+    });
+    let fechaPre=null;
+    if(hayPre){
+      const lista=plan.filter(x=>x.pre>0).map(x=>'• '+x.p.nombre+' T-'+x.r.talla+(x.r.color?' · '+x.r.color:'')+' ('+x.pre+' u.)').join('\n');
+      const dias=prompt('⚠️ Sin stock suficiente:\n'+lista+'\n\n¿En cuántos días aprox. te llega? (déjalo vacío si no sabes aún)\n\nSe marcará como Pre-venta hasta que registres la compra.','');
+      if(dias===null){ toast('Cancelado — no se agregó nada'); btn.disabled=false; btn.textContent=txtBtn; return; }
+      const dn=parseInt(dias);
+      if(!isNaN(dn)&&dn>0){ const f=new Date(); f.setDate(f.getDate()+dn); fechaPre=f.toISOString().slice(0,10); }
+    }
+    // 2) Pedido/carrito (si no hay uno activo)
+    let carritoId;
+    if(!currentPedidoActivo){
+      const carritoRows=await dbPost('carritos',{cliente_id:currentLiveClient.id,estado:'abierto',total:0});
+      const carrito=Array.isArray(carritoRows)?carritoRows[0]:carritoRows;
+      carritoId=carrito.id;
+      const pedRows=await dbPost('pedidos',{numero:'',cliente_id:currentLiveClient.id,carrito_id:carritoId,subtotal:0,costo_envio:0,total:0,monto_pagado:0,estado:'acumulando'});
+      currentPedidoActivo=Array.isArray(pedRows)?pedRows[0]:pedRows;
+      currentCarritoId=currentPedidoActivo.id;
+    } else carritoId=currentPedidoActivo.carrito_id;
+    // 3) Insertar todas las unidades de una sola vez
+    const filas=[];
+    plan.forEach(x=>{
+      const mk=pre=>({carrito_id:carritoId,prenda_id:x.p.id,talla:x.r.talla,color:x.r.color||'',precio_unitario:x.p.precio,estado_bolsa:'sin_agregar',estado_pago:'pendiente',monto_pagado:0,preventa:pre,preventa_fecha_estimada:pre?fechaPre:null});
+      for(let i=0;i<x.normales;i++) filas.push(mk(false));
+      for(let i=0;i<x.pre;i++) filas.push(mk(true));
+    });
+    const creados=await dbPost('carrito_items',filas);
+    if(!Array.isArray(creados)||creados.length!==filas.length){ throw new Error('No se guardaron todas las prendas — revisa el carrito'); }
+    creados.forEach(it=>{
+      const p=DB.prendas.find(x=>x.id===it.prenda_id);
+      liveCart.push({id:it.id,prenda_id:it.prenda_id,nombre:p?p.nombre:'Prenda',talla:it.talla,color:it.color||'',precio:it.precio_unitario,estado_pago:'pendiente',estado_bolsa:'sin_agregar',preventa:!!it.preventa});
+    });
+    // 4) Descontar stock (puede quedar negativo → lo resuelve una Compra)
+    const porCombo={}, porPrenda={};
+    plan.forEach(x=>{ porCombo[x.key]=(porCombo[x.key]||0)+x.r.cant; porPrenda[x.p.id]=(porPrenda[x.p.id]||0)+x.r.cant; });
+    for(const key of Object.keys(porCombo)){
+      const [pid,talla,color]=key.split('|');
+      const row=(DB.stockRows||[]).find(s=>s.prenda_id===pid&&s.talla===talla&&(s.color||'')===color);
+      if(!row) continue;
+      const nuevo=(row.cantidad||0)-porCombo[key];
+      try{ await dbPatch(`prenda_stock?prenda_id=eq.${pid}&talla=eq.${encodeURIComponent(talla)}&color=eq.${encodeURIComponent(color)}`,{cantidad:nuevo}); row.cantidad=nuevo; }catch(e){ console.warn('stock combo',e.message); }
+    }
+    for(const pid of Object.keys(porPrenda)){
+      const p=DB.prendas.find(x=>x.id===pid); if(!p) continue;
+      const nuevo=(p.stock||0)-porPrenda[pid];
+      try{ await dbPatch(`prendas?id=eq.${pid}`,{stock:nuevo}); p.stock=nuevo; }catch(e){ console.warn('stock prenda',e.message); }
+    }
+    // 5) Recalcular total del pedido
+    const nuevoSubtotal=liveCart.reduce((a,i)=>a+i.precio,0);
+    const nuevoTotal=nuevoSubtotal+(currentPedidoActivo.costo_envio||0);
+    const patchPedido={subtotal:nuevoSubtotal,total:nuevoTotal};
+    if(['pago_completo','empaquetado'].includes(currentPedidoActivo.estado)&&(currentPedidoActivo.monto_pagado||0)<nuevoTotal){
+      patchPedido.estado=(currentPedidoActivo.monto_pagado||0)>0?'pago_parcial':'pago_pendiente';
+      toast('⚠️ Este pedido ya estaba '+(currentPedidoActivo.estado==='empaquetado'?'empaquetado':'pago completo')+' — vuelve a "falta pago" por las prendas nuevas');
+    }
+    await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,patchPedido);
+    currentPedidoActivo.subtotal=nuevoSubtotal; currentPedidoActivo.total=nuevoTotal;
+    if(patchPedido.estado) currentPedidoActivo.estado=patchPedido.estado;
+    const n=filas.length;
+    lvrReset();
+    renderLiveCart();
+    toast('✓ '+n+(n===1?' prenda agregada':' prendas agregadas')+(hayPre?' — con pre-venta':''));
+    const s=document.getElementById('lvr-q-'+lvrRows[0].k); if(s) s.focus();
+  } catch(e){ toast('Error: '+e.message); }
+  finally { btn.disabled=false; btn.textContent=txtBtn; }
 }
 
 async function liveSearch(val){
@@ -3947,6 +4188,7 @@ async function selectLiveClient(id){
     document.getElementById('live-client-card').style.display='block';
     document.getElementById('live-cart-card').style.display='block';
     document.getElementById('live-resumen-card').style.display='block';
+    lvrReset();
     renderLiveCart();
   } catch(e){ console.error('selectLiveClient error:',e); alert('Error cargando clienta'); }
 }
@@ -3977,103 +4219,6 @@ async function registrarNuevaEnLive(tel){
     } catch(e2){}
     alert('Error registrando: '+e.message);
   }
-}
-
-async function addToCart(){
-  const prendaId=document.getElementById('lv-prenda').value;
-  const talla=document.getElementById('lv-talla').value;
-  const color=document.getElementById('lv-color').value;
-  if(!prendaId||!talla){ toast('Selecciona prenda y talla'); return; }
-  const prenda = DB.prendas.find(p=>p.id===prendaId);
-  if(!prenda) return;
-  try {
-    // Verificar stock ANTES de crear nada — para saber si es pre-venta
-    let esPreventa = false;
-    let stockActual = null;
-    try {
-      const stockRows = await dbGet(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${color||''}`);
-      stockActual = stockRows.length ? stockRows[0].cantidad : null;
-      esPreventa = stockActual !== null && stockActual <= 0;
-    } catch(e){ /* stock check opcional */ }
-
-    let preventaFechaEstimada = null;
-    if(esPreventa){
-      const dias = prompt('⚠️ "'+prenda.nombre+'" T-'+talla+(color?' · '+color:'')+' está sin stock.\n\n¿En cuántos días aprox. te llega? (déjalo vacío si no sabes aún)\n\nSe marcará como Pre-venta hasta que registres la compra.', '');
-      if(dias===null){ toast('Cancelado — no se agregó'); return; } // canceló el prompt
-      const diasNum = parseInt(dias);
-      if(!isNaN(diasNum) && diasNum>0){
-        const f = new Date(); f.setDate(f.getDate()+diasNum);
-        preventaFechaEstimada = f.toISOString().slice(0,10);
-      }
-    }
-
-    // Si no hay pedido activo, crear carrito + pedido en estado "acumulando"
-    let carritoId;
-    if(!currentPedidoActivo){
-      const carritoRows = await dbPost('carritos', {cliente_id:currentLiveClient.id, estado:'abierto', total:0});
-      const carrito = Array.isArray(carritoRows)?carritoRows[0]:carritoRows;
-      carritoId = carrito.id;
-      const pedRows = await dbPost('pedidos', {
-        numero:'', cliente_id:currentLiveClient.id, carrito_id:carritoId,
-        subtotal:0, costo_envio:0, total:0, monto_pagado:0, estado:'acumulando'
-      });
-      currentPedidoActivo = Array.isArray(pedRows)?pedRows[0]:pedRows;
-      currentCarritoId = currentPedidoActivo.id;
-    } else {
-      carritoId = currentPedidoActivo.carrito_id;
-    }
-    const itemRows = await dbPost('carrito_items', {
-      carrito_id:carritoId,
-      prenda_id:prendaId,
-      talla, color: color||'',
-      precio_unitario:prenda.precio,
-      estado_bolsa:'sin_agregar',
-      estado_pago:'pendiente',
-      monto_pagado:0,
-      preventa: esPreventa,
-      preventa_fecha_estimada: preventaFechaEstimada
-    });
-    // Descontar stock (puede quedar negativo — eso es lo que luego resuelve una Compra)
-    try {
-      if(stockActual !== null){
-        await dbPatch(`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${talla}&color=eq.${color||''}`,{cantidad:stockActual-1});
-      }
-      if(esPreventa) toast('🕒 Agregado como Pre-venta — pendiente de reponer');
-    } catch(e){ /* stock check opcional */ }
-    const item = Array.isArray(itemRows)?itemRows[0]:itemRows;
-    if(!item || !item.id){ toast('Error guardando prenda — intenta de nuevo'); return; }
-    liveCart.push({id:item.id, prenda_id:prendaId, nombre:prenda.nombre, talla, color:color||'', precio:prenda.precio, estado_pago:'pendiente', estado_bolsa:'sin_agregar', preventa:esPreventa});
-    // Descontar 1 unidad de stock del modelo (best-effort, no bloquea la venta)
-    let avisoStock = '';
-    try {
-      const nuevoStock = (prenda.stock||0)-1;
-      await dbPatch(`prendas?id=eq.${prendaId}`,{stock:nuevoStock});
-      prenda.stock = nuevoStock;
-      const idx = DB.prendas.findIndex(p=>p.id===prendaId);
-      if(idx>-1) DB.prendas[idx].stock = nuevoStock;
-      if(nuevoStock<=0) avisoStock = ' — ⚠️ sin stock';
-    } catch(e){ console.warn('No se pudo descontar stock:', e.message); }
-    // Recalcular total del pedido
-    const nuevoSubtotal = liveCart.reduce((a,i)=>a+i.precio,0);
-    const nuevoTotal = nuevoSubtotal+(currentPedidoActivo.costo_envio||0);
-    const patchPedido = {subtotal:nuevoSubtotal, total:nuevoTotal};
-    // Si ya estaba pago_completo o empaquetado, con la prenda nueva vuelve a quedar debiendo — retrocede el estado
-    if(['pago_completo','empaquetado'].includes(currentPedidoActivo.estado) && (currentPedidoActivo.monto_pagado||0) < nuevoTotal){
-      patchPedido.estado = (currentPedidoActivo.monto_pagado||0) > 0 ? 'pago_parcial' : 'pago_pendiente';
-      toast('⚠️ Este pedido ya estaba '+(currentPedidoActivo.estado==='empaquetado'?'empaquetado':'pago completo')+' — vuelve a "falta pago" por la prenda nueva');
-    }
-    await dbPatch(`pedidos?id=eq.${currentPedidoActivo.id}`,patchPedido);
-    currentPedidoActivo.subtotal = nuevoSubtotal;
-    currentPedidoActivo.total = nuevoTotal;
-    if(patchPedido.estado) currentPedidoActivo.estado = patchPedido.estado;
-    document.getElementById('lv-prenda').value='';
-    document.getElementById('lv-talla').innerHTML='<option value="">— talla —</option>';
-    document.getElementById('lv-color').innerHTML='<option value="">— color —</option>';
-    document.getElementById('lv-search').value='';
-    renderPrendasSelect(DB.prendas);
-    renderLiveCart();
-    toast('✓ Prenda agregada'+avisoStock);
-  } catch(e){ toast('Error: '+e.message); }
 }
 
 function renderLiveCart(){
