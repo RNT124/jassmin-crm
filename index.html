@@ -4272,6 +4272,27 @@ async function toggleBolsaCarritoItem(itemId, el){
   } catch(e){ toast('Error: '+e.message); }
 }
 
+// Devuelve 1 unidad al stock: de la talla/color exactos y del total del modelo (best-effort)
+async function devolverStockItem(prendaId, talla, color){
+  if(!prendaId) return;
+  try {
+    if(talla!==undefined && talla!==null && talla!==''){
+      const q=`prenda_stock?prenda_id=eq.${prendaId}&talla=eq.${encodeURIComponent(talla)}&color=eq.${encodeURIComponent(color||'')}`;
+      const rows=await dbGet(q+'&select=cantidad');
+      if(rows.length){
+        await dbPatch(q,{cantidad:(rows[0].cantidad||0)+1});
+        const loc=(DB.stockRows||[]).find(s=>s.prenda_id===prendaId&&s.talla===talla&&(s.color||'')===(color||''));
+        if(loc) loc.cantidad=(rows[0].cantidad||0)+1;
+      }
+    }
+    const rows=await dbGet(`prendas?id=eq.${prendaId}&select=stock`);
+    if(rows.length){
+      await dbPatch(`prendas?id=eq.${prendaId}`,{stock:(rows[0].stock||0)+1});
+      const p=(DB.prendas||[]).find(x=>x.id===prendaId); if(p) p.stock=(rows[0].stock||0)+1;
+    }
+  } catch(e){ console.warn('No se pudo devolver stock:', e.message); }
+}
+
 async function removeCartItem(i){
   const item=liveCart[i];
   if(item.estado_pago==='confirmado'){
@@ -4286,13 +4307,8 @@ async function removeCartItem(i){
     await dbPatch(`carrito_items?id=eq.${item.id}`,{estado_bolsa:'eliminado'});
     liveCart.splice(i,1);
     renderLiveCart();
-    // Devolver 1 unidad de stock del modelo (best-effort)
-    if(item.prenda_id){
-      try {
-        const rows = await dbGet(`prendas?id=eq.${item.prenda_id}&select=stock`);
-        if(rows.length) await dbPatch(`prendas?id=eq.${item.prenda_id}`,{stock:(rows[0].stock||0)+1});
-      } catch(e){ console.warn('No se pudo devolver stock:', e.message); }
-    }
+    // Devolver 1 unidad al stock (talla/color + total del modelo)
+    await devolverStockItem(item.prenda_id, item.talla, item.color);
     if(currentPedidoActivo){
       const nuevoSubtotal = liveCart.reduce((a,it)=>a+it.precio,0);
       if(liveCart.length === 0){
@@ -4330,6 +4346,8 @@ async function removeCarritoItem(itemId, precio, pedidoId, pagado, prendaId){
   }
   if(!confirm('¿Eliminar esta prenda?')) return;
   try {
+    let itInfo=null;
+    try { const r=await dbGet(`carrito_items?id=eq.${itemId}&select=talla,color,prenda_id,estado_bolsa`); itInfo=r[0]||null; } catch(e){}
     await dbPatch(`carrito_items?id=eq.${itemId}`,{estado_bolsa:'eliminado'});
     // Recalcular total del pedido directo por id
     const ped = await dbGet(`pedidos?id=eq.${pedidoId}&select=id,carrito_id,costo_envio`);
@@ -4343,13 +4361,8 @@ async function removeCarritoItem(itemId, precio, pedidoId, pagado, prendaId){
         await dbPatch(`pedidos?id=eq.${pedidoId}`,{subtotal:nuevoSubtotal, total:nuevoSubtotal+(ped[0].costo_envio||0)});
       }
     }
-    // Devolver 1 unidad de stock del modelo (best-effort)
-    if(prendaId){
-      try {
-        const rows = await dbGet(`prendas?id=eq.${prendaId}&select=stock`);
-        if(rows.length) await dbPatch(`prendas?id=eq.${prendaId}`,{stock:(rows[0].stock||0)+1});
-      } catch(e){ console.warn('No se pudo devolver stock:', e.message); }
-    }
+    // Devolver 1 unidad al stock (solo si no estaba ya eliminada)
+    if(!itInfo || itInfo.estado_bolsa!=='eliminado') await devolverStockItem(prendaId||itInfo?.prenda_id, itInfo?itInfo.talla:undefined, itInfo?itInfo.color:'');
     toast('✓ Prenda eliminada');
     loadCarritos();
   } catch(e){ toast('Error: '+e.message); }
