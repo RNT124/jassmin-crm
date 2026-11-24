@@ -1217,14 +1217,22 @@ td.empty-state{padding:20px;text-align:center}
           <button class="btn btn-primary btn-sm" id="btn-nuevo-corte" onclick="openModalCorte()">+ Nuevo corte</button>
         </div>
         <div class="metrics-grid" id="cortes-metrics"></div>
-        <div class="tabs" style="margin-bottom:12px">
-          <div class="tab active" onclick="filterCortes('mes',this)">Este mes</div>
-          <div class="tab" onclick="filterCortes('hoy',this)">Hoy</div>
-          <div class="tab" onclick="filterCortes('semana',this)">Esta semana</div>
-          <div class="tab" onclick="filterCortes('todos',this)">Todos</div>
+        <div class="tabs" style="margin-bottom:12px" id="cortes-tabs">
+          <div class="tab" data-f="hoy" onclick="filterCortes('hoy')">Hoy</div>
+          <div class="tab" data-f="ayer" onclick="filterCortes('ayer')">Ayer</div>
+          <div class="tab" data-f="semana" onclick="filterCortes('semana')">Esta semana</div>
+          <div class="tab active" data-f="mes" onclick="filterCortes('mes')">Este mes</div>
+          <div class="tab" data-f="todos" onclick="filterCortes('todos')">Todos</div>
         </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;color:var(--text3)">Día de esta semana:</span>
+          <div id="cortes-dias" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+          <span style="font-size:12px;color:var(--text3);margin-left:4px">o fecha:</span>
+          <input type="date" id="cortes-fecha" onchange="filterCortes(this.value?('fecha:'+this.value):'mes')" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:#fff">
+        </div>
+        <div id="cortes-rango" style="font-size:12px;color:var(--text3);margin-bottom:12px"></div>
         <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <input id="cortes-search" type="text" placeholder="🔍 Buscar por teléfono..." style="flex:1;min-width:200px;max-width:280px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarCortes(this.value)">
+          <input id="cortes-search" type="text" placeholder="🔍 Buscar por celular, nombre o DNI..." style="flex:1;min-width:200px;max-width:320px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="filtrarCortes(this.value)">
           <button class="btn btn-sm" id="btn-cortes-pendientes" onclick="toggleCortesPendientes()">💰 Ver pendientes de pago</button>
         </div>
         <div id="cortes-lista"><div class="loading">Cargando...</div></div>
@@ -7043,10 +7051,38 @@ let DB_cortes=[];
 let currentCorteItem=null;
 let currentCorteCliente=null;
 
-function filterCortes(f,el){
+function corteRango(f){
+  const ahora=new Date();
+  const ini=d=>{ const x=new Date(d); x.setHours(0,0,0,0); return x; };
+  const mas=(d,n)=>{ const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+  const fmt=d=>d.toLocaleDateString('es-PE',{weekday:'short',day:'2-digit',month:'2-digit'}).replace('.','');
+  const hoy=ini(ahora);
+  let desde=null,hasta=null,label='Mostrando: todo el historial';
+  if(f==='hoy'){ desde=hoy; hasta=mas(hoy,1); label='Mostrando: hoy, '+fmt(hoy); }
+  else if(f==='ayer'){ desde=mas(hoy,-1); hasta=hoy; label='Mostrando: ayer, '+fmt(desde); }
+  else if(f==='semana'){ desde=ini(inicioSemanaLunes(ahora)); label='Mostrando: '+fmt(desde)+' en adelante'; }
+  else if(f==='todos'){ }
+  else if(f.startsWith('dia:')){ desde=mas(ini(inicioSemanaLunes(ahora)),parseInt(f.slice(4))); hasta=mas(desde,1); label='Mostrando: solo '+fmt(desde); }
+  else if(f.startsWith('fecha:')){ const [y,m,d]=f.slice(6).split('-').map(Number); desde=new Date(y,m-1,d); hasta=mas(desde,1); label='Mostrando: solo '+fmt(desde); }
+  else { desde=new Date(ahora.getFullYear(),ahora.getMonth(),1); label='Mostrando: '+fmt(desde)+' en adelante'; }
+  return {desde,hasta,label};
+}
+function corteMarcarFiltro(f){
+  document.querySelectorAll('#cortes-tabs .tab').forEach(t=>t.classList.toggle('active',t.dataset.f===f));
+  const nombres=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const lunes=inicioSemanaLunes(new Date());
+  const c=document.getElementById('cortes-dias');
+  if(c) c.innerHTML=nombres.map((n,i)=>{
+    const d=new Date(lunes); d.setDate(d.getDate()+i);
+    const on=f==='dia:'+i;
+    return `<button class="btn btn-xs" title="${d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})}" style="${on?'background:var(--pink);color:#fff;border-color:var(--pink)':''}" onclick="filterCortes('dia:${i}')">${n}</button>`;
+  }).join('');
+  const fi=document.getElementById('cortes-fecha'); if(fi && !f.startsWith('fecha:')) fi.value='';
+  const r=document.getElementById('cortes-rango'); if(r) r.textContent=corteRango(f).label;
+}
+function filterCortes(f){
   corteFiltro=f;
-  document.querySelectorAll('#pg-cortes .tab').forEach(t=>t.classList.remove('active'));
-  if(el) el.classList.add('active');
+  corteMarcarFiltro(f);
   const search=document.getElementById('cortes-search');
   if(search) search.value='';
   loadCortes(f);
@@ -7055,7 +7091,7 @@ function filterCortes(f,el){
 let cortesSoloPendientes = false;
 
 function filtrarCortes(q){
-  q=(q||'').toLowerCase().trim();
+  q=lvrNorm(q).trim();
   document.querySelectorAll('#cortes-lista [data-tel]').forEach(card=>{
     const pasaTexto = !q || card.dataset.tel.includes(q);
     const pasaPendiente = !cortesSoloPendientes || card.dataset.falta==='1';
@@ -7082,18 +7118,14 @@ async function loadCortes(f){
   document.getElementById('cortes-lista').innerHTML='<div class="loading">Cargando...</div>';
   try {
     // Traer items de carrito con info de clienta y prenda según rango
-    const ahora=new Date();
-    let desde;
-    if(f==='hoy'){ desde=new Date(ahora); desde.setHours(0,0,0,0); }
-    else if(f==='semana'){ desde=inicioSemanaLunes(ahora); }
-    else if(f==='todos'){ desde=null; }
-    else { desde=new Date(ahora.getFullYear(),ahora.getMonth(),1); }
+    const {desde,hasta}=corteRango(f);
+    corteMarcarFiltro(f);
 
     // Traemos TODO el historial (sin filtro de fecha) — el filtro de arriba solo decide
     // qué clientas aparecen en la lista; el saldo de cada una siempre se calcula completo,
     // para que nunca diga "Todo pagado" si en realidad debe algo de un mes anterior.
-    const todosItems = await dbGet(`carrito_items?estado_bolsa=neq.eliminado&select=*,prendas(nombre,precio),carritos(cliente_id,clientes(nombre,telefono))&order=agregado_en.desc`);
-    const itemsEnPeriodo = desde ? todosItems.filter(it=>new Date(it.agregado_en) >= desde) : todosItems;
+    const todosItems = await dbGet(`carrito_items?estado_bolsa=neq.eliminado&select=*,prendas(nombre,precio),carritos(cliente_id,clientes(nombre,telefono,dni))&order=agregado_en.desc`);
+    const itemsEnPeriodo = todosItems.filter(it=>{ const t=new Date(it.agregado_en); return (!desde||t>=desde)&&(!hasta||t<hasta); });
 
     // Total vendido y cobrado real del período (incluye abonos parciales, no solo prendas 100% confirmadas)
     const totalVendido=itemsEnPeriodo.reduce((a,it)=>a+(it.precio_unitario||0),0);
@@ -7131,7 +7163,7 @@ async function loadCortes(f){
     todosItems.forEach(it=>{
       const cl = it.carritos?.clientes;
       const key = cl?.telefono || `sin-tel-${cl?.nombre||it.id}`;
-      if(!gruposGlobal[key]) gruposGlobal[key] = { nombre: cl?.nombre||'Sin datos', telefono: cl?.telefono||'', items: [] };
+      if(!gruposGlobal[key]) gruposGlobal[key] = { nombre: cl?.nombre||'Sin datos', telefono: cl?.telefono||'', dni: cl?.dni||'', items: [] };
       gruposGlobal[key].items.push(it);
     });
 
@@ -7175,7 +7207,7 @@ async function loadCortes(f){
         </tr>`;
       }).join('');
 
-      return `<div class="card mb-16" data-tel="${(g.telefono||'').toLowerCase()}" data-falta="${g.falta>0?'1':'0'}">
+      return `<div class="card mb-16" data-tel="${lvrNorm((g.telefono||'')+' '+(g.nombre||'')+' '+(g.dni||''))}" data-falta="${g.falta>0?'1':'0'}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
           <div>
             <div style="font-weight:600;font-size:14px">${g.nombre}</div>
