@@ -172,6 +172,14 @@ td.empty-state{padding:20px;text-align:center}
 .avatar-md{width:34px;height:34px;border-radius:50%;background:var(--pink-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--pink-dark);flex-shrink:0}
 
 /* LIVE REGISTRO */
+.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-items:start}
+.emp-card{padding:14px}
+.emp-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--border)}
+.emp-it{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border)}
+.emp-it:last-of-type{border-bottom:none}
+.emp-it-t{flex:1;min-width:0;font-size:13px}
+.emp-it-p{font-size:12.5px;font-weight:600;white-space:nowrap}
+@media (max-width:640px){.emp-grid{grid-template-columns:1fr}}
 .live-panel{display:grid;grid-template-columns:minmax(260px,.75fr) minmax(0,1.75fr);gap:14px}
 @media (max-width:860px){.live-panel{grid-template-columns:1fr}}
 /* Registro live: filas de prendas */
@@ -872,6 +880,11 @@ td.empty-state{padding:20px;text-align:center}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a7 7 0 0 1 12-4.9M16 11a4 4 0 1 1 5 5.9M21 21l-4.35-4.35"/></svg>
       Clientas
     </div>
+    <div class="sb-item" id="sb-empaquetado" onclick="nav('empaquetado',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3.3 7.5L12 12l8.7-4.5M12 22V12"/></svg>
+      Empaquetado
+      <span id="badge-empaquetado" style="margin-left:auto;background:var(--pink);color:#fff;font-size:10px;padding:1px 7px;border-radius:20px;display:none">0</span>
+    </div>
     <div class="sb-item" id="sb-despacho" onclick="nav('despacho',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
       Despacho
@@ -1491,6 +1504,24 @@ td.empty-state{padding:20px;text-align:center}
           <div class="tabs" id="sh-av-filtros" style="margin:0 0 10px;border:none"><div class="tab active" data-f="faltan" onclick="shAvFiltrar('faltan')">Faltan por avisar</div><div class="tab" data-f="avisadas" onclick="shAvFiltrar('avisadas')">Avisadas</div><div class="tab" data-f="todas" onclick="shAvFiltrar('todas')">Todas</div></div>
           <div id="sh-av-lista"></div>
         </div>
+      </div>
+
+      <div id="pg-empaquetado" class="page">
+        <div class="metrics-grid">
+          <div class="metric"><div class="metric-val" id="emp-m-pend">0</div><div class="metric-lbl">Prendas por empaquetar</div><div class="metric-delta text-hint" id="emp-m-pend-c"></div></div>
+          <div class="metric"><div class="metric-val" id="emp-m-bolsa">0</div><div class="metric-lbl">Prendas ya en bolsa</div><div class="metric-delta text-hint" id="emp-m-bolsa-c"></div></div>
+        </div>
+        <div class="sec-header" style="margin-bottom:10px">
+          <div class="tabs" id="emp-tabs" style="margin:0;border:none">
+            <div class="tab active" data-t="por" onclick="empSetTab('por')">Por empaquetar</div>
+            <div class="tab" data-t="bolsa" onclick="empSetTab('bolsa')">En bolsa</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input id="emp-search" type="text" placeholder="🔍 Buscar por celular, nombre o DNI..." oninput="empRender()" style="min-width:220px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+            <button class="btn btn-sm" onclick="loadEmpaquetado()">↻ Actualizar</button>
+          </div>
+        </div>
+        <div id="emp-lista" class="emp-grid"></div>
       </div>
 
       <div id="pg-despacho" class="page">
@@ -2330,7 +2361,7 @@ function nav(page, el){
   document.getElementById('pg-'+page).classList.add('active');
   if(el) el.classList.add('active');
   toggleSidebarMobile(false); // cerrar el menú en celular al navegar
-  const titles={dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho',asistencia:'Control de Asistencia',inventario:'Inventario',brasil:'Brasil',boletas:'Boletas Shalom'};
+  const titles={empaquetado:'Empaquetado',dashboard:'Dashboard',live:'Registro — live',carritos:'Carritos abiertos',cortes:'Cortes de pago',pedidos:'Pedidos',clientes:'Clientas',catalogo:'Catálogo',stock:'Stock',urgentes:'Solicitudes urgentes',compras:'Compras y Gastos',config:'Configuración',despacho:'Despacho',asistencia:'Control de Asistencia',inventario:'Inventario',brasil:'Brasil',boletas:'Boletas Shalom'};
   const subtitles={
     dashboard:'Resumen de tu negocio, hoy',
     live:'Busca a tu clienta y agrega las prendas que va llevando',
@@ -2344,6 +2375,7 @@ function nav(page, el){
     compras:'Registra reposición de mercadería y gastos del negocio',
     config:'Ajustes y acciones administrativas',
     despacho:'Pedidos listos para empaquetar y enviar hoy',
+    empaquetado:'Mete cada prenda a la bolsa de su clienta y mira lo que ya está empaquetado',
     asistencia: esTrabajador() ? 'Marca tu entrada y salida del día' : 'Historial de asistencia y cálculo de pago de tus trabajadoras',
     inventario:'Cuenta tu mercadería física y compárala contra el sistema',
     brasil:'Ventas y compras hechas en Brasil — separadas del negocio normal',
@@ -2358,12 +2390,148 @@ function nav(page, el){
   if(page==='catalogo') loadCatalogo();
   if(page==='stock') loadStock();
   if(page==='despacho') loadDespacho();
+  if(page==='empaquetado') loadEmpaquetado();
   if(page==='urgentes') loadUrgentes();
   if(page==='compras') loadCompras();
   if(page==='asistencia') loadAsistencia();
   if(page==='inventario') loadInventarioHistorial();
   if(page==='brasil') brTab(brTabActual);
   if(page==='boletas') shInit();
+}
+
+// ═══════════════════════════ EMPAQUETADO ═══════════════════════════
+let EMP_COLS = false;      // true cuando carrito_items tiene bolsa_por / bolsa_en
+let empTab = 'por';        // 'por' | 'bolsa'
+let empData = [];          // [{pedido, cliente, items:[...]}]
+async function empDetectarCols(){
+  try { await dbGet('carrito_items?select=bolsa_en,bolsa_por&limit=1'); EMP_COLS = true; } catch(e){ EMP_COLS = false; }
+}
+function bolsaPatch(enBolsa){
+  const o = { estado_bolsa: enBolsa ? 'en_bolsa' : 'sin_agregar' };
+  if(EMP_COLS){ o.bolsa_por = enBolsa ? (currentUser?.nombre||currentUser?.key||null) : null; o.bolsa_en = enBolsa ? new Date().toISOString() : null; }
+  return o;
+}
+function empFmtFecha(iso){
+  if(!iso) return '';
+  const f=new Date(iso);
+  return f.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})+' '+f.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+}
+function empSetTab(t){
+  empTab=t;
+  document.querySelectorAll('#emp-tabs .tab').forEach(x=>x.classList.toggle('active',x.dataset.t===t));
+  empRender();
+}
+async function loadEmpaquetado(){
+  const box=document.getElementById('emp-lista');
+  if(!box) return;
+  box.innerHTML='<div class="text-hint text-sm" style="padding:20px">Cargando…</div>';
+  try {
+    await empDetectarCols();
+    const peds = await dbGet('pedidos?estado=in.(acumulando,listo_envio,pago_pendiente,pago_parcial,pago_completo,empaquetado)&select=id,numero,estado,tipo_envio,carrito_id,cliente_id,clientes(nombre,telefono,dni,distrito,envio_urgente_en)&order=creado_en.asc&limit=1000');
+    const ids = peds.map(p=>p.carrito_id).filter(Boolean);
+    let items = [];
+    if(ids.length){
+      const cols = 'id,carrito_id,talla,color,precio_unitario,monto_pagado,estado_pago,estado_bolsa,preventa,agregado_en,prendas(nombre,codigo)'+(EMP_COLS?',bolsa_por,bolsa_en':'');
+      for(let i=0;i<ids.length;i+=80){
+        const chunk=ids.slice(i,i+80);
+        items = items.concat(await dbGet(`carrito_items?carrito_id=in.(${chunk.join(',')})&estado_bolsa=neq.eliminado&select=${cols}&order=agregado_en.asc&limit=3000`));
+      }
+    }
+    const porCarrito={};
+    items.forEach(it=>{ (porCarrito[it.carrito_id]=porCarrito[it.carrito_id]||[]).push(it); });
+    empData = peds.map(p=>({pedido:p, cliente:p.clientes||{}, items:porCarrito[p.carrito_id]||[]})).filter(g=>g.items.length);
+    empRender();
+  } catch(e){
+    box.innerHTML=`<div class="text-hint text-sm" style="padding:20px;color:var(--red)">No se pudo cargar: ${lvrEsc(e.message)}</div>`;
+  }
+}
+function empPago(g){
+  const vend=g.items.reduce((a,i)=>a+(i.precio_unitario||0),0), pag=g.items.reduce((a,i)=>a+(i.monto_pagado||0),0);
+  if(vend>0 && pag>=vend) return {cls:'badge-ok',txt:'✓ Pagado'};
+  if(pag>0) return {cls:'badge-warn',txt:'Pago parcial · falta S/ '+(vend-pag)};
+  return {cls:'badge-danger',txt:'Sin pago'};
+}
+function empRender(){
+  const box=document.getElementById('emp-lista'); if(!box) return;
+  const q=lvrNorm(document.getElementById('emp-search')?.value||'').trim();
+  const pend = it=>it.estado_bolsa!=='en_bolsa';
+  // Resumen
+  let nPend=0,cPend=0,nBolsa=0,cBolsa=0;
+  empData.forEach(g=>{ const a=g.items.filter(pend).length, b=g.items.length-a; nPend+=a; nBolsa+=b; if(a) cPend++; if(b) cBolsa++; });
+  const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
+  set('emp-m-pend',nPend); set('emp-m-pend-c',cPend+' clientas'); set('emp-m-bolsa',nBolsa); set('emp-m-bolsa-c',cBolsa+' bolsas');
+  const bd=document.getElementById('badge-empaquetado'); if(bd){ bd.textContent=nPend; bd.style.display=nPend?'inline-block':'none'; }
+  let lista = empData.filter(g=>{
+    if(q){ const h=lvrNorm((g.cliente.nombre||'')+' '+(g.cliente.telefono||'')+' '+(g.cliente.dni||'')); if(!h.includes(q)) return false; }
+    return g.items.some(empTab==='por'?pend:(it=>!pend(it)));
+  });
+  if(empTab==='por'){
+    lista.sort((a,b)=>{
+      const ua=a.cliente.envio_urgente_en?0:1, ub=b.cliente.envio_urgente_en?0:1; if(ua!==ub) return ua-ub;
+      const fa=Math.min(...a.items.filter(pend).map(i=>new Date(i.agregado_en))), fb=Math.min(...b.items.filter(pend).map(i=>new Date(i.agregado_en)));
+      return fa-fb;
+    });
+  } else {
+    lista.sort((a,b)=>{
+      const fa=Math.max(...a.items.filter(i=>!pend(i)).map(i=>new Date(i.bolsa_en||i.agregado_en))), fb=Math.max(...b.items.filter(i=>!pend(i)).map(i=>new Date(i.bolsa_en||i.agregado_en)));
+      return fb-fa;
+    });
+  }
+  if(!lista.length){
+    box.innerHTML=`<div class="card" style="text-align:center;padding:36px;color:var(--text3)">${empTab==='por'?'🎉 No hay prendas pendientes de empaquetar':'Aún no hay bolsas armadas'}</div>`;
+    return;
+  }
+  box.innerHTML = lista.map(g=>{
+    const pg=empPago(g), c=g.cliente;
+    const pendientes=g.items.filter(pend), enBolsa=g.items.filter(i=>!pend(i));
+    const mostrar = empTab==='por' ? pendientes : enBolsa;
+    const urg = c.envio_urgente_en ? '<span class="badge" style="background:#FFE8CC;color:#B3541E">🚀 Urgente</span>' : '';
+    const env = g.pedido.tipo_envio ? `<span class="badge badge-gray">${lvrEsc(g.pedido.tipo_envio)}</span>` : '';
+    const filas = mostrar.map(it=>{
+      const nom=lvrEsc(it.prendas?.nombre||'Prenda');
+      const det=[it.talla,it.color].filter(Boolean).map(lvrEsc).join(' · ');
+      if(empTab==='por'){
+        const btn = it.preventa
+          ? `<span class="badge badge-warn" title="Aún no llega la mercadería">⏳ Pre-venta</span>`
+          : `<button class="btn btn-sm btn-success" onclick="empMeter('${it.id}',true)">📦 A la bolsa</button>`;
+        return `<div class="emp-it"><div class="emp-it-t"><strong>${nom}</strong><span class="text-hint"> ${det}</span><div class="text-hint" style="font-size:11px">registrada ${empFmtFecha(it.agregado_en)}</div></div><div class="emp-it-p">S/ ${it.precio_unitario}</div>${btn}</div>`;
+      }
+      const quien = it.bolsa_por||it.bolsa_en ? `<div class="text-hint" style="font-size:11px">📦 ${lvrEsc(it.bolsa_por||'')} ${it.bolsa_en?'· '+empFmtFecha(it.bolsa_en):''}</div>` : '';
+      return `<div class="emp-it"><div class="emp-it-t"><strong>${nom}</strong><span class="text-hint"> ${det}</span>${quien}</div><div class="emp-it-p">S/ ${it.precio_unitario}</div><button class="btn btn-sm" onclick="empMeter('${it.id}',false)">↩ Sacar</button></div>`;
+    }).join('');
+    let pie='';
+    if(empTab==='por'){
+      const listos=pendientes.filter(i=>!i.preventa).length;
+      if(listos>1) pie=`<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="empMeterTodo('${g.pedido.id}')">📦 Todo a la bolsa (${listos})</button></div>`;
+      if(enBolsa.length) pie+=`<div class="text-hint" style="font-size:11.5px;margin-top:6px">Ya tiene ${enBolsa.length} prenda${enBolsa.length>1?'s':''} en su bolsa</div>`;
+    } else if(pendientes.length){
+      pie=`<div style="margin-top:8px"><span class="badge badge-warn">⚠ Faltan ${pendientes.length} prenda${pendientes.length>1?'s':''} por sumar a esta bolsa</span></div>`;
+    } else {
+      pie=`<div style="margin-top:8px"><span class="badge badge-ok">✓ Bolsa completa</span></div>`;
+    }
+    return `<div class="card emp-card"><div class="emp-head"><div><div style="font-weight:600;font-size:14.5px">${lvrEsc(c.nombre||'Sin nombre')}</div><div class="text-hint" style="font-size:12px">${lvrEsc(c.telefono||'')}${c.distrito?' · '+lvrEsc(c.distrito):''}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${urg}${env}<span class="badge ${pg.cls}">${pg.txt}</span></div></div>${filas}${pie}</div>`;
+  }).join('');
+}
+async function empMeter(itemId, enBolsa){
+  const it=empData.flatMap(g=>g.items).find(x=>x.id===itemId); if(!it) return;
+  try {
+    const patch=bolsaPatch(enBolsa);
+    await dbPatch(`carrito_items?id=eq.${itemId}`,patch);
+    Object.assign(it,patch);
+    empRender();
+  } catch(e){ toast('Error: '+e.message); }
+}
+async function empMeterTodo(pedidoId){
+  const g=empData.find(x=>x.pedido.id===pedidoId); if(!g) return;
+  const its=g.items.filter(i=>i.estado_bolsa!=='en_bolsa' && !i.preventa);
+  if(!its.length) return;
+  try {
+    const patch=bolsaPatch(true);
+    await dbPatch(`carrito_items?id=in.(${its.map(i=>i.id).join(',')})`,patch);
+    its.forEach(i=>Object.assign(i,patch));
+    empRender();
+    toast('✓ '+its.length+' prendas a la bolsa');
+  } catch(e){ toast('Error: '+e.message); }
 }
 
 // ═══════════════════════════ INIT ═══════════════════════════
@@ -3879,6 +4047,7 @@ function irAlLiveConCliente(clienteId){
 
 // ═══════════════════════════ LIVE ═══════════════════════════
 async function loadCatalogoLive(){
+  empDetectarCols();
   try {
     const [prendas, stockRows] = await Promise.all([
       dbGet('prendas?activo=eq.true&order=nombre'),
@@ -4257,7 +4426,7 @@ async function toggleBolsaItem(i, el){
   const item=liveCart[i];
   const nuevo=item.estado_bolsa==='en_bolsa'?'sin_agregar':'en_bolsa';
   liveCart[i].estado_bolsa=nuevo;
-  try { await dbPatch(`carrito_items?id=eq.${item.id}`,{estado_bolsa:nuevo}); } catch(e){}
+  try { await dbPatch(`carrito_items?id=eq.${item.id}`,bolsaPatch(nuevo==='en_bolsa')); } catch(e){}
   renderLiveCart();
 }
 
@@ -4265,7 +4434,7 @@ async function toggleBolsaCarritoItem(itemId, el){
   const actual = el.textContent.includes('En bolsa') ? 'en_bolsa' : 'sin_agregar';
   const nuevo = actual==='en_bolsa' ? 'sin_agregar' : 'en_bolsa';
   try {
-    await dbPatch(`carrito_items?id=eq.${itemId}`,{estado_bolsa:nuevo});
+    await dbPatch(`carrito_items?id=eq.${itemId}`,bolsaPatch(nuevo==='en_bolsa'));
     el.textContent = nuevo==='en_bolsa' ? '📦 En bolsa' : 'Sin agregar';
     el.className = `badge ${nuevo==='en_bolsa'?'badge-info':'badge-gray'}`;
     el.style.cssText='font-size:9px;cursor:pointer';
