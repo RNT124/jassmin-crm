@@ -172,14 +172,32 @@ td.empty-state{padding:20px;text-align:center}
 .avatar-md{width:34px;height:34px;border-radius:50%;background:var(--pink-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--pink-dark);flex-shrink:0}
 
 /* LIVE REGISTRO */
-.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-items:start}
-.emp-card{padding:14px}
-.emp-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--border)}
-.emp-it{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border)}
-.emp-it:last-of-type{border-bottom:none}
-.emp-it-t{flex:1;min-width:0;font-size:13px}
-.emp-it-p{font-size:12.5px;font-weight:600;white-space:nowrap}
-@media (max-width:640px){.emp-grid{grid-template-columns:1fr}}
+.emp-grid{display:flex;flex-direction:column;gap:14px;max-width:960px}
+.emp-card{padding:0;overflow:hidden;border-left:6px solid var(--border2)}
+.emp-card.e-urg{border-left-color:#E8892B}
+.emp-card.e-ok{border-left-color:var(--green)}
+.emp-card.e-parc{border-left-color:var(--amber-dark)}
+.emp-card.e-no{border-left-color:var(--red)}
+.emp-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:14px 16px 10px;flex-wrap:wrap}
+.emp-prog{padding:0 16px 10px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text2)}
+.emp-bar{flex:1;height:7px;border-radius:6px;background:var(--gray-light);overflow:hidden}
+.emp-bar>i{display:block;height:100%;background:var(--green);border-radius:6px}
+.emp-row{display:grid;grid-template-columns:minmax(0,2.4fr) 96px minmax(0,1.3fr) 72px 138px;gap:10px;align-items:center;padding:10px 16px;border-top:1px solid var(--border);font-size:13px}
+.emp-th{padding:6px 16px;background:var(--gray-light);font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-top:1px solid var(--border)}
+.emp-c-n small{display:block;color:var(--text3);font-size:11px;margin-top:1px}
+.emp-c-p{font-weight:600;text-align:right;white-space:nowrap}
+.emp-c-b{display:flex;justify-content:flex-end}
+.emp-c-b .btn,.emp-c-b .badge{width:100%;justify-content:center;text-align:center}
+.emp-foot{padding:10px 16px 14px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media (max-width:640px){
+  .emp-th{display:none}
+  .emp-row{grid-template-columns:1fr 1fr 1fr;gap:6px 10px;padding:12px 14px}
+  .emp-c-n{grid-column:1 / -1;font-size:14px}
+  .emp-c-p{text-align:left}
+  .emp-c-b{grid-column:1 / -1}
+  .emp-c-b .btn{padding:11px;font-size:14px}
+  .emp-head,.emp-prog,.emp-foot{padding-left:14px;padding-right:14px}
+}
 .live-panel{display:grid;grid-template-columns:minmax(260px,.75fr) minmax(0,1.75fr);gap:14px}
 @media (max-width:860px){.live-panel{grid-template-columns:1fr}}
 /* Registro live: filas de prendas */
@@ -2489,27 +2507,29 @@ function empRender(){
     const env = g.pedido.tipo_envio ? `<span class="badge badge-gray">${lvrEsc(g.pedido.tipo_envio)}</span>` : '';
     const filas = mostrar.map(it=>{
       const nom=lvrEsc(it.prendas?.nombre||'Prenda');
-      const det=[it.talla,it.color].filter(Boolean).map(lvrEsc).join(' · ');
+      const talla=lvrEsc(it.talla||'—'), color=lvrEsc(it.color||'—');
       if(empTab==='por'){
         const btn = it.preventa
           ? `<span class="badge badge-warn" title="Aún no llega la mercadería">⏳ Pre-venta</span>`
           : `<button class="btn btn-sm btn-success" onclick="empMeter('${it.id}',true)">📦 A la bolsa</button>`;
-        return `<div class="emp-it"><div class="emp-it-t"><strong>${nom}</strong><span class="text-hint"> ${det}</span><div class="text-hint" style="font-size:11px">registrada ${empFmtFecha(it.agregado_en)}</div></div><div class="emp-it-p">S/ ${it.precio_unitario}</div>${btn}</div>`;
+        return `<div class="emp-row"><div class="emp-c-n"><strong>${nom}</strong><small>registrada ${empFmtFecha(it.agregado_en)}</small></div><div class="emp-c-t">${talla}</div><div class="emp-c-c">${color}</div><div class="emp-c-p">S/ ${it.precio_unitario}</div><div class="emp-c-b">${btn}</div></div>`;
       }
-      const quien = it.bolsa_por||it.bolsa_en ? `<div class="text-hint" style="font-size:11px">📦 ${lvrEsc(it.bolsa_por||'')} ${it.bolsa_en?'· '+empFmtFecha(it.bolsa_en):''}</div>` : '';
-      return `<div class="emp-it"><div class="emp-it-t"><strong>${nom}</strong><span class="text-hint"> ${det}</span>${quien}</div><div class="emp-it-p">S/ ${it.precio_unitario}</div><button class="btn btn-sm" onclick="empMeter('${it.id}',false)">↩ Sacar</button></div>`;
+      const quien = (it.bolsa_por||it.bolsa_en) ? `<small>📦 ${lvrEsc(it.bolsa_por||'')} ${it.bolsa_en?'· '+empFmtFecha(it.bolsa_en):''}</small>` : '';
+      return `<div class="emp-row"><div class="emp-c-n"><strong>${nom}</strong>${quien}</div><div class="emp-c-t">${talla}</div><div class="emp-c-c">${color}</div><div class="emp-c-p">S/ ${it.precio_unitario}</div><div class="emp-c-b"><button class="btn btn-sm" onclick="empMeter('${it.id}',false)">↩ Sacar</button></div></div>`;
     }).join('');
     let pie='';
     if(empTab==='por'){
       const listos=pendientes.filter(i=>!i.preventa).length;
-      if(listos>1) pie=`<div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="empMeterTodo('${g.pedido.id}')">📦 Todo a la bolsa (${listos})</button></div>`;
-      if(enBolsa.length) pie+=`<div class="text-hint" style="font-size:11.5px;margin-top:6px">Ya tiene ${enBolsa.length} prenda${enBolsa.length>1?'s':''} en su bolsa</div>`;
+      if(listos>1) pie+=`<button class="btn btn-sm btn-primary" onclick="empMeterTodo('${g.pedido.id}')">📦 Todo a la bolsa (${listos})</button>`;
+      if(enBolsa.length) pie+=`<span class="text-hint" style="font-size:12px">Ya tiene ${enBolsa.length} prenda${enBolsa.length>1?'s':''} en su bolsa</span>`;
     } else if(pendientes.length){
-      pie=`<div style="margin-top:8px"><span class="badge badge-warn">⚠ Faltan ${pendientes.length} prenda${pendientes.length>1?'s':''} por sumar a esta bolsa</span></div>`;
+      pie=`<span class="badge badge-warn">⚠ Faltan ${pendientes.length} prenda${pendientes.length>1?'s':''} por sumar a esta bolsa</span>`;
     } else {
-      pie=`<div style="margin-top:8px"><span class="badge badge-ok">✓ Bolsa completa</span></div>`;
+      pie=`<span class="badge badge-ok">✓ Bolsa completa</span>`;
     }
-    return `<div class="card emp-card"><div class="emp-head"><div><div style="font-weight:600;font-size:14.5px">${lvrEsc(c.nombre||'Sin nombre')}</div><div class="text-hint" style="font-size:12px">${lvrEsc(c.telefono||'')}${c.distrito?' · '+lvrEsc(c.distrito):''}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${urg}${env}<span class="badge ${pg.cls}">${pg.txt}</span></div></div>${filas}${pie}</div>`;
+    const tot=g.items.length, pct=Math.round(enBolsa.length/tot*100);
+    const cls = c.envio_urgente_en ? 'e-urg' : (pg.cls==='badge-ok'?'e-ok':(pg.cls==='badge-warn'?'e-parc':'e-no'));
+    return `<div class="card emp-card ${cls}"><div class="emp-head"><div><div style="font-weight:600;font-size:15px">${lvrEsc(c.nombre||'Sin nombre')}</div><div class="text-hint" style="font-size:12px">${lvrEsc(c.telefono||'')}${c.distrito?' · '+lvrEsc(c.distrito):''}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${urg}${env}<span class="badge ${pg.cls}">${pg.txt}</span></div></div><div class="emp-prog"><span><strong>${enBolsa.length} de ${tot}</strong> en bolsa</span><div class="emp-bar"><i style="width:${pct}%"></i></div></div><div class="emp-row emp-th"><div>Prenda</div><div>Talla</div><div>Color</div><div style="text-align:right">Precio</div><div></div></div>${filas}${pie?`<div class="emp-foot">${pie}</div>`:''}</div>`;
   }).join('');
 }
 async function empMeter(itemId, enBolsa){
