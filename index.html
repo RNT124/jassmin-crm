@@ -219,6 +219,11 @@ td.empty-state{padding:20px;text-align:center}
 .lvr-opt .p{font-weight:600;white-space:nowrap}
 .lvr-empty{padding:12px;font-size:12.5px;color:var(--text3)}
 .lvr-precio{font-weight:600;font-size:13px;text-align:right}
+.lvr-precio{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.lvr-ed{border:none;background:none;cursor:pointer;font-size:12px;padding:0;line-height:1;opacity:.7}
+.lvr-ed:hover{opacity:1}
+.lvr-mod{color:var(--pink-dark);font-weight:700}
+.lvr-precio small.lvr-mod{font-size:10px;font-weight:600;white-space:nowrap}
 .lvr-x{border:none;background:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px;line-height:1}
 .lvr-x:hover{color:var(--pink)}
 .lvr-add{width:100%;padding:10px;border:1.5px dashed var(--pink-mid);background:var(--pink-light);color:var(--pink-dark);border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px}
@@ -4022,6 +4027,7 @@ async function loadCarritos(){
               + '</div>'
               + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
                 + '<span style="font-weight:600;font-size:13px">S/ '+it.precio_unitario+'</span>'
+                + ((esTrabajador()||pagado)?'':'<span style="cursor:pointer;font-size:12px" title="Cambiar precio" onclick="editarPrecioItem(\''+it.id+'\','+it.precio_unitario+',\''+c.id+'\')">✏️</span>')
                 + btnEliminar
               + '</div>'
             + '</div>';
@@ -4114,6 +4120,22 @@ function lvrOptHtml(lista, sel, vacio){
   const lab=o=> o.q===null? o.v : (o.q>0? `${o.v} (${o.q})` : `${o.v} (agotado)`);
   return `<option value="">${vacio}</option>`+lista.map(o=>`<option value="${lvrEsc(o.v)}"${o.v===sel?' selected':''}>${lvrEsc(lab(o))}</option>`).join('');
 }
+function lvrUnit(r){ const p=lvrPrenda(r); if(!p) return 0; return (r.precio!=null)?r.precio:p.precio; }
+function lvrPrecioHtml(r){
+  const p=lvrPrenda(r); if(!p) return '—';
+  const mod=(r.precio!=null && r.precio!==p.precio);
+  const lapiz=esTrabajador()?'':`<button class="lvr-ed" title="Cambiar precio de venta" onclick="lvrEditarPrecio(${r.k})">✏️</button>`;
+  return `<span class="${mod?'lvr-mod':''}">S/ ${lvrUnit(r)*(r.cant||0)}</span>${lapiz}${mod?`<small class="lvr-mod">c/u ${lvrUnit(r)} (normal ${p.precio})</small>`:''}`;
+}
+function lvrEditarPrecio(k){
+  if(esTrabajador()) return;
+  const r=lvrRows.find(x=>x.k===k); const p=r&&lvrPrenda(r); if(!p) return;
+  const v=prompt('Precio de venta por unidad (normal: S/ '+p.precio+')\nDéjalo vacío para volver al precio normal:', lvrUnit(r));
+  if(v===null) return;
+  if(v.trim()===''){ r.precio=null; }
+  else { const n=parseFloat(v.replace(',','.')); if(isNaN(n)||n<0){ toast('Precio no válido'); return; } r.precio=n; }
+  lvrRefrescarFila(k);
+}
 function lvrRowHtml(r){
   const p=lvrPrenda(r);
   const tallas=lvrTallasDe(r), colores=lvrColoresDe(r);
@@ -4127,7 +4149,7 @@ function lvrRowHtml(r){
     <select id="lvr-t-${r.k}" ${p?'':'disabled'} onchange="lvrSet(${r.k},'talla',this.value)">${lvrOptHtml(tallas,r.talla,'Talla')}</select>
     <select id="lvr-c-${r.k}" ${p&&!sinColor?'':'disabled'} onchange="lvrSet(${r.k},'color',this.value)">${sinColor?'<option value="">Sin color</option>':lvrOptHtml(colores,r.color,'Color')}</select>
     <input id="lvr-n-${r.k}" type="number" min="1" value="${r.cant}" oninput="lvrSetCant(${r.k},this.value)" onkeydown="lvrKeyCant(event,${r.k})">
-    <div class="lvr-precio" id="lvr-p-${r.k}">${p?'S/ '+(p.precio*(r.cant||0)):'—'}</div>
+    <div class="lvr-precio" id="lvr-p-${r.k}">${lvrPrecioHtml(r)}</div>
     <button class="lvr-x" title="Quitar fila" onclick="lvrQuitar(${r.k})">✕</button>
   </div>`;
 }
@@ -4145,14 +4167,14 @@ function lvrRefrescarFila(k){
   const t=document.getElementById('lvr-t-'+k), c=document.getElementById('lvr-c-'+k);
   if(t){ t.disabled=!p; t.innerHTML=lvrOptHtml(tallas,r.talla,'Talla'); }
   if(c){ c.disabled=!p||sinColor; c.innerHTML=sinColor?'<option value="">Sin color</option>':lvrOptHtml(colores,r.color,'Color'); }
-  const pr=document.getElementById('lvr-p-'+k); if(pr) pr.textContent=p?'S/ '+(p.precio*(r.cant||0)):'—';
+  const pr=document.getElementById('lvr-p-'+k); if(pr) pr.innerHTML=lvrPrecioHtml(r);
   const row=document.getElementById('lvr-'+k); if(row) row.classList.remove('err');
   r.err=false;
   lvrResumen();
 }
 function lvrResumen(){
   let n=0,tot=0;
-  lvrRows.forEach(r=>{ const p=lvrPrenda(r); if(p){ n+=(r.cant||0); tot+=p.precio*(r.cant||0); } });
+  lvrRows.forEach(r=>{ const p=lvrPrenda(r); if(p){ n+=(r.cant||0); tot+=lvrUnit(r)*(r.cant||0); } });
   const a=document.getElementById('lvr-count'), b=document.getElementById('lvr-total');
   if(a) a.textContent=n+(n===1?' prenda':' prendas');
   if(b) b.textContent='S/ '+tot;
@@ -4234,7 +4256,7 @@ function lvrKey(e,k){
 }
 function lvrElegir(k,prendaId){
   const r=lvrRows.find(x=>x.k===k); const p=(DB.prendas||[]).find(x=>x.id===prendaId); if(!r||!p) return;
-  r.prendaId=p.id; r.texto=p.nombre; r.talla=''; r.color='';
+  r.prendaId=p.id; r.texto=p.nombre; r.talla=''; r.color=''; r.precio=null;
   lvrAutoUnica(r);
   const i=document.getElementById('lvr-q-'+k); if(i) i.value=p.nombre;
   const l=document.getElementById('lvr-l-'+k); if(l) l.style.display='none';
@@ -4292,7 +4314,7 @@ async function lvrCargar(){
     // 3) Insertar todas las unidades de una sola vez
     const filas=[];
     plan.forEach(x=>{
-      const mk=pre=>({carrito_id:carritoId,prenda_id:x.p.id,talla:x.r.talla,color:x.r.color||'',precio_unitario:x.p.precio,estado_bolsa:'sin_agregar',estado_pago:'pendiente',monto_pagado:0,preventa:pre,preventa_fecha_estimada:pre?fechaPre:null});
+      const mk=pre=>({carrito_id:carritoId,prenda_id:x.p.id,talla:x.r.talla,color:x.r.color||'',precio_unitario:lvrUnit(x.r),estado_bolsa:'sin_agregar',estado_pago:'pendiente',monto_pagado:0,preventa:pre,preventa_fecha_estimada:pre?fechaPre:null});
       for(let i=0;i<x.normales;i++) filas.push(mk(false));
       for(let i=0;i<x.pre;i++) filas.push(mk(true));
     });
@@ -4427,6 +4449,7 @@ function renderLiveCart(){
         <span class="font-500">${it.nombre}</span>
         <span style="display:flex;align-items:center;gap:6px">
           <span class="font-500">S/ ${it.precio}</span>
+          ${(esTrabajador()||it.estado_pago==='confirmado'||!it.id)?'':`<span style="cursor:pointer;font-size:12px" title="Cambiar precio" onclick="editarPrecioItem('${it.id}',${it.precio},'${currentPedidoActivo?currentPedidoActivo.id:''}')">✏️</span>`}
           <span style="cursor:pointer;color:var(--text3);font-size:12px" onclick="removeCartItem(${i})">✕</span>
         </span>
       </div>
@@ -4480,6 +4503,32 @@ async function devolverStockItem(prendaId, talla, color){
       const p=(DB.prendas||[]).find(x=>x.id===prendaId); if(p) p.stock=(rows[0].stock||0)+1;
     }
   } catch(e){ console.warn('No se pudo devolver stock:', e.message); }
+}
+
+async function editarPrecioItem(itemId, actual, pedidoId){
+  if(esTrabajador()){ toast('Solo admin u operador puede cambiar precios'); return; }
+  const v=prompt('Nuevo precio de venta de esta prenda (actual: S/ '+actual+'):', actual);
+  if(v===null) return;
+  const n=parseFloat(String(v).replace(',','.'));
+  if(isNaN(n)||n<0){ toast('Precio no válido'); return; }
+  if(n===actual) return;
+  try{
+    const it=await dbGet(`carrito_items?id=eq.${itemId}&select=estado_pago,carrito_id`);
+    if(!it.length) throw new Error('Prenda no encontrada');
+    if(it[0].estado_pago==='confirmado'){ toast('⚠️ Esta prenda ya está pagada — no se puede cambiar el precio'); return; }
+    await dbPatch(`carrito_items?id=eq.${itemId}`,{precio_unitario:n});
+    const ped=pedidoId?await dbGet(`pedidos?id=eq.${pedidoId}&select=id,carrito_id,costo_envio`):[];
+    if(ped.length){
+      const all=await dbGet(`carrito_items?carrito_id=eq.${ped[0].carrito_id}&estado_bolsa=neq.eliminado&select=precio_unitario`);
+      const sub=all.reduce((a,x)=>a+(x.precio_unitario||0),0);
+      await dbPatch(`pedidos?id=eq.${pedidoId}`,{subtotal:sub,total:sub+(ped[0].costo_envio||0)});
+      if(currentPedidoActivo&&currentPedidoActivo.id===pedidoId){ currentPedidoActivo.subtotal=sub; currentPedidoActivo.total=sub+(ped[0].costo_envio||0); }
+    }
+    const li=liveCart.find(x=>x.id===itemId); if(li) li.precio=n;
+    renderLiveCart();
+    if(document.getElementById('carritos-lista') && typeof loadCarritos==='function'){ try{ loadCarritos(); }catch(e){} }
+    toast('✓ Precio actualizado: S/ '+n);
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 async function removeCartItem(i){
