@@ -7194,10 +7194,11 @@ async function loadCortes(f){
       const g = gruposGlobal[key];
       const vendido = g.items.reduce((a,it)=>a+(it.precio_unitario||0),0);
       const pagado = g.items.reduce((a,it)=>a+(it.monto_pagado||0),0);
-      return { key, ...g, vendido, pagado, falta: vendido-pagado };
+      const ultimoReg = g.items.reduce((m,it)=>Math.max(m,new Date(it.agregado_en).getTime()||0),0);
+      return { key, ...g, vendido, pagado, falta: vendido-pagado, ultimoReg };
     }).sort((a,b)=>{
       if((a.falta>0)!==(b.falta>0)) return a.falta>0?-1:1; // con saldo pendiente primero
-      return (a.nombre||'').localeCompare(b.nombre||'');
+      return b.ultimoReg-a.ultimoReg; // luego: la que registraste más recién arriba
     });
 
     const ocultaMonto=ocultarMontosCortes();
