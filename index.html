@@ -4004,6 +4004,32 @@ async function urgMarcarImpresas(marcar){
     loadUrgentes();
   }catch(e){ toast('Error: '+e.message); }
 }
+function urgExportarExcel(){
+  const ids=[...document.querySelectorAll('.urg-check:checked')].map(c=>c.dataset.id);
+  if(!ids.length){ toast('Selecciona al menos una clienta'); return; }
+  const lista=ids.map(id=>urgData[id]).filter(Boolean);
+  const esSh=x=>(x.cl.tipo_envio_preferido||'').startsWith('shalom');
+  const sh=lista.filter(esSh), mo=lista.filter(x=>!esSh(x));
+  if(sh.length&&mo.length){ toast('⚠️ Selecciona solo Motorizado o solo Shalom para exportar el Excel (cada uno tiene su formato)'); return; }
+  if(sh.length){ abrirExcelShalomPro(sh.map(x=>x.cl)); return; }
+  const hoy=new Date();
+  const datos=[
+    ['','','','','','','','','','',''],
+    ['DATOS DEL CLIENTE','','','','','','','','DATOS DEL PRODUCTO 1','',''],
+    ['FECHA ENTREGA','CLIENTE','DISTRITO','DIRECCIÓN DE ENTREGA','CELULAR','TIPO DE SERVICIO','COBRAR S/','','DESCRIPCION DEL PAQUETE','PESO (KG)','COMENTARIO']
+  ];
+  mo.forEach(({cl:c,ped:p})=>{
+    const cobrar=p.envio_pagado?0:(p.costo_envio||14);
+    datos.push([hoy,c.nombre||'',c.distrito||'',c.direccion||'',c.telefono?parseInt(c.telefono):'','entrega',cobrar,'','ROPA','','']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(datos);
+  ws['!merges']=[{s:{r:1,c:0},e:{r:1,c:6}},{s:{r:1,c:8},e:{r:1,c:10}}];
+  ws['!cols']=[{wch:12},{wch:22},{wch:18},{wch:38},{wch:12},{wch:14},{wch:10},{wch:3},{wch:16},{wch:10},{wch:24}];
+  for(let r=3;r<datos.length;r++){ const cell=ws[XLSX.utils.encode_cell({r,c:0})]; if(cell) cell.z='dd/mm/yyyy'; }
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Hoja 1');
+  XLSX.writeFile(wb,'urgentes-motorizado-'+hoy.toISOString().slice(0,10)+'.xlsx');
+  toast('✓ Excel descargado — '+mo.length+' pedido(s)');
+}
 async function urgImprimirEtiquetas(){
   const ids=[...document.querySelectorAll('.urg-check:checked')].map(c=>c.dataset.id);
   if(!ids.length){ toast('Selecciona al menos una clienta'); return; }
@@ -4128,6 +4154,7 @@ async function loadUrgentes(){
       <div id="urgentes-bulk-bar" style="display:none;position:sticky;top:0;z-index:5;background:var(--primary);color:#fff;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:10px">
         <span id="urgentes-bulk-count" style="font-size:12.5px;font-weight:500"></span>
         <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="urgImprimirEtiquetas()">🏷️ Imprimir etiquetas</button>
+        <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="urgExportarExcel()">📊 Exportar Excel</button>
         <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="urgMarcarImpresas(true)">✅ Marcar como impresas</button>
         <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="urgMarcarImpresas(false)">↩ Quitar marca</button>
         <button class="btn btn-sm" id="urg-btn-desp" style="background:#fff;color:var(--primary)" onclick="bulkRegistrarDespacho()">🚚 Registrar despacho</button></span>
