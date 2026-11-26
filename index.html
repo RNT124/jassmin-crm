@@ -3164,7 +3164,9 @@ function filtrarUrgentes(q){
   document.querySelectorAll('#urgentes-lista [data-tel]').forEach(card=>{
     const coincide = !q || card.dataset.tel.includes(q) || card.dataset.dni.includes(q);
     card.style.display = coincide ? '' : 'none';
+    if(!coincide){ const c=card.querySelector('.urg-check'); if(c) c.checked=false; }
   });
+  if(typeof actualizarBulkUrgentes==='function') actualizarBulkUrgentes();
 }
 
 // ═══════════════════════════ CONFIGURACIÓN — ZONA DE REINICIO ═══════════════════════════
@@ -3988,9 +3990,33 @@ async function guardarGasto(){
   } catch(e){ toast('Error registrando gasto: '+e.message); }
 }
 
+function urgSeleccionarTodos(on){
+  document.querySelectorAll('.urg-check').forEach(c=>{ if(c.closest('.card').style.display!=='none') c.checked=on; });
+  actualizarBulkUrgentes();
+}
+let urgData = {};
+async function urgImprimirEtiquetas(){
+  const ids=[...document.querySelectorAll('.urg-check:checked')].map(c=>c.dataset.id);
+  if(!ids.length){ toast('Selecciona al menos una clienta'); return; }
+  const lista=ids.map(id=>urgData[id]).filter(Boolean);
+  const carritoIds=lista.map(x=>x.ped.carrito_id).filter(Boolean);
+  let items=[];
+  try{ if(carritoIds.length) items=await dbGet(`carrito_items?carrito_id=in.(${carritoIds.join(',')})&estado_bolsa=neq.eliminado&select=carrito_id`); }
+  catch(e){ toast('Error: '+e.message); return; }
+  const peds=lista.map(({cl,ped})=>{
+    const n=items.filter(i=>i.carrito_id===ped.carrito_id).length;
+    return {id:ped.id, codigo:ped.numero, cli:{...cl, tipo_envio_preferido:cl.tipo_envio_preferido||ped.tipo_envio||''}, usuario_wa:'', etiqueta_en:ped.etiqueta_en||null, peru:true, items:Array.from({length:n||1},()=>({cantidad:1})), tieneDatos:true};
+  });
+  brEtqMostrar(peds,true);
+}
 function actualizarBulkUrgentes(){
   const checks = document.querySelectorAll('.urg-check:checked');
   const bar = document.getElementById('urgentes-bulk-bar');
+  if(!bar) return;
+  const vis=[...document.querySelectorAll('.urg-check')].filter(c=>c.closest('.card').style.display!=='none');
+  const all=document.getElementById('urg-all'); if(all) all.checked = vis.length>0 && vis.every(c=>c.checked);
+  const nEmp=[...checks].filter(c=>c.dataset.estado==='empaquetado').length;
+  const bd=document.getElementById('urg-btn-desp'); if(bd) bd.textContent='🚚 Registrar despacho ('+nEmp+' empaquetado'+(nEmp!==1?'s':'')+')';
   if(checks.length>0){
     bar.style.display='flex';
     document.getElementById('urgentes-bulk-count').textContent = checks.length+' pedido'+(checks.length!==1?'s':'')+' seleccionado'+(checks.length!==1?'s':'');
@@ -4000,8 +4026,11 @@ function actualizarBulkUrgentes(){
 }
 
 async function bulkRegistrarDespacho(){
-  const ids = [...document.querySelectorAll('.urg-check:checked')].map(c=>c.dataset.id);
-  if(!ids.length) return;
+  const marcados = [...document.querySelectorAll('.urg-check:checked')];
+  const ids = marcados.filter(c=>c.dataset.estado==='empaquetado').map(c=>c.dataset.id);
+  const ign = marcados.length-ids.length;
+  if(!ids.length){ toast('Ninguna de las seleccionadas está en Empaquetado'); return; }
+  if(ign) toast('ℹ️ '+ign+' seleccionada'+(ign!==1?'s':'')+' no está'+(ign!==1?'n':'')+' empaquetada'+(ign!==1?'s':'')+' y se ignora'+(ign!==1?'n':''));
 
   // Pre-ventas pendientes entre los seleccionados — mismo criterio que en Despacho
   const pedidosSel = await dbGet(`pedidos?id=in.(${ids.join(',')})&select=id,carrito_id`);
@@ -4085,9 +4114,12 @@ async function loadUrgentes(){
       return;
     }
 
-    document.getElementById('urgentes-lista').innerHTML = `<div id="urgentes-bulk-bar" style="display:none;position:sticky;top:0;z-index:5;background:var(--primary);color:#fff;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:10px">
+    urgData = {};
+    document.getElementById('urgentes-lista').innerHTML = `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;margin:0 0 8px 2px;cursor:pointer"><input type="checkbox" id="urg-all" onchange="urgSeleccionarTodos(this.checked)" style="width:16px;height:16px;cursor:pointer"> Seleccionar todos</label>
+      <div id="urgentes-bulk-bar" style="display:none;position:sticky;top:0;z-index:5;background:var(--primary);color:#fff;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:10px">
         <span id="urgentes-bulk-count" style="font-size:12.5px;font-weight:500"></span>
-        <button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="bulkRegistrarDespacho()">🚚 Registrar despacho a los seleccionados</button>
+        <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm" style="background:#fff;color:var(--primary)" onclick="urgImprimirEtiquetas()">🏷️ Imprimir etiquetas</button>
+        <button class="btn btn-sm" id="urg-btn-desp" style="background:#fff;color:var(--primary)" onclick="bulkRegistrarDespacho()">🚚 Registrar despacho</button></span>
       </div>` + rows.map(({cl,ped})=>{
       const mins = Math.floor((Date.now()-new Date(cl.envio_urgente_en).getTime())/60000);
       const tiempo = mins<60 ? `hace ${mins} min` : mins<1440 ? `hace ${Math.floor(mins/60)}h` : `hace ${Math.floor(mins/1440)}d`;
@@ -4129,14 +4161,15 @@ async function loadUrgentes(){
         estadoLbl = ped.estado; accion='';
       }
 
+      urgData[ped.id]={cl,ped};
       return `<div class="card" data-tel="${(cl.telefono||'').toLowerCase()}" data-dni="${(cl.dni||'').toLowerCase()}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:10px">
-          ${ped.estado==='empaquetado'?`<input type="checkbox" class="urg-check" data-id="${ped.id}" onchange="actualizarBulkUrgentes()" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">`:''}
+          <input type="checkbox" class="urg-check" data-id="${ped.id}" data-estado="${ped.estado}" onchange="actualizarBulkUrgentes()" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">
           <div>
             <div style="font-weight:600;font-size:13.5px">${cl.nombre} <span style="font-weight:400;color:var(--text3);font-size:11.5px">· solicitado ${tiempo}</span></div>
             <div style="font-size:12px;color:var(--text2)">📱 ${cl.telefono} · 🪪 DNI ${cl.dni||'—'} · Talla ${cl.talla||'—'}</div>
             <div style="font-size:12px;color:var(--text2)">${etiqueta}</div>
-            <div style="font-size:11.5px;color:var(--text3);margin-top:2px">Pedido ${ped.numero||'(sin generar)'} · <strong>${estadoLbl}</strong></div>
+            <div style="font-size:11.5px;color:var(--text3);margin-top:2px">Pedido ${ped.numero||'(sin generar)'} · <strong>${estadoLbl}</strong> · ${ped.etiqueta_en?'<span style="color:var(--green)">🏷 impresa</span>':'<span>sin imprimir</span>'}</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -9058,7 +9091,7 @@ async function brEtqMarcar(){
     brEtqItems.forEach(x=>{ x.p.etiqueta_en = ahora; if(x.p.peru){ const o=despachoActual.find(q=>q.id===x.p.id); if(o) o.etiqueta_en=ahora; } });
     closeModal('modal-br-etq'); toast('✓ Marcadas como impresas');
     if(idsBr.length) brEnvRender();
-    if(idsPe.length) renderDespachoListas();
+    if(idsPe.length){ try{ renderDespachoListas(); }catch(e){} if(document.getElementById('pg-urgentes')?.classList.contains('active')) loadUrgentes(); }
   } catch(e){ toast('Error: '+e.message); }
 }
 
