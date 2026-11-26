@@ -2573,7 +2573,7 @@ function empRender(){
       const talla=lvrEsc(it.talla||'—'), color=lvrEsc(it.color||'—');
       if(empTab==='por'){
         const btn = it.preventa
-          ? `<span class="badge badge-warn" title="Aún no llega la mercadería">⏳ Pre-venta</span>`
+          ? `<span class="badge badge-warn" title="Aún no llega la mercadería">⏳ Pre-venta</span>${(currentUser&&currentUser.rol!=='trabajador'&&it.estado_pago!=='confirmado')?` <button class="btn btn-xs" title="Cambiar por la misma prenda de otra clienta que sí tiene stock" onclick="empIntercambiar('${it.id}')">⇄ Intercambiar</button>`:''}`
           : `<button class="btn btn-sm btn-success" onclick="empMeter('${it.id}',true)">📦 A la bolsa</button>`;
         return `<div class="emp-row"><div class="emp-c-n"><strong>${nom}</strong><small>registrada ${empFmtFecha(it.agregado_en)}</small></div><div class="emp-c-t">${talla}</div><div class="emp-c-c">${color}</div><div class="emp-c-p">S/ ${it.precio_unitario}</div><div class="emp-c-b">${btn}</div></div>`;
       }
@@ -2603,6 +2603,30 @@ async function empMeter(itemId, enBolsa){
     Object.assign(it,patch);
     empRender();
   } catch(e){ toast('Error: '+e.message); }
+}
+async function empIntercambiar(itemId){
+  if(!currentUser||currentUser.rol==='trabajador') return;
+  let a=null, ga=null;
+  empData.forEach(g=>g.items.forEach(x=>{ if(x.id===itemId){ a=x; ga=g; } }));
+  if(!a) return;
+  const key=x=>[x.prendas?.codigo||x.prendas?.nombre||'',x.talla||'',x.color||'',Number(x.precio_unitario)].join('|');
+  const cand=[];
+  empData.forEach(g=>{ if(g.pedido.id===ga.pedido.id) return;
+    g.items.forEach(x=>{ if(!x.preventa && x.estado_bolsa==='sin_agregar' && x.estado_pago!=='confirmado' && !(x.monto_pagado>0) && key(x)===key(a)) cand.push({x,g}); }); });
+  if(!cand.length){ toast('No hay otra clienta con esta misma prenda (talla, color y precio) con stock y sin pagar'); return; }
+  let el=cand[0];
+  if(cand.length>1){
+    const n=prompt('¿Con cuál clienta intercambias?\n\n'+cand.map((c,i)=>(i+1)+') '+(c.g.cliente.nombre||'Sin nombre')+' · '+(c.g.cliente.telefono||'')).join('\n')+'\n\nEscribe el número:');
+    if(n===null) return; el=cand[parseInt(n)-1]; if(!el){ toast('Número no válido'); return; }
+  }
+  const nom=a.prendas?.nombre||'Prenda';
+  if(!confirm(`¿Intercambiar ${nom} (${a.talla||''} ${a.color||''})?\n\n• ${ga.cliente.nombre||'Sin nombre'} (pre-venta) recibirá la prenda CON stock de ${el.g.cliente.nombre||'Sin nombre'}.\n• ${el.g.cliente.nombre||'Sin nombre'} pasará a pre-venta con esta.\n\nNo cambia el stock ni los totales (ambas S/ ${a.precio_unitario}).`)) return;
+  try{
+    await dbPatch(`carrito_items?id=eq.${a.id}&estado_pago=neq.confirmado`,{carrito_id:el.x.carrito_id});
+    await dbPatch(`carrito_items?id=eq.${el.x.id}&estado_pago=neq.confirmado`,{carrito_id:a.carrito_id});
+    toast('✓ Intercambio hecho');
+    loadEmpaquetado();
+  }catch(e){ toast('Error: '+e.message); }
 }
 async function empMeterTodo(pedidoId){
   const g=empData.find(x=>x.pedido.id===pedidoId); if(!g) return;
