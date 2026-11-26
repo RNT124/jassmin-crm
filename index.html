@@ -201,6 +201,46 @@ td.empty-state{padding:20px;text-align:center}
 .live-panel{display:grid;grid-template-columns:minmax(260px,.75fr) minmax(0,1.75fr);gap:14px}
 @media (max-width:860px){.live-panel{grid-template-columns:1fr}}
 /* Registro live: filas de prendas */
+
+.vt-bar{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;background:var(--gray-light);border-radius:var(--radius);padding:12px;margin-bottom:14px}
+.vt-bar-l{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text2);font-weight:600}
+.vt-bar-l input{padding:7px 9px;font-size:13px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:#fff;min-width:0}
+.vt-bar-l:has(button) input{display:inline-block}
+.vt-sec{font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:22px 0 10px}
+.vt-hero{background:linear-gradient(135deg,var(--pink-light),#fff);border:1px solid var(--pink-mid);border-radius:14px;padding:18px;margin-bottom:14px}
+.vt-hero-top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.vt-big{font-size:34px;font-weight:700;line-height:1;color:var(--text)}
+.vt-big small{font-size:13px;font-weight:500;color:var(--text2)}
+.vt-pct{font-size:30px;font-weight:700;color:var(--pink-dark)}
+.vt-prog{height:16px;background:#fff;border:1px solid var(--pink-mid);border-radius:99px;overflow:hidden;margin:14px 0 8px}
+.vt-prog>div{height:100%;background:linear-gradient(90deg,var(--pink),var(--pink-dark));border-radius:99px;transition:width .5s}
+.vt-prog.ok>div{background:linear-gradient(90deg,#3aa76d,#1f7a4a)}
+.vt-hint{font-size:12px;color:var(--text2)}
+.vt-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.vt-kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:13px}
+.vt-kpi b{display:block;font-size:21px;font-weight:700;line-height:1.1}
+.vt-kpi span{font-size:11px;color:var(--text2)}
+.vt-kpi em{display:block;font-style:normal;font-size:11px;margin-top:4px;font-weight:600}
+.vt-up{color:#1f7a4a}.vt-down{color:#c0392b}
+.vt-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px}
+.vt-card h4{margin:0 0 10px;font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+.vt-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.vt-cols{grid-template-columns:1fr}}
+.vt-chart{display:flex;align-items:flex-end;gap:4px;height:130px;position:relative;padding-top:6px}
+.vt-chart .c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.vt-chart .b{width:100%;max-width:34px;background:var(--gray-mid);border-radius:4px 4px 0 0;min-height:2px}
+.vt-chart .b.cur{background:var(--pink)}
+.vt-chart .l{font-size:9.5px;color:var(--text3);margin-top:4px;white-space:nowrap}
+.vt-chart .v{font-size:9px;color:var(--text2);margin-bottom:2px;white-space:nowrap}
+.vt-meta-line{position:absolute;left:0;right:0;border-top:1.5px dashed var(--pink-dark)}
+.vt-meta-line span{position:absolute;right:0;top:-15px;font-size:10px;color:var(--pink-dark);font-weight:600;background:#fff;padding:0 3px}
+.vt-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.vt-tbl td,.vt-tbl th{padding:6px 4px;border-bottom:1px solid var(--border);text-align:left}
+.vt-tbl th{font-size:10.5px;color:var(--text3);text-transform:uppercase}
+.vt-tbl td.n,.vt-tbl th.n{text-align:right;white-space:nowrap}
+.vt-hr{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:6px}
+.vt-hr i{flex:1;height:8px;background:var(--gray-light);border-radius:99px;overflow:hidden}
+.vt-hr i b{display:block;height:100%;background:var(--pink);border-radius:99px}
 .lvr-head{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
 .lvr-hint{font-size:11.5px;color:var(--text3)}
 .lvr-cols,.lvr-row{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1.4fr) minmax(0,1.4fr) 56px 66px 24px;gap:8px;align-items:center}
@@ -975,6 +1015,23 @@ td.empty-state{padding:20px;text-align:center}
         <div class="tabs" style="margin-bottom:14px">
           <div class="tab active" id="db-tab-btn-operacion" onclick="setDashboardTab('operacion')">📋 Pedidos / Operación</div>
           <div class="tab" id="db-tab-btn-finanzas" onclick="setDashboardTab('finanzas')">💰 Inventario / Finanzas</div>
+          <div class="tab" id="db-tab-btn-ventas" style="display:none" onclick="setDashboardTab('ventas')">📈 Ventas y meta</div>
+        </div>
+
+        <!-- ═══ TAB: VENTAS Y META (solo admin) ═══ -->
+        <div id="db-tab-ventas" style="display:none">
+          <div class="vt-bar">
+            <div class="vt-bar-l"><label>Mes</label><input type="month" id="vt-mes" onchange="vtCambiarMes()"></div>
+            <div class="vt-bar-l"><label>Meta del mes (S/)</label><input type="number" id="vt-meta" min="0" step="100" placeholder="Ej: 30000" onkeydown="if(event.key==='Enter')vtGuardarMeta()"><button class="btn btn-primary btn-sm" onclick="vtGuardarMeta()">Guardar meta</button></div>
+          </div>
+          <div id="vt-cuerpo"><div class="loading">Cargando...</div></div>
+          <div class="vt-sec">🎙️ Ventas de un live</div>
+          <div class="vt-bar">
+            <div class="vt-bar-l"><label>Desde</label><input type="datetime-local" id="vt-live-d"></div>
+            <div class="vt-bar-l"><label>Hasta</label><input type="datetime-local" id="vt-live-h"></div>
+            <div class="vt-bar-l"><label>&nbsp;</label><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="vtLive()">Ver ventas</button><button class="btn btn-sm" onclick="vtLivePreset('hoy')">Hoy</button><button class="btn btn-sm" onclick="vtLivePreset('noche')">Hoy desde las 6 pm</button><button class="btn btn-sm" onclick="vtLivePreset('ayer')">Ayer</button></span></div>
+          </div>
+          <div id="vt-live"><div class="text-hint text-sm">Elige fecha y hora de inicio y fin y toca "Ver ventas".</div></div>
         </div>
 
         <!-- ═══ TAB 1: OPERACIÓN ═══ -->
@@ -2344,6 +2401,7 @@ async function doLogin(){
   if(currentUser.rol!=='admin' && currentUser.key!=='micaela') document.getElementById('sb-item-brasil').style.display='none';
   if(currentUser.rol!=='admin') document.getElementById('sb-admin-section').style.display='none';
   if(currentUser.rol==='trabajador') document.getElementById('sb-item-dashboard').style.display='none';
+  { const _b=document.getElementById('db-tab-btn-ventas'); if(_b) _b.style.display = currentUser.rol==='admin' ? '' : 'none'; }
   if(currentUser.rol==='trabajador') document.getElementById('btn-nuevo-corte').style.display='none';
   if(currentUser.rol==='operador') document.getElementById('sb-item-asistencia').style.display='none';
   if(currentUser.rol==='operador') document.getElementById('sb-item-inventario').style.display='none';
@@ -2728,9 +2786,169 @@ async function loadDashboard(){
   } catch(e){ console.error('Dashboard error:',e); }
 }
 
+
+// ═══════════════ DASHBOARD · VENTAS Y META (solo admin) ═══════════════
+let VT = {items:[], meta:{}, desde:null, listo:false};
+const vtS = n => 'S/ '+Math.round(n||0).toLocaleString('es-PE');
+const vtMesKey = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const vtMesNom = k => { const [y,m]=k.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('es-PE',{month:'long',year:'numeric'}); };
+const vtMesCorto = k => { const [y,m]=k.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('es-PE',{month:'short'}).replace('.',''); };
+const vtEsc = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function vtLocalInput(d){ const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); }
+async function vtPaginar(base){
+  const out=[]; const N=1000;
+  for(let off=0; off<200000; off+=N){
+    const r=await dbGet(`${base}&order=agregado_en.asc,id.asc&limit=${N}&offset=${off}`);
+    out.push(...r); if(r.length<N) break;
+  }
+  return out;
+}
+async function vtInit(){
+  if(!currentUser || currentUser.rol!=='admin') return;
+  const m=document.getElementById('vt-mes');
+  if(!m.value) m.value=vtMesKey(new Date());
+  if(!document.getElementById('vt-live-d').value) vtLivePreset('hoy',true);
+  await vtCargar();
+}
+async function vtCargar(){
+  const cuerpo=document.getElementById('vt-cuerpo');
+  try{
+    const hoy=new Date();
+    const desde=new Date(hoy.getFullYear(),hoy.getMonth()-12,1);
+    const sel='id,agregado_en,precio_unitario,monto_pagado,estado_pago,carrito_id,prenda_id,prendas(nombre),carritos(cliente_id,clientes(nombre,telefono))';
+    VT.items = await vtPaginar(`carrito_items?agregado_en=gte.${desde.toISOString()}&estado_bolsa=neq.eliminado&select=${sel}`);
+    VT.items.forEach(it=>{ it._d=new Date(it.agregado_en); it._cli=it.carritos?.cliente_id||it.carrito_id; it._nom=it.carritos?.clientes?.nombre||it.carritos?.clientes?.telefono||'Sin nombre'; });
+    const metas=await dbGet('metas_mensuales?select=mes,meta'); VT.meta={}; metas.forEach(x=>VT.meta[x.mes]=Number(x.meta)||0);
+    VT.listo=true; vtRender();
+  }catch(e){ cuerpo.innerHTML='<div class="text-hint">Error: '+vtEsc(e.message)+'</div>'; }
+}
+function vtCambiarMes(){ if(VT.listo) vtRender(); }
+async function vtGuardarMeta(){
+  const mes=document.getElementById('vt-mes').value; const v=parseFloat(document.getElementById('vt-meta').value);
+  if(!mes||isNaN(v)||v<0){ toast('Escribe una meta válida'); return; }
+  try{
+    await supaFetch('metas_mensuales?on_conflict=mes','POST',JSON.stringify({mes,meta:v,actualizado_en:new Date().toISOString()}),'resolution=merge-duplicates,return=representation');
+    VT.meta[mes]=v; toast('✓ Meta de '+vtMesNom(mes)+': '+vtS(v)); vtRender();
+  }catch(e){ toast('Error: '+e.message); }
+}
+function vtAgrupa(items){
+  const clis=new Set(); let tot=0,pag=0;
+  items.forEach(i=>{ tot+=i.precio_unitario||0; pag+=i.monto_pagado||0; clis.add(i._cli); });
+  return {tot,pag,n:items.length,clis:clis.size};
+}
+function vtDelta(a,b){
+  if(!b) return '';
+  const p=(a-b)/b*100; const up=p>=0;
+  return `<em class="${up?'vt-up':'vt-down'}">${up?'▲':'▼'} ${Math.abs(p).toFixed(0)}% vs mes anterior</em>`;
+}
+function vtRender(){
+  const mes=document.getElementById('vt-mes').value||vtMesKey(new Date());
+  const [Y,M]=mes.split('-').map(Number);
+  const items=VT.items.filter(i=>vtMesKey(i._d)===mes);
+  const prevKey=vtMesKey(new Date(Y,M-2,1));
+  const prev=vtAgrupa(VT.items.filter(i=>vtMesKey(i._d)===prevKey));
+  const a=vtAgrupa(items);
+  const meta=VT.meta[mes]||0;
+  const inp=document.getElementById('vt-meta'); if(document.activeElement!==inp) inp.value=meta||'';
+  const hoy=new Date(); const esActual=vtMesKey(hoy)===mes;
+  const diasMes=new Date(Y,M,0).getDate();
+  const diaHoy=esActual?hoy.getDate():(new Date(Y,M-1,1)>hoy?0:diasMes);
+  const diasRest=esActual?diasMes-diaHoy:0;
+  const pct=meta?a.tot/meta*100:0;
+  const falta=Math.max(meta-a.tot,0);
+  const proy=(esActual&&diaHoy>0)?a.tot/diaHoy*diasMes:null;
+  const porDia=(esActual&&diasRest>0)?falta/diasRest:null;
+  // hero
+  let hero;
+  if(meta){
+    hero=`<div class="vt-hero"><div class="vt-hero-top"><div><div class="vt-hint">Vendido en ${vtMesNom(mes)}</div><div class="vt-big">${vtS(a.tot)} <small>de ${vtS(meta)}</small></div></div><div class="vt-pct">${pct.toFixed(1)}%</div></div>
+      <div class="vt-prog ${pct>=100?'ok':''}"><div style="width:${Math.min(pct,100)}%"></div></div>
+      <div class="vt-hint">${pct>=100?'🎉 ¡Meta cumplida! Superaste por '+vtS(a.tot-meta):'Faltan <b>'+vtS(falta)+'</b> para la meta'}${esActual&&diasRest>0&&pct<100?` · quedan ${diasRest} días · necesitas <b>${vtS(porDia)}</b> por día`:''}${esActual&&diasRest===0&&pct<100?' · último día del mes':''}</div>
+      ${proy!==null?`<div class="vt-hint" style="margin-top:4px">Proyección a fin de mes (al ritmo actual): <b>${vtS(proy)}</b> (${(proy/meta*100).toFixed(0)}% de la meta)</div>`:''}</div>`;
+  } else {
+    hero=`<div class="vt-hero"><div class="vt-big">${vtS(a.tot)} <small>vendido en ${vtMesNom(mes)}</small></div><div class="vt-hint" style="margin-top:8px">Escribe tu meta del mes arriba y toca "Guardar meta" para ver el % de cumplimiento.</div></div>`;
+  }
+  // kpis
+  const ticket=a.clis?a.tot/a.clis:0, ticketP=prev.clis?prev.tot/prev.clis:0;
+  const cobr=a.tot?a.pag/a.tot*100:0;
+  const kpis=`<div class="vt-kpis">
+    <div class="vt-kpi"><span>Total vendido</span><b>${vtS(a.tot)}</b>${vtDelta(a.tot,prev.tot)}</div>
+    <div class="vt-kpi"><span>Prendas vendidas</span><b>${a.n}</b>${vtDelta(a.n,prev.n)}</div>
+    <div class="vt-kpi"><span>Clientas que compraron</span><b>${a.clis}</b>${vtDelta(a.clis,prev.clis)}</div>
+    <div class="vt-kpi"><span>Ticket promedio por clienta</span><b>${vtS(ticket)}</b>${vtDelta(ticket,ticketP)}</div>
+    <div class="vt-kpi"><span>Cobrado</span><b>${vtS(a.pag)}</b><em>${cobr.toFixed(0)}% de lo vendido</em></div>
+    <div class="vt-kpi"><span>Por cobrar</span><b>${vtS(Math.max(a.tot-a.pag,0))}</b></div>
+  </div>`;
+  // meses (12)
+  const meses=[]; for(let i=11;i>=0;i--) meses.push(vtMesKey(new Date(Y,M-1-i,1)));
+  const porMes={}; VT.items.forEach(i=>{ const k=vtMesKey(i._d); porMes[k]=(porMes[k]||0)+(i.precio_unitario||0); });
+  const mxM=Math.max(...meses.map(k=>porMes[k]||0),meta,1);
+  const chartM=`<div class="vt-chart">${meta?`<div class="vt-meta-line" style="bottom:calc(${meta/mxM*100}% * .78 + 22px)"><span>meta ${vtS(meta)}</span></div>`:''}${meses.map(k=>{ const v=porMes[k]||0; return `<div class="c"><div class="v">${v?Math.round(v/1000*10)/10+'k':''}</div><div class="b ${k===mes?'cur':''}" style="height:${Math.max(v/mxM*78,v?2:0)}%" title="${vtMesNom(k)}: ${vtS(v)}"></div><div class="l">${vtMesCorto(k)}</div></div>`; }).join('')}</div>`;
+  // dias
+  const porDiaV=Array(diasMes).fill(0); items.forEach(i=>porDiaV[i._d.getDate()-1]+=(i.precio_unitario||0));
+  const mxD=Math.max(...porDiaV,1);
+  const metaDia=meta?meta/diasMes:0;
+  const chartD=`<div class="vt-chart" style="gap:2px">${porDiaV.map((v,i)=>`<div class="c"><div class="b ${esActual&&i+1===diaHoy?'cur':''}" style="height:${Math.max(v/mxD*88,v?2:0)}%" title="Día ${i+1}: ${vtS(v)}"></div>${(i+1)%5===0||i===0?`<div class="l">${i+1}</div>`:'<div class="l">&nbsp;</div>'}</div>`).join('')}</div>`;
+  // mejor día / hora
+  let mejorDia=null; porDiaV.forEach((v,i)=>{ if(v>0&&(!mejorDia||v>mejorDia.v)) mejorDia={d:i+1,v}; });
+  const dSem=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']; const porSem=Array(7).fill(0); items.forEach(i=>porSem[i._d.getDay()]+=(i.precio_unitario||0));
+  const mxS=Math.max(...porSem,1);
+  const porHora=Array(24).fill(0); items.forEach(i=>porHora[i._d.getHours()]+=(i.precio_unitario||0));
+  const topH=porHora.map((v,h)=>({h,v})).filter(x=>x.v>0).sort((x,y)=>y.v-x.v).slice(0,5); const mxH=Math.max(...topH.map(x=>x.v),1);
+  const fh=h=>{ const x=h%12||12; return x+(h<12?' am':' pm'); };
+  // top prendas y clientas
+  const pp={}; items.forEach(i=>{ const k=i.prenda_id; (pp[k]=pp[k]||{n:i.prendas?.nombre||'(sin nombre)',u:0,v:0}); pp[k].u++; pp[k].v+=i.precio_unitario||0; });
+  const topP=Object.values(pp).sort((x,y)=>y.v-x.v).slice(0,8);
+  const cc={}; items.forEach(i=>{ (cc[i._cli]=cc[i._cli]||{n:i._nom,u:0,v:0}); cc[i._cli].u++; cc[i._cli].v+=i.precio_unitario||0; });
+  const topC=Object.values(cc).sort((x,y)=>y.v-x.v).slice(0,8);
+  const tbl=(rows,h1)=>`<table class="vt-tbl"><tr><th>${h1}</th><th class="n">Und</th><th class="n">Monto</th></tr>${rows.map(r=>`<tr><td>${vtEsc(r.n)}</td><td class="n">${r.u}</td><td class="n">${vtS(r.v)}</td></tr>`).join('')||'<tr><td colspan="3" class="text-hint">Sin ventas</td></tr>'}</table>`;
+  document.getElementById('vt-cuerpo').innerHTML = hero + kpis +
+    `<div class="vt-cols"><div class="vt-card"><h4>Ventas por mes (últimos 12)</h4>${chartM}</div><div class="vt-card"><h4>Ventas por día — ${vtMesNom(mes)}</h4>${chartD}${metaDia?`<div class="vt-hint" style="margin-top:6px">Meta diaria promedio: ${vtS(metaDia)}</div>`:''}</div></div>`+
+    `<div class="vt-cols"><div class="vt-card"><h4>Mejor momento de venta</h4>${mejorDia?`<div class="vt-hint" style="margin-bottom:8px">Mejor día del mes: <b>${mejorDia.d}</b> (${vtS(mejorDia.v)})</div>`:''}
+      <div class="vt-hint" style="margin:6px 0 4px"><b>Por día de la semana</b></div>${dSem.map((n,i)=>`<div class="vt-hr"><span style="width:78px">${n}</span><i><b style="width:${porSem[i]/mxS*100}%"></b></i><span style="width:70px;text-align:right">${vtS(porSem[i])}</span></div>`).join('')}
+      <div class="vt-hint" style="margin:10px 0 4px"><b>Mejores horas</b> <span style="font-weight:400">(según la hora en que registras)</span></div>${topH.map(x=>`<div class="vt-hr"><span style="width:78px">${fh(x.h)}</span><i><b style="width:${x.v/mxH*100}%"></b></i><span style="width:70px;text-align:right">${vtS(x.v)}</span></div>`).join('')||'<div class="text-hint text-sm">Sin ventas</div>'}</div>
+     <div><div class="vt-card"><h4>Prendas más vendidas del mes</h4>${tbl(topP,'Prenda')}</div><div class="vt-card"><h4>Mejores clientas del mes</h4>${tbl(topC,'Clienta')}</div></div></div>`;
+}
+function vtLivePreset(k,silencio){
+  const n=new Date(); const d=new Date(n); let h=new Date(n);
+  if(k==='hoy'){ d.setHours(0,0,0,0); }
+  else if(k==='noche'){ d.setHours(18,0,0,0); }
+  else if(k==='ayer'){ d.setDate(d.getDate()-1); d.setHours(0,0,0,0); h=new Date(d); h.setHours(23,59,0,0); }
+  document.getElementById('vt-live-d').value=vtLocalInput(d); document.getElementById('vt-live-h').value=vtLocalInput(h);
+  if(!silencio) vtLive();
+}
+async function vtLive(){
+  const box=document.getElementById('vt-live');
+  const d=new Date(document.getElementById('vt-live-d').value), h=new Date(document.getElementById('vt-live-h').value);
+  if(isNaN(d)||isNaN(h)||h<=d){ toast('Revisa las fechas: "Hasta" debe ser posterior a "Desde"'); return; }
+  box.innerHTML='<div class="loading">Cargando...</div>';
+  try{
+    const sel='id,agregado_en,precio_unitario,monto_pagado,carrito_id,prenda_id,talla,color,prendas(nombre),carritos(cliente_id,clientes(nombre,telefono))';
+    const its=await vtPaginar(`carrito_items?agregado_en=gte.${d.toISOString()}&agregado_en=lt.${h.toISOString()}&estado_bolsa=neq.eliminado&select=${sel}`);
+    its.forEach(i=>{ i._cli=i.carritos?.cliente_id||i.carrito_id; i._nom=i.carritos?.clientes?.nombre||i.carritos?.clientes?.telefono||'Sin nombre'; });
+    const a=vtAgrupa(its);
+    const pp={}; its.forEach(i=>{ const k=i.prenda_id; (pp[k]=pp[k]||{n:i.prendas?.nombre||'(sin nombre)',u:0,v:0}); pp[k].u++; pp[k].v+=i.precio_unitario||0; });
+    const topP=Object.values(pp).sort((x,y)=>y.v-x.v);
+    const cc={}; its.forEach(i=>{ (cc[i._cli]=cc[i._cli]||{n:i._nom,u:0,v:0}); cc[i._cli].u++; cc[i._cli].v+=i.precio_unitario||0; });
+    const topC=Object.values(cc).sort((x,y)=>y.v-x.v);
+    const tbl=(rows,h1)=>`<table class="vt-tbl"><tr><th>${h1}</th><th class="n">Und</th><th class="n">Monto</th></tr>${rows.map(r=>`<tr><td>${vtEsc(r.n)}</td><td class="n">${r.u}</td><td class="n">${vtS(r.v)}</td></tr>`).join('')||'<tr><td colspan="3" class="text-hint">Sin ventas en este rango</td></tr>'}</table>`;
+    box.innerHTML=`<div class="vt-kpis">
+      <div class="vt-kpi"><span>Vendido en el rango</span><b>${vtS(a.tot)}</b></div>
+      <div class="vt-kpi"><span>Prendas</span><b>${a.n}</b></div>
+      <div class="vt-kpi"><span>Clientas</span><b>${a.clis}</b></div>
+      <div class="vt-kpi"><span>Ticket por clienta</span><b>${vtS(a.clis?a.tot/a.clis:0)}</b></div>
+      <div class="vt-kpi"><span>Ya cobrado</span><b>${vtS(a.pag)}</b></div></div>
+      <div class="vt-hint" style="margin-bottom:8px">Del ${d.toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} al ${h.toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="vt-cols"><div class="vt-card"><h4>Prendas vendidas</h4>${tbl(topP,'Prenda')}</div><div class="vt-card"><h4>Por clienta</h4>${tbl(topC,'Clienta')}</div></div>`;
+  }catch(e){ box.innerHTML='<div class="text-hint">Error: '+vtEsc(e.message)+'</div>'; }
+}
+
 function setDashboardTab(tab){
   document.getElementById('db-tab-operacion').style.display = tab==='operacion'?'block':'none';
   document.getElementById('db-tab-finanzas').style.display = tab==='finanzas'?'block':'none';
+  const _vt=document.getElementById('db-tab-ventas'); if(_vt) _vt.style.display = tab==='ventas'?'block':'none';
+  const _vb=document.getElementById('db-tab-btn-ventas'); if(_vb) _vb.classList.toggle('active', tab==='ventas');
+  if(tab==='ventas') vtInit();
   document.getElementById('db-tab-btn-operacion').classList.toggle('active', tab==='operacion');
   document.getElementById('db-tab-btn-finanzas').classList.toggle('active', tab==='finanzas');
   if(tab==='finanzas'){ loadDashboardFinanzas(); loadConsultaVentas(); }
